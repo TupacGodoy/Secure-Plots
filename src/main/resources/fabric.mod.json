@@ -1,0 +1,41 @@
+{
+	"schemaVersion": 1,
+	"id": "secure-plots",
+	"version": "${version}",
+	"name": "Secure Plots",
+	"description": "This is an example description! Tell everyone what your mod is about!",
+	"authors": [
+		"Me!"
+	],
+	"contact": {
+		"homepage": "https://fabricmc.net/",
+		"sources": "https://github.com/FabricMC/fabric-example-mod"
+	},
+	"license": "CC0-1.0",
+	"icon": "assets/secure-plots/icon.png",
+	"environment": "*",
+	"entrypoints": {
+		"main": [
+			"com.zhilius.secureplots.SecurePlots"
+		],
+		"client": [
+			"com.zhilius.secureplots.SecurePlotsClient"
+		],
+		"fabric-datagen": [
+			"com.zhilius.secureplots.SecurePlotsDataGenerator"
+		]
+	},
+	"mixins": [
+		"secure-plots.mixins.json",
+		{
+			"config": "secure-plots.client.mixins.json",
+			"environment": "client"
+		}
+	],
+	"depends": {
+		"fabricloader": ">=0.18.4",
+		"minecraft": "~1.21.1",
+		"java": ">=21",
+		"fabric-api": "*"
+	}
+}
