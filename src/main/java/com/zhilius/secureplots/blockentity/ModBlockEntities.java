@@ -15,7 +15,14 @@ public class ModBlockEntities {
         PLOT_BLOCK_ENTITY = Registry.register(
                 Registries.BLOCK_ENTITY_TYPE,
                 Identifier.of(SecurePlots.MOD_ID, "plot_block_entity"),
-                BlockEntityType.Builder.create(PlotBlockEntity::new, ModBlocks.PLOT_BLOCK).build()
+                BlockEntityType.Builder.create(PlotBlockEntity::new,
+                        ModBlocks.BRONZE_PLOT_BLOCK,
+                        ModBlocks.IRON_PLOT_BLOCK,
+                        ModBlocks.GOLD_PLOT_BLOCK,
+                        ModBlocks.DIAMOND_PLOT_BLOCK,
+                        ModBlocks.NETHERITE_PLOT_BLOCK,
+                        ModBlocks.QUANTUM_PLOT_BLOCK
+                ).build()
         );
         SecurePlots.LOGGER.info("Registrando block entities de Secure Plots...");
     }

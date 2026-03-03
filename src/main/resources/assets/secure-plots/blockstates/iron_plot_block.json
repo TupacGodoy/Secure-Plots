@@ -1,0 +1,5 @@
+{
+  "variants": {
+    "": { "model": "secure-plots:block/iron_plot_block" }
+  }
+}

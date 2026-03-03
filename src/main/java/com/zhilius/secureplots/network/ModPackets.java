@@ -129,6 +129,12 @@ public class ModPackets {
                     }
                     data.setSize(nextSize);
                     manager.markDirty();
+
+                    // Replace the block in the world with the matching tier block
+                    net.minecraft.block.Block newBlock =
+                            com.zhilius.secureplots.block.ModBlocks.fromTier(nextSize.tier);
+                    serverWorld.setBlockState(pos, newBlock.getDefaultState());
+
                     player.sendMessage(
                             net.minecraft.text.Text
                                     .literal("Proteccion mejorada a " + nextSize.displayName + " (" + nextSize.radius
