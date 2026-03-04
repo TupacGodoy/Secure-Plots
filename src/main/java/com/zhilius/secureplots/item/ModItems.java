@@ -12,11 +12,10 @@ import net.fabricmc.fabric.api.itemgroup.v1.ItemGroupEvents;
 
 public class ModItems {
 
-    public static final Item PLOT_WAND = register("plot_wand",
-            new PlotWandItem(new Item.Settings()
+    public static final Item PLOT_blueprint = register("plot_blueprint",
+            new PlotblueprintItem(new Item.Settings()
                     .maxCount(1)
-                    .rarity(Rarity.UNCOMMON)
-            ));
+                    .rarity(Rarity.UNCOMMON)));
 
     private static Item register(String name, Item item) {
         return Registry.register(Registries.ITEM, Identifier.of(SecurePlots.MOD_ID, name), item);
@@ -26,13 +25,12 @@ public class ModItems {
         SecurePlots.LOGGER.info("Registrando items de Secure Plots...");
 
         ItemGroupEvents.modifyEntriesEvent(ItemGroups.FUNCTIONAL).register(entries -> {
-            entries.add(PLOT_WAND);
+            entries.add(PLOT_blueprint);
             entries.add(ModBlocks.BRONZE_PLOT_BLOCK.asItem());
-            entries.add(ModBlocks.IRON_PLOT_BLOCK.asItem());
+            entries.add(ModBlocks.emerald_PLOT_BLOCK.asItem());
             entries.add(ModBlocks.GOLD_PLOT_BLOCK.asItem());
             entries.add(ModBlocks.DIAMOND_PLOT_BLOCK.asItem());
             entries.add(ModBlocks.NETHERITE_PLOT_BLOCK.asItem());
-            entries.add(ModBlocks.QUANTUM_PLOT_BLOCK.asItem());
         });
     }
 }

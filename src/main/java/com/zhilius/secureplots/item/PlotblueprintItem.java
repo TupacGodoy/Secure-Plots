@@ -19,9 +19,9 @@ import net.minecraft.item.Item.TooltipContext;
 
 import java.util.List;
 
-public class PlotWandItem extends Item {
+public class PlotblueprintItem extends Item {
 
-    public PlotWandItem(Settings settings) {
+    public PlotblueprintItem(Settings settings) {
         super(settings);
     }
 
@@ -37,7 +37,8 @@ public class PlotWandItem extends Item {
 
             for (PlotData data : manager.getAllPlots()) {
                 if (!data.getOwnerId().equals(player.getUuid()) &&
-                    data.getRoleOf(player.getUuid()) == PlotData.Role.VISITOR) continue;
+                        data.getRoleOf(player.getUuid()) == PlotData.Role.VISITOR)
+                    continue;
 
                 double dist = playerPos.getSquaredDistance(data.getCenter());
                 if (dist < nearestDist && dist < 200 * 200) {
@@ -50,11 +51,18 @@ public class PlotWandItem extends Item {
                 // Send packet to show border and open info
                 ModPackets.sendShowPlotBorder(player, nearest);
                 player.sendMessage(Text.literal(""), false);
-                player.sendMessage(Text.literal("🗺 Plano de: " + nearest.getPlotName()).formatted(Formatting.GOLD, Formatting.BOLD), false);
-                player.sendMessage(Text.literal("  Tamaño: " + nearest.getSize().displayName + " (" + nearest.getSize().radius + "x" + nearest.getSize().radius + ")").formatted(Formatting.AQUA), false);
-                player.sendMessage(Text.literal("  Dueño: " + nearest.getOwnerName()).formatted(Formatting.WHITE), false);
+                player.sendMessage(Text.literal("🗺 Plano de: " + nearest.getPlotName()).formatted(Formatting.GOLD,
+                        Formatting.BOLD), false);
+                player.sendMessage(Text.literal("  Tamaño: " + nearest.getSize().displayName + " ("
+                        + nearest.getSize().radius + "x" + nearest.getSize().radius + ")").formatted(Formatting.AQUA),
+                        false);
+                player.sendMessage(Text.literal("  Dueño: " + nearest.getOwnerName()).formatted(Formatting.WHITE),
+                        false);
                 if (!nearest.hasRank()) {
-                    player.sendMessage(Text.literal("  Expira en: " + nearest.getDaysRemaining(world.getTime()) + " días").formatted(Formatting.YELLOW), false);
+                    player.sendMessage(
+                            Text.literal("  Expira en: " + nearest.getDaysRemaining(world.getTime()) + " días")
+                                    .formatted(Formatting.YELLOW),
+                            false);
                 } else {
                     player.sendMessage(Text.literal("  Permanente (con rango)").formatted(Formatting.GREEN), false);
                 }
@@ -63,14 +71,19 @@ public class PlotWandItem extends Item {
                 // Show all nearby plots as overview
                 List<PlotData> playerPlots = manager.getPlayerPlots(player.getUuid());
                 if (playerPlots.isEmpty()) {
-                    player.sendMessage(Text.literal("No tenés protecciones colocadas.").formatted(Formatting.RED), false);
+                    player.sendMessage(Text.literal("No tenés protecciones colocadas.").formatted(Formatting.RED),
+                            false);
                 } else {
                     player.sendMessage(Text.literal("Tus protecciones:").formatted(Formatting.GOLD), false);
                     for (PlotData plot : playerPlots) {
                         BlockPos c = plot.getCenter();
-                        player.sendMessage(Text.literal("  • " + plot.getPlotName() + " en " + c.getX() + ", " + c.getY() + ", " + c.getZ()).formatted(Formatting.WHITE), false);
+                        player.sendMessage(Text.literal(
+                                "  • " + plot.getPlotName() + " en " + c.getX() + ", " + c.getY() + ", " + c.getZ())
+                                .formatted(Formatting.WHITE), false);
                     }
-                    player.sendMessage(Text.literal("Acercate a una protección para ver sus límites.").formatted(Formatting.GRAY), false);
+                    player.sendMessage(
+                            Text.literal("Acercate a una protección para ver sus límites.").formatted(Formatting.GRAY),
+                            false);
                 }
             }
         }

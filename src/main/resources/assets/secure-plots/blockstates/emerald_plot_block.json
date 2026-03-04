@@ -1,0 +1,7 @@
+{
+    "variants": {
+        "": {
+            "model": "secure-plots:block/emerald_plot_block"
+        }
+    }
+}

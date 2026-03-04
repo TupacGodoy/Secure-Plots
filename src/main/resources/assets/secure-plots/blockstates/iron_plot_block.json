@@ -1,5 +1,7 @@
 {
   "variants": {
-    "": { "model": "secure-plots:block/iron_plot_block" }
+    "": {
+      "model": "secure-plots:block/emmerald_plot_block"
+    }
   }
 }

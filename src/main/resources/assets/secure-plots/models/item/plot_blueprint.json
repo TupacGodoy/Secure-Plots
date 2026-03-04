@@ -1,6 +1,6 @@
 {
   "parent": "minecraft:item/handheld",
   "textures": {
-    "layer0": "secure-plots:item/plot_wand"
+    "layer0": "secure-plots:item/plot_blueprint"
   }
 }

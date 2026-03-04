@@ -1,6 +1,6 @@
 {
   "parent": "minecraft:block/cube_all",
   "textures": {
-    "all": "secure-plots:block/iron_plot_block"
+    "all": "secure-plots:block/emerald_plot_block"
   }
 }

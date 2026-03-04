@@ -1,9 +1,8 @@
 {
   "block.secure-plots.bronze_plot_block": "Bloque de Parcela de Bronce",
-  "block.secure-plots.iron_plot_block": "Bloque de Parcela de Hierro",
+  "block.secure-plots.emerald_plot_block": "Bloque de Parcela de Esmeralda",
   "block.secure-plots.gold_plot_block": "Bloque de Parcela de Oro",
   "block.secure-plots.diamond_plot_block": "Bloque de Parcela de Diamante",
   "block.secure-plots.netherite_plot_block": "Bloque de Parcela de Netherite",
-  "block.secure-plots.quantum_plot_block": "Bloque de Parcela Cuántico",
-  "item.secure-plots.plot_wand": "Varita de Parcela"
+  "item.secure-plots.plot_blueprint": "Plano de Parcela"
 }
