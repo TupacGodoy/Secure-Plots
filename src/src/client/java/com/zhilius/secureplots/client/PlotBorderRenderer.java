@@ -17,11 +17,11 @@ public class PlotBorderRenderer {
     private static final Random RAND = new Random();
 
     // { r_core, g_core, b_core,  r_glow, g_glow, b_glow,  r_white, g_white, b_white }
-    // tier 0=bronze  1=gold  2=emerald  3=diamond  4=netherite
+    // tier 0=bronze  1=emerald  2=gold  3=diamond  4=netherite
     private static final float[][] TIER_COLORS = {
         { 1.00f, 0.55f, 0.05f,   0.70f, 0.28f, 0.00f,   1.00f, 0.88f, 0.55f }, // bronze
-        { 1.00f, 0.85f, 0.00f,   0.80f, 0.50f, 0.00f,   1.00f, 0.97f, 0.65f }, // gold
         { 0.10f, 0.90f, 0.20f,   0.00f, 0.55f, 0.10f,   0.70f, 1.00f, 0.75f }, // emerald
+        { 1.00f, 0.85f, 0.00f,   0.80f, 0.50f, 0.00f,   1.00f, 0.97f, 0.65f }, // gold
         { 0.15f, 0.95f, 1.00f,   0.00f, 0.50f, 0.80f,   0.75f, 1.00f, 1.00f }, // diamond
         { 0.45f, 0.20f, 0.60f,   0.22f, 0.05f, 0.32f,   0.78f, 0.58f, 0.90f }, // netherite
     };

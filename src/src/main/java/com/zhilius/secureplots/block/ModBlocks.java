@@ -4,8 +4,6 @@ import com.zhilius.secureplots.SecurePlots;
 import net.minecraft.block.AbstractBlock;
 import net.minecraft.block.Block;
 import net.minecraft.block.MapColor;
-import net.minecraft.item.BlockItem;
-import net.minecraft.item.Item;
 import net.minecraft.registry.Registries;
 import net.minecraft.registry.Registry;
 import net.minecraft.util.Identifier;
@@ -18,23 +16,23 @@ public class ModBlocks {
                     .mapColor(MapColor.ORANGE)
                     .strength(50f, 1200f)
                     .luminance(state -> 4)
-                    .requiresTool(), 0));
+                    .requiresTool(), 0), 0);
 
-    // Tier 1 - Gold
-    public static final Block GOLD_PLOT_BLOCK = register("gold_plot_block",
-            new PlotBlock(AbstractBlock.Settings.create()
-                    .mapColor(MapColor.GOLD)
-                    .strength(50f, 1200f)
-                    .luminance(state -> 5)
-                    .requiresTool(), 1));
-
-    // Tier 2 - Emerald
+    // Tier 1 - Emerald
     public static final Block emerald_PLOT_BLOCK = register("emerald_plot_block",
             new PlotBlock(AbstractBlock.Settings.create()
                     .mapColor(MapColor.GREEN)
                     .strength(50f, 1200f)
+                    .luminance(state -> 5)
+                    .requiresTool(), 1), 1);
+
+    // Tier 2 - Gold
+    public static final Block GOLD_PLOT_BLOCK = register("gold_plot_block",
+            new PlotBlock(AbstractBlock.Settings.create()
+                    .mapColor(MapColor.GOLD)
+                    .strength(50f, 1200f)
                     .luminance(state -> 6)
-                    .requiresTool(), 2));
+                    .requiresTool(), 2), 2);
 
     // Tier 3 - Diamond
     public static final Block DIAMOND_PLOT_BLOCK = register("diamond_plot_block",
@@ -42,7 +40,7 @@ public class ModBlocks {
                     .mapColor(MapColor.DIAMOND_BLUE)
                     .strength(50f, 1200f)
                     .luminance(state -> 7)
-                    .requiresTool(), 3));
+                    .requiresTool(), 3), 3);
 
     // Tier 4 - Netherite
     public static final Block NETHERITE_PLOT_BLOCK = register("netherite_plot_block",
@@ -50,22 +48,22 @@ public class ModBlocks {
                     .mapColor(MapColor.BLACK)
                     .strength(50f, 1200f)
                     .luminance(state -> 8)
-                    .requiresTool(), 4));
+                    .requiresTool(), 4), 4);
 
     public static Block fromTier(int tier) {
         return switch (tier) {
             case 0 -> BRONZE_PLOT_BLOCK;
-            case 1 -> GOLD_PLOT_BLOCK;
-            case 2 -> emerald_PLOT_BLOCK;
+            case 1 -> emerald_PLOT_BLOCK;
+            case 2 -> GOLD_PLOT_BLOCK;
             case 3 -> DIAMOND_PLOT_BLOCK;
             case 4 -> NETHERITE_PLOT_BLOCK;
             default -> BRONZE_PLOT_BLOCK;
         };
     }
 
-    private static Block register(String name, Block block) {
+    private static Block register(String name, Block block, int tier) {
         Identifier id = Identifier.of(SecurePlots.MOD_ID, name);
-        Registry.register(Registries.ITEM, id, new BlockItem(block, new Item.Settings()));
+        Registry.register(Registries.ITEM, id, new PlotBlockItem(block, tier));
         return Registry.register(Registries.BLOCK, id, block);
     }
 
@@ -73,3 +71,4 @@ public class ModBlocks {
         SecurePlots.LOGGER.info("Registrando bloques de Secure Plots...");
     }
 }
+

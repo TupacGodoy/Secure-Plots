@@ -110,7 +110,7 @@ public class PlotBlock extends BlockWithEntity {
             player.sendMessage(Text.literal(""), false);
             player.sendMessage(Text.literal("  ➤ Clic derecho al bloque para abrir el menú").formatted(Formatting.WHITE), false);
             player.sendMessage(Text.literal("  ➤ Usa el Plano de Protección para ver los límites").formatted(Formatting.WHITE), false);
-            player.sendMessage(Text.literal("  ➤ Tamaño actual: " + plotSize.radius + "x" + plotSize.radius).formatted(Formatting.AQUA), false);
+            player.sendMessage(Text.literal("  ➤ Tamaño actual: " + plotSize.getRadius() + "x" + plotSize.getRadius()).formatted(Formatting.AQUA), false);
             player.sendMessage(Text.literal("  ➤ Expira en: " + (25 + 5 * plotSize.tier) + " días (sin rango)").formatted(Formatting.YELLOW), false);
             player.sendMessage(Text.literal(""), false);
             player.sendMessage(Text.literal("  ¡Mejorala con cobblecoins y recursos!").formatted(Formatting.GREEN), false);
@@ -129,7 +129,7 @@ public class PlotBlock extends BlockWithEntity {
         player.sendMessage(Text.literal("  Dueño: ").formatted(Formatting.GRAY)
                 .append(Text.literal(data.getOwnerName()).formatted(Formatting.WHITE)), false);
         player.sendMessage(Text.literal("  Tamaño: ").formatted(Formatting.GRAY)
-                .append(Text.literal(data.getSize().radius + "x" + data.getSize().radius).formatted(Formatting.AQUA)), false);
+                .append(Text.literal(data.getSize().getRadius() + "x" + data.getSize().getRadius()).formatted(Formatting.AQUA)), false);
         player.sendMessage(Text.literal("  Miembros: ").formatted(Formatting.GRAY)
                 .append(Text.literal(String.valueOf(data.getMembers().size())).formatted(Formatting.GREEN)), false);
         player.sendMessage(Text.literal("═══════════════════════════").formatted(Formatting.GOLD), false);
@@ -158,7 +158,7 @@ public class PlotBlock extends BlockWithEntity {
     @Override
     public void appendTooltip(ItemStack stack, TooltipContext context, List<Text> tooltip, TooltipType options) {
         PlotSize plotSize = PlotSize.fromTier(this.tier);
-        int size = plotSize.radius;
+        int size = plotSize.getRadius();
         tooltip.add(Text.literal("Protege: " + size + "x" + size + " bloques").formatted(Formatting.AQUA));
         tooltip.add(Text.literal("Tier " + (this.tier + 1) + " — " + plotSize.displayName).formatted(Formatting.GRAY));
         tooltip.add(Text.literal("Coloca para reclamar tu parcela.").formatted(Formatting.DARK_GRAY));

@@ -1,0 +1,6 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "secure-plots:item/plot_hologram_bg"
+  }
+}

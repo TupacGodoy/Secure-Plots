@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "id": "secure-plots",
+  "version": "1.0.0",
+  "name": "Secure Plots",
+  "description": "Protección de territorios con menú, roles y mejoras.",
+  "authors": ["zhilius"],
+  "contact": {},
+  "license": "MIT",
+  "icon": "assets/secure-plots/icon.png",
+  "environment": "*",
+  "entrypoints": {
+    "main": ["com.zhilius.secureplots.SecurePlots"],
+    "client": ["com.zhilius.secureplots.client.SecurePlotsClient"]
+  },
+  "mixins": [
+    "secure-plots.mixins.json",
+    {
+      "config": "secure-plots.client.mixins.json",
+      "environment": "client"
+    }
+  ],
+  "depends": {
+    "fabricloader": ">=0.15.0",
+    "minecraft": "~1.21.1",
+    "java": ">=21",
+    "fabric-api": "*"
+  },
+  "suggests": {}
+}

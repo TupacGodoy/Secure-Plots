@@ -1,0 +1,8 @@
+{
+  "block.secure-plots.bronze_plot_block": "Bronze Plot Block",
+  "block.secure-plots.emerald_plot_block": "Emerald Plot Block",
+  "block.secure-plots.gold_plot_block": "Gold Plot Block",
+  "block.secure-plots.diamond_plot_block": "Diamond Plot Block",
+  "block.secure-plots.netherite_plot_block": "Netherite Plot Block",
+  "item.secure-plots.plot_blueprint": "Plot Blueprint"
+}

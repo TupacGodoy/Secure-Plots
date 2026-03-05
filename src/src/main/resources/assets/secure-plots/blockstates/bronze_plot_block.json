@@ -1,0 +1,5 @@
+{
+  "variants": {
+    "": { "model": "secure-plots:block/bronze_plot_block" }
+  }
+}

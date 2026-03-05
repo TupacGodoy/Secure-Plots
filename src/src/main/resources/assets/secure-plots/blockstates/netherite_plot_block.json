@@ -1,0 +1,5 @@
+{
+  "variants": {
+    "": { "model": "secure-plots:block/netherite_plot_block" }
+  }
+}

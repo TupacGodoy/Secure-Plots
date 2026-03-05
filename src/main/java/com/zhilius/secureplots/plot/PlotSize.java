@@ -1,12 +1,11 @@
 package com.zhilius.secureplots.plot;
 
 public enum PlotSize {
-    SMALL(15, "Pequeño", 0, "bronze_plot_block"),
-    MEDIUM(30, "Mediano", 1, "iron_plot_block"),
-    LARGE(50, "Grande", 2, "gold_plot_block"),
-    XLARGE(70, "Extra Grande", 3, "diamond_plot_block"),
-    HUGE(100, "Enorme", 4, "netherite_plot_block"),
-    MASSIVE(200, "Masivo", 5, "quantum_plot_block");
+    BRONZE(15,  "Bronce",    0, "bronze_plot_block"),
+    GOLD  (30,  "Oro",       1, "gold_plot_block"),
+    EMERALD(50, "Esmeralda", 2, "emerald_plot_block"),
+    DIAMOND(75, "Diamante",  3, "diamond_plot_block"),
+    NETHERITE(100, "Netherita", 4, "netherite_plot_block");
 
     public final int radius;
     public final String displayName;
@@ -32,6 +31,6 @@ public enum PlotSize {
         for (PlotSize size : values()) {
             if (size.tier == tier) return size;
         }
-        return SMALL;
+        return BRONZE;
     }
 }
