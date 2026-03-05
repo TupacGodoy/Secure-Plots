@@ -1,0 +1,35 @@
+{
+  "textures": {
+    "0": "secure-plots:item/hologram_panel",
+    "particle": "secure-plots:item/hologram_panel"
+  },
+  "elements": [
+    {
+      "from": [-16, -8, 0],
+      "to":   [ 16,  8, 0.1],
+      "faces": {
+        "south": { "uv": [0, 0, 16, 16], "texture": "#0" },
+        "north": { "uv": [0, 0, 16, 16], "texture": "#0" }
+      }
+    }
+  ],
+  "display": {
+    "head": {
+      "rotation": [0, 0, 0],
+      "translation": [0, 0, 0],
+      "scale": [1, 1, 1]
+    },
+    "ground": {
+      "scale": [0, 0, 0]
+    },
+    "fixed": {
+      "scale": [0, 0, 0]
+    },
+    "thirdperson_righthand": {
+      "scale": [0, 0, 0]
+    },
+    "firstperson_righthand": {
+      "scale": [0, 0, 0]
+    }
+  }
+}

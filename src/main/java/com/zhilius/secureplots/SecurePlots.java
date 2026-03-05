@@ -5,6 +5,7 @@ import com.zhilius.secureplots.blockentity.ModBlockEntities;
 import com.zhilius.secureplots.config.SecurePlotsConfig;
 import com.zhilius.secureplots.item.ModItems;
 import com.zhilius.secureplots.network.ModPackets;
+import com.zhilius.secureplots.hologram.PlotHologram;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.event.player.AttackBlockCallback;
 import net.fabricmc.fabric.api.event.player.UseBlockCallback;
@@ -34,6 +35,9 @@ public class SecurePlots implements ModInitializer {
 
         // Register network packets
         ModPackets.registerServerHandlers();
+
+        // Register hologram ticker
+        PlotHologram.registerTicker();
 
         // Protect plots from modification by non-members
         registerProtectionEvents();

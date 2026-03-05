@@ -12,6 +12,9 @@ import net.fabricmc.fabric.api.itemgroup.v1.ItemGroupEvents;
 
 public class ModItems {
 
+    public static final Item HOLOGRAM_PANEL = register("hologram_panel",
+            new Item(new Item.Settings().maxCount(1)));
+
     public static final Item PLOT_blueprint = register("plot_blueprint",
             new PlotblueprintItem(new Item.Settings()
                     .maxCount(1)

@@ -1,6 +1,7 @@
 package com.zhilius.secureplots.block;
 
 import com.mojang.serialization.MapCodec;
+import com.zhilius.secureplots.hologram.PlotHologram;
 import com.zhilius.secureplots.blockentity.PlotBlockEntity;
 import com.zhilius.secureplots.plot.PlotData;
 import com.zhilius.secureplots.plot.PlotManager;
@@ -52,6 +53,16 @@ public class PlotBlock extends BlockWithEntity {
             BlockEntity be = world.getBlockEntity(pos);
             if (be instanceof PlotBlockEntity plotBE) {
                 plotBE.openScreen((ServerPlayerEntity) player);
+
+                // Mostrar holograma o chat al hacer clic derecho
+                com.zhilius.secureplots.plot.PlotManager manager =
+                    com.zhilius.secureplots.plot.PlotManager.getOrCreate((net.minecraft.server.world.ServerWorld) world);
+                com.zhilius.secureplots.plot.PlotData data = manager.getPlot(pos);
+                if (data != null) {
+                    PlotHologram.spawn((net.minecraft.server.world.ServerWorld) world, pos, data, 200, player.getYaw());
+                    com.zhilius.secureplots.network.ModPackets.sendShowPlotBorder((ServerPlayerEntity) player, data);
+                    sendHologramAsChat(player, data);
+                }
             }
         }
         return ActionResult.SUCCESS;
@@ -94,7 +105,33 @@ public class PlotBlock extends BlockWithEntity {
             player.sendMessage(Text.literal("  Mejorala con cobblecoins y recursos!").formatted(Formatting.GREEN),
                     false);
             player.sendMessage(Text.literal("═══════════════════════════").formatted(Formatting.GOLD), false);
+
+            // Mostrar holograma encima del bloque
+            PlotHologram.spawn((net.minecraft.server.world.ServerWorld) world, pos, data, 300, placer.getYaw());
         }
+    }
+
+    /** Verifica si hay al menos 3 bloques de aire encima del bloque. */
+    private boolean hasSpaceForHologram(World world, BlockPos pos) {
+        for (int i = 1; i <= 3; i++) {
+            if (!world.getBlockState(pos.up(i)).isAir()) return false;
+        }
+        return true;
+    }
+
+    /** Envía la info del plot como mensajes de chat cuando no hay espacio para el holograma. */
+    private void sendHologramAsChat(PlayerEntity player, com.zhilius.secureplots.plot.PlotData data) {
+        String name = (data.getPlotName() != null && !data.getPlotName().isBlank())
+                ? data.getPlotName() : "Parcela Protegida";
+        player.sendMessage(Text.literal("═══════════════════════════").formatted(Formatting.GOLD), false);
+        player.sendMessage(Text.literal("  🛡 " + name).formatted(Formatting.YELLOW, Formatting.BOLD), false);
+        player.sendMessage(Text.literal("  Dueño: ").formatted(Formatting.GRAY)
+                .append(Text.literal(data.getOwnerName()).formatted(Formatting.WHITE)), false);
+        player.sendMessage(Text.literal("  Tamaño: ").formatted(Formatting.GRAY)
+                .append(Text.literal(data.getSize().radius + "x" + data.getSize().radius).formatted(Formatting.AQUA)), false);
+        player.sendMessage(Text.literal("  Miembros: ").formatted(Formatting.GRAY)
+                .append(Text.literal(String.valueOf(data.getMembers().size())).formatted(Formatting.GREEN)), false);
+        player.sendMessage(Text.literal("═══════════════════════════").formatted(Formatting.GOLD), false);
     }
 
     @Override
@@ -110,6 +147,7 @@ public class PlotBlock extends BlockWithEntity {
                     return state;
                 }
                 manager.removePlot(pos);
+                PlotHologram.remove((net.minecraft.server.world.ServerWorld) world, pos);
                 player.sendMessage(Text.literal("✗ Protección eliminada.").formatted(Formatting.RED), false);
             }
         }

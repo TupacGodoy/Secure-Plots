@@ -3,6 +3,7 @@ package com.zhilius.secureplots.client;
 import com.zhilius.secureplots.network.ModPackets;
 import com.zhilius.secureplots.plot.PlotData;
 import net.fabricmc.api.ClientModInitializer;
+import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderEvents;
 import net.minecraft.util.math.BlockPos;
@@ -18,7 +19,6 @@ public class SecurePlotsClient implements ClientModInitializer {
     public static class BorderDisplay {
         public PlotData data;
         public long expiresAt;
-
         public BorderDisplay(PlotData data) {
             this.data = data;
             this.expiresAt = System.currentTimeMillis() + 10000;
@@ -27,6 +27,8 @@ public class SecurePlotsClient implements ClientModInitializer {
 
     @Override
     public void onInitializeClient() {
+        ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) ->
+                HologramTestCommand.register(dispatcher));
 
         ClientPlayNetworking.registerGlobalReceiver(ModPackets.OpenPlotScreenPayload.ID,
                 (payload, context) -> {
@@ -49,10 +51,7 @@ public class SecurePlotsClient implements ClientModInitializer {
             Iterator<BorderDisplay> iter = activeBorders.iterator();
             while (iter.hasNext()) {
                 BorderDisplay display = iter.next();
-                if (display.expiresAt < now) {
-                    iter.remove();
-                    continue;
-                }
+                if (display.expiresAt < now) { iter.remove(); continue; }
                 PlotBorderRenderer.render(context, display.data);
             }
         });
