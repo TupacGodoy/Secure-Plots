@@ -116,7 +116,7 @@ public class PlotBlock extends BlockWithEntity {
             player.sendMessage(Text.literal("  ¡Mejorala con cobblecoins y recursos!").formatted(Formatting.GREEN), false);
             player.sendMessage(Text.literal("═══════════════════════════").formatted(Formatting.GOLD), false);
 
-            PlotHologram.spawn((net.minecraft.server.world.ServerWorld) world, pos, data, 300, placer.getYaw());
+            PlotHologram.spawn((net.minecraft.server.world.ServerWorld) world, pos, data, 200, placer.getYaw());
             com.zhilius.secureplots.network.ModPackets.sendShowPlotBorder(player, data);
         }
     }

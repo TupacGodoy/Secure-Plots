@@ -2,6 +2,7 @@ package com.zhilius.secureplots;
 
 import com.zhilius.secureplots.block.ModBlocks;
 import com.zhilius.secureplots.blockentity.ModBlockEntities;
+import com.zhilius.secureplots.command.SpCommand;
 import com.zhilius.secureplots.config.SecurePlotsConfig;
 import com.zhilius.secureplots.item.ModItems;
 import com.zhilius.secureplots.network.ModPackets;
@@ -35,6 +36,9 @@ public class SecurePlots implements ModInitializer {
 
         // Register network packets
         ModPackets.registerServerHandlers();
+
+        // Register commands
+        SpCommand.register();
 
         // Register hologram ticker
         PlotHologram.registerTicker();
