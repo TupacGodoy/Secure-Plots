@@ -46,6 +46,12 @@ public class SecurePlotsClient implements ClientModInitializer {
                     });
                 });
 
+        ClientPlayNetworking.registerGlobalReceiver(ModPackets.HidePlotBorderPayload.ID,
+                (payload, context) -> {
+                    net.minecraft.util.math.BlockPos pos = payload.pos();
+                    context.client().execute(() -> activeBorders.removeIf(b -> b.data.getCenter().equals(pos)));
+                });
+
         WorldRenderEvents.AFTER_TRANSLUCENT.register(context -> {
             long now = System.currentTimeMillis();
             Iterator<BorderDisplay> iter = activeBorders.iterator();

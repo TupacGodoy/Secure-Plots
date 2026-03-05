@@ -23,8 +23,17 @@ import java.util.UUID;
 
 public class PlotBlock extends BlockWithEntity {
 
-    public PlotBlock(Settings settings) {
+    // Tier de este bloque específico (0=bronze, 1=iron/emerald, 2=gold, 3=diamond, 4=netherite)
+    private final int tier;
+
+    public PlotBlock(Settings settings, int tier) {
         super(settings);
+        this.tier = tier;
+    }
+
+    // Constructor sin tier para el codec (usa tier 0 como fallback)
+    public PlotBlock(Settings settings) {
+        this(settings, 0);
     }
 
     @Override
@@ -54,7 +63,6 @@ public class PlotBlock extends BlockWithEntity {
             if (be instanceof PlotBlockEntity plotBE) {
                 plotBE.openScreen((ServerPlayerEntity) player);
 
-                // Mostrar holograma o chat al hacer clic derecho
                 com.zhilius.secureplots.plot.PlotManager manager =
                     com.zhilius.secureplots.plot.PlotManager.getOrCreate((net.minecraft.server.world.ServerWorld) world);
                 com.zhilius.secureplots.plot.PlotData data = manager.getPlot(pos);
@@ -74,7 +82,10 @@ public class PlotBlock extends BlockWithEntity {
         if (!world.isClient && placer instanceof ServerPlayerEntity player) {
             PlotManager manager = PlotManager.getOrCreate((net.minecraft.server.world.ServerWorld) world);
 
-            if (!manager.canPlace(pos, PlotSize.SMALL)) {
+            // Usar el PlotSize correspondiente al tier de ESTE bloque
+            PlotSize plotSize = PlotSize.fromTier(this.tier);
+
+            if (!manager.canPlace(pos, plotSize)) {
                 world.breakBlock(pos, true, player);
                 player.sendMessage(Text.literal("✗ No puedes colocar una protección aquí, está muy cerca de otra.")
                         .formatted(Formatting.RED), false);
@@ -85,43 +96,27 @@ public class PlotBlock extends BlockWithEntity {
             String ownerName = player.getName().getString();
             long tick = world.getTime();
 
-            PlotData data = new PlotData(ownerId, ownerName, pos, PlotSize.SMALL, tick);
+            PlotData data = new PlotData(ownerId, ownerName, pos, plotSize, tick);
             manager.addPlot(data);
 
             player.sendMessage(Text.literal(""), false);
             player.sendMessage(Text.literal("═══════════════════════════").formatted(Formatting.GOLD), false);
-            player.sendMessage(Text.literal("  🛡 ¡Protección colocada!").formatted(Formatting.YELLOW, Formatting.BOLD),
-                    false);
+            player.sendMessage(Text.literal("  🛡 ¡Protección colocada!").formatted(Formatting.YELLOW, Formatting.BOLD), false);
             player.sendMessage(Text.literal("═══════════════════════════").formatted(Formatting.GOLD), false);
             player.sendMessage(Text.literal(""), false);
-            player.sendMessage(
-                    Text.literal("  ➤ Clic derecho al bloque para abrir el menú").formatted(Formatting.WHITE), false);
-            player.sendMessage(
-                    Text.literal("  ➤ Usa el Plano de Protección para ver los límites").formatted(Formatting.WHITE),
-                    false);
-            player.sendMessage(Text.literal("  ➤ Tamaño actual: 15x15").formatted(Formatting.AQUA), false);
-            player.sendMessage(Text.literal("  ➤ Expira en: 25 días (sin rango)").formatted(Formatting.YELLOW), false);
+            player.sendMessage(Text.literal("  ➤ Clic derecho al bloque para abrir el menú").formatted(Formatting.WHITE), false);
+            player.sendMessage(Text.literal("  ➤ Usa el Plano de Protección para ver los límites").formatted(Formatting.WHITE), false);
+            player.sendMessage(Text.literal("  ➤ Tamaño actual: " + plotSize.radius + "x" + plotSize.radius).formatted(Formatting.AQUA), false);
+            player.sendMessage(Text.literal("  ➤ Expira en: " + (25 + 5 * plotSize.tier) + " días (sin rango)").formatted(Formatting.YELLOW), false);
             player.sendMessage(Text.literal(""), false);
-            player.sendMessage(Text.literal("  Mejorala con cobblecoins y recursos!").formatted(Formatting.GREEN),
-                    false);
+            player.sendMessage(Text.literal("  ¡Mejorala con cobblecoins y recursos!").formatted(Formatting.GREEN), false);
             player.sendMessage(Text.literal("═══════════════════════════").formatted(Formatting.GOLD), false);
 
-            // Mostrar holograma encima del bloque
             PlotHologram.spawn((net.minecraft.server.world.ServerWorld) world, pos, data, 300, placer.getYaw());
-            // Mostrar borde del área protegida al colocar
             com.zhilius.secureplots.network.ModPackets.sendShowPlotBorder(player, data);
         }
     }
 
-    /** Verifica si hay al menos 3 bloques de aire encima del bloque. */
-    private boolean hasSpaceForHologram(World world, BlockPos pos) {
-        for (int i = 1; i <= 3; i++) {
-            if (!world.getBlockState(pos.up(i)).isAir()) return false;
-        }
-        return true;
-    }
-
-    /** Envía la info del plot como mensajes de chat cuando no hay espacio para el holograma. */
     private void sendHologramAsChat(PlayerEntity player, com.zhilius.secureplots.plot.PlotData data) {
         String name = (data.getPlotName() != null && !data.getPlotName().isBlank())
                 ? data.getPlotName() : "Parcela Protegida";
@@ -143,13 +138,13 @@ public class PlotBlock extends BlockWithEntity {
             PlotData data = manager.getPlot(pos);
             if (data != null) {
                 if (!data.getOwnerId().equals(player.getUuid()) && !player.hasPermissionLevel(2)) {
-                    player.sendMessage(Text.literal("✗ No eres el dueño de esta protección.").formatted(Formatting.RED),
-                            false);
+                    player.sendMessage(Text.literal("✗ No eres el dueño de esta protección.").formatted(Formatting.RED), false);
                     world.setBlockState(pos, state);
                     return state;
                 }
                 manager.removePlot(pos);
                 PlotHologram.remove((net.minecraft.server.world.ServerWorld) world, pos);
+                com.zhilius.secureplots.network.ModPackets.sendHidePlotBorder((net.minecraft.server.network.ServerPlayerEntity) player, pos);
                 player.sendMessage(Text.literal("✗ Protección eliminada.").formatted(Formatting.RED), false);
             }
         }

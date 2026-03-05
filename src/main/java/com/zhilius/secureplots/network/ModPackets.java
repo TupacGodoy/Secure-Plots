@@ -47,7 +47,20 @@ public class ModPackets {
         }
     }
 
-    public record UpdatePlotPayload(BlockPos pos, NbtCompound nbt) implements CustomPayload {
+    public record HidePlotBorderPayload(BlockPos pos) implements CustomPayload {
+        public static final Id<HidePlotBorderPayload> ID = new Id<>(
+                Identifier.of(SecurePlots.MOD_ID, "hide_plot_border"));
+        public static final PacketCodec<PacketByteBuf, HidePlotBorderPayload> CODEC = PacketCodec.of(
+                (value, buf) -> buf.writeBlockPos(value.pos()),
+                buf -> new HidePlotBorderPayload(buf.readBlockPos()));
+
+        @Override
+        public Id<? extends CustomPayload> getId() {
+            return ID;
+        }
+    }
+
+        public record UpdatePlotPayload(BlockPos pos, NbtCompound nbt) implements CustomPayload {
         public static final Id<UpdatePlotPayload> ID = new Id<>(Identifier.of(SecurePlots.MOD_ID, "update_plot"));
         public static final PacketCodec<PacketByteBuf, UpdatePlotPayload> CODEC = PacketCodec.of(
                 (value, buf) -> {
@@ -77,6 +90,7 @@ public class ModPackets {
     public static void registerPayloads() {
         PayloadTypeRegistry.playS2C().register(OpenPlotScreenPayload.ID, OpenPlotScreenPayload.CODEC);
         PayloadTypeRegistry.playS2C().register(ShowPlotBorderPayload.ID, ShowPlotBorderPayload.CODEC);
+        PayloadTypeRegistry.playS2C().register(HidePlotBorderPayload.ID, HidePlotBorderPayload.CODEC);
         PayloadTypeRegistry.playC2S().register(UpdatePlotPayload.ID, UpdatePlotPayload.CODEC);
         PayloadTypeRegistry.playC2S().register(UpgradePlotPayload.ID, UpgradePlotPayload.CODEC);
     }
@@ -87,6 +101,10 @@ public class ModPackets {
 
     public static void sendShowPlotBorder(ServerPlayerEntity player, PlotData data) {
         ServerPlayNetworking.send(player, new ShowPlotBorderPayload(data.toNbt()));
+    }
+
+    public static void sendHidePlotBorder(ServerPlayerEntity player, BlockPos pos) {
+        ServerPlayNetworking.send(player, new HidePlotBorderPayload(pos));
     }
 
     public static void registerServerHandlers() {
