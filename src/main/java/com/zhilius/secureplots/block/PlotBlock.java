@@ -108,6 +108,8 @@ public class PlotBlock extends BlockWithEntity {
 
             // Mostrar holograma encima del bloque
             PlotHologram.spawn((net.minecraft.server.world.ServerWorld) world, pos, data, 300, placer.getYaw());
+            // Mostrar borde del área protegida al colocar
+            com.zhilius.secureplots.network.ModPackets.sendShowPlotBorder(player, data);
         }
     }
 
