@@ -63,17 +63,17 @@ public class PlotBlock extends BlockWithEntity {
     @Override
     public ActionResult onUse(BlockState state, World world, BlockPos pos, PlayerEntity player, BlockHitResult hit) {
         if (!world.isClient) {
-            BlockEntity be = world.getBlockEntity(pos);
-            if (be instanceof PlotBlockEntity plotBE) {
-                plotBE.openScreen((ServerPlayerEntity) player);
+            com.zhilius.secureplots.plot.PlotManager manager =
+                com.zhilius.secureplots.plot.PlotManager.getOrCreate((net.minecraft.server.world.ServerWorld) world);
+            com.zhilius.secureplots.plot.PlotData data = manager.getPlot(pos);
+            if (data != null) {
+                com.zhilius.secureplots.network.ModPackets.sendShowPlotBorder((ServerPlayerEntity) player, data);
 
-                com.zhilius.secureplots.plot.PlotManager manager =
-                    com.zhilius.secureplots.plot.PlotManager.getOrCreate((net.minecraft.server.world.ServerWorld) world);
-                com.zhilius.secureplots.plot.PlotData data = manager.getPlot(pos);
-                if (data != null) {
+                boolean spaceAvailable = PlotHologram.hasSpace((net.minecraft.server.world.ServerWorld) world, pos);
+                if (spaceAvailable) {
                     PlotHologram.spawn((net.minecraft.server.world.ServerWorld) world, pos, data, 200, player.getYaw());
-                    com.zhilius.secureplots.network.ModPackets.sendShowPlotBorder((ServerPlayerEntity) player, data);
-                    sendHologramAsChat(player, data);
+                } else {
+                    sendInfoToChat((ServerPlayerEntity) player, data);
                 }
             }
         }
@@ -103,17 +103,14 @@ public class PlotBlock extends BlockWithEntity {
             PlotData data = new PlotData(ownerId, ownerName, pos, plotSize, tick);
             manager.addPlot(data);
 
-            player.sendMessage(Text.literal(""), false);
             player.sendMessage(Text.literal("═══════════════════════════").formatted(Formatting.GOLD), false);
-            player.sendMessage(Text.literal("  🛡 ¡Protección colocada!").formatted(Formatting.YELLOW, Formatting.BOLD), false);
+            player.sendMessage(Text.literal("  🛡 ¡Parcela creada!").formatted(Formatting.YELLOW, Formatting.BOLD), false);
             player.sendMessage(Text.literal("═══════════════════════════").formatted(Formatting.GOLD), false);
-            player.sendMessage(Text.literal(""), false);
-            player.sendMessage(Text.literal("  ➤ Clic derecho al bloque para abrir el menú").formatted(Formatting.WHITE), false);
-            player.sendMessage(Text.literal("  ➤ Usa el Plano de Protección para ver los límites").formatted(Formatting.WHITE), false);
-            player.sendMessage(Text.literal("  ➤ Tamaño actual: " + plotSize.radius + "x" + plotSize.radius).formatted(Formatting.AQUA), false);
-            player.sendMessage(Text.literal("  ➤ Expira en: " + (25 + 5 * plotSize.tier) + " días (sin rango)").formatted(Formatting.YELLOW), false);
-            player.sendMessage(Text.literal(""), false);
-            player.sendMessage(Text.literal("  ¡Mejorala con cobblecoins y recursos!").formatted(Formatting.GREEN), false);
+            player.sendMessage(Text.literal("  Tamaño: ").formatted(Formatting.GRAY)
+                    .append(Text.literal(plotSize.radius + "x" + plotSize.radius + " bloques").formatted(Formatting.AQUA)), false);
+            player.sendMessage(Text.literal("  Nivel: ").formatted(Formatting.GRAY)
+                    .append(Text.literal(plotSize.displayName).formatted(Formatting.AQUA)), false);
+            player.sendMessage(Text.literal("  Usá el §6Plano de Protección §7para gestionarla.").formatted(Formatting.GRAY), false);
             player.sendMessage(Text.literal("═══════════════════════════").formatted(Formatting.GOLD), false);
 
             PlotHologram.spawn((net.minecraft.server.world.ServerWorld) world, pos, data, 200, placer.getYaw());
@@ -121,17 +118,26 @@ public class PlotBlock extends BlockWithEntity {
         }
     }
 
-    private void sendHologramAsChat(PlayerEntity player, com.zhilius.secureplots.plot.PlotData data) {
+    private void sendInfoToChat(ServerPlayerEntity player, com.zhilius.secureplots.plot.PlotData data) {
         String name = (data.getPlotName() != null && !data.getPlotName().isBlank())
                 ? data.getPlotName() : "Parcela Protegida";
+        int size = data.getSize().radius;
+        String membersStr = data.getMembers().isEmpty() ? "Ninguno" : String.valueOf(data.getMembers().size());
+
         player.sendMessage(Text.literal("═══════════════════════════").formatted(Formatting.GOLD), false);
         player.sendMessage(Text.literal("  🛡 " + name).formatted(Formatting.YELLOW, Formatting.BOLD), false);
+        player.sendMessage(Text.literal("═══════════════════════════").formatted(Formatting.GOLD), false);
         player.sendMessage(Text.literal("  Dueño: ").formatted(Formatting.GRAY)
                 .append(Text.literal(data.getOwnerName()).formatted(Formatting.WHITE)), false);
+        player.sendMessage(Text.literal("  Nivel: ").formatted(Formatting.GRAY)
+                .append(Text.literal(data.getSize().displayName).formatted(Formatting.AQUA)), false);
         player.sendMessage(Text.literal("  Tamaño: ").formatted(Formatting.GRAY)
-                .append(Text.literal(data.getSize().radius + "x" + data.getSize().radius).formatted(Formatting.AQUA)), false);
+                .append(Text.literal(size + "x" + size + " bloques").formatted(Formatting.AQUA)), false);
         player.sendMessage(Text.literal("  Miembros: ").formatted(Formatting.GRAY)
-                .append(Text.literal(String.valueOf(data.getMembers().size())).formatted(Formatting.GREEN)), false);
+                .append(Text.literal(membersStr).formatted(Formatting.GREEN)), false);
+        player.sendMessage(Text.literal("  ⚠ Usá el ").formatted(Formatting.YELLOW)
+                .append(Text.literal("Plano de Protección").formatted(Formatting.GOLD))
+                .append(Text.literal(" para gestionar.").formatted(Formatting.YELLOW)), false);
         player.sendMessage(Text.literal("═══════════════════════════").formatted(Formatting.GOLD), false);
     }
 

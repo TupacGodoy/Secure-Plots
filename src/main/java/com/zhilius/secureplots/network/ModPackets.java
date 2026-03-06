@@ -75,6 +75,22 @@ public class ModPackets {
         }
     }
 
+    public record AddMemberPayload(BlockPos pos, String playerName) implements CustomPayload {
+        public static final Id<AddMemberPayload> ID = new Id<>(Identifier.of(SecurePlots.MOD_ID, "add_member"));
+        public static final PacketCodec<PacketByteBuf, AddMemberPayload> CODEC = PacketCodec.of(
+                (value, buf) -> { buf.writeBlockPos(value.pos()); buf.writeString(value.playerName()); },
+                buf -> new AddMemberPayload(buf.readBlockPos(), buf.readString()));
+        @Override public Id<? extends CustomPayload> getId() { return ID; }
+    }
+
+    public record RemoveMemberPayload(BlockPos pos, String playerName) implements CustomPayload {
+        public static final Id<RemoveMemberPayload> ID = new Id<>(Identifier.of(SecurePlots.MOD_ID, "remove_member"));
+        public static final PacketCodec<PacketByteBuf, RemoveMemberPayload> CODEC = PacketCodec.of(
+                (value, buf) -> { buf.writeBlockPos(value.pos()); buf.writeString(value.playerName()); },
+                buf -> new RemoveMemberPayload(buf.readBlockPos(), buf.readString()));
+        @Override public Id<? extends CustomPayload> getId() { return ID; }
+    }
+
     public record UpgradePlotPayload(BlockPos pos) implements CustomPayload {
         public static final Id<UpgradePlotPayload> ID = new Id<>(Identifier.of(SecurePlots.MOD_ID, "upgrade_plot"));
         public static final PacketCodec<PacketByteBuf, UpgradePlotPayload> CODEC = PacketCodec.of(
@@ -93,6 +109,8 @@ public class ModPackets {
         PayloadTypeRegistry.playS2C().register(HidePlotBorderPayload.ID, HidePlotBorderPayload.CODEC);
         PayloadTypeRegistry.playC2S().register(UpdatePlotPayload.ID, UpdatePlotPayload.CODEC);
         PayloadTypeRegistry.playC2S().register(UpgradePlotPayload.ID, UpgradePlotPayload.CODEC);
+        PayloadTypeRegistry.playC2S().register(AddMemberPayload.ID, AddMemberPayload.CODEC);
+        PayloadTypeRegistry.playC2S().register(RemoveMemberPayload.ID, RemoveMemberPayload.CODEC);
     }
 
     public static void sendOpenPlotScreen(ServerPlayerEntity player, BlockPos pos, PlotData data) {
@@ -161,6 +179,80 @@ public class ModPackets {
                             false);
                     sendOpenPlotScreen(player, pos, data);
                 }
+            });
+        });
+
+        // Add member handler
+        ServerPlayNetworking.registerGlobalReceiver(AddMemberPayload.ID, (payload, context) -> {
+            BlockPos pos = payload.pos();
+            String targetName = payload.playerName();
+            ServerPlayerEntity player = context.player();
+            context.server().execute(() -> {
+                if (!(player.getWorld() instanceof net.minecraft.server.world.ServerWorld serverWorld)) return;
+                var manager = com.zhilius.secureplots.plot.PlotManager.getOrCreate(serverWorld);
+                PlotData data = manager.getPlot(pos);
+                if (data == null || !data.getOwnerId().equals(player.getUuid())) return;
+
+                ServerPlayerEntity target = context.server().getPlayerManager().getPlayer(targetName);
+                if (target == null) {
+                    player.sendMessage(net.minecraft.text.Text.literal("✗ Jugador \"" + targetName + "\" no está en línea.")
+                            .formatted(net.minecraft.util.Formatting.RED), false);
+                    return;
+                }
+                if (target.getUuid().equals(player.getUuid())) {
+                    player.sendMessage(net.minecraft.text.Text.literal("✗ No podés agregarte a vos mismo.")
+                            .formatted(net.minecraft.util.Formatting.RED), false);
+                    return;
+                }
+                if (data.getRoleOf(target.getUuid()) != PlotData.Role.VISITOR) {
+                    player.sendMessage(net.minecraft.text.Text.literal("✗ " + targetName + " ya tiene acceso.")
+                            .formatted(net.minecraft.util.Formatting.YELLOW), false);
+                    return;
+                }
+                data.addMember(target.getUuid(), target.getName().getString(), PlotData.Role.MEMBER);
+                manager.markDirty();
+                player.sendMessage(net.minecraft.text.Text.literal("✔ " + targetName + " agregado.")
+                        .formatted(net.minecraft.util.Formatting.GREEN), false);
+                target.sendMessage(net.minecraft.text.Text.literal("✔ Fuiste agregado a " + data.getPlotName() + " de " + player.getName().getString())
+                        .formatted(net.minecraft.util.Formatting.GREEN), false);
+                // Refresh screen
+                sendOpenPlotScreen(player, pos, data);
+            });
+        });
+
+        // Remove member handler
+        ServerPlayNetworking.registerGlobalReceiver(RemoveMemberPayload.ID, (payload, context) -> {
+            BlockPos pos = payload.pos();
+            String targetName = payload.playerName();
+            ServerPlayerEntity player = context.player();
+            context.server().execute(() -> {
+                if (!(player.getWorld() instanceof net.minecraft.server.world.ServerWorld serverWorld)) return;
+                var manager = com.zhilius.secureplots.plot.PlotManager.getOrCreate(serverWorld);
+                PlotData data = manager.getPlot(pos);
+                if (data == null || !data.getOwnerId().equals(player.getUuid())) return;
+
+                java.util.UUID targetUuid = null;
+                for (java.util.Map.Entry<java.util.UUID, PlotData.Role> entry : data.getMembers().entrySet()) {
+                    if (data.getMemberName(entry.getKey()).equalsIgnoreCase(targetName)) {
+                        targetUuid = entry.getKey();
+                        break;
+                    }
+                }
+                if (targetUuid == null) {
+                    player.sendMessage(net.minecraft.text.Text.literal("✗ " + targetName + " no es miembro.")
+                            .formatted(net.minecraft.util.Formatting.RED), false);
+                    return;
+                }
+                data.removeMember(targetUuid);
+                manager.markDirty();
+                player.sendMessage(net.minecraft.text.Text.literal("✔ " + targetName + " eliminado.")
+                        .formatted(net.minecraft.util.Formatting.GREEN), false);
+                ServerPlayerEntity target = context.server().getPlayerManager().getPlayer(targetUuid);
+                if (target != null) {
+                    target.sendMessage(net.minecraft.text.Text.literal("✗ Te quitaron el acceso a " + data.getPlotName())
+                            .formatted(net.minecraft.util.Formatting.RED), false);
+                }
+                sendOpenPlotScreen(player, pos, data);
             });
         });
     }
