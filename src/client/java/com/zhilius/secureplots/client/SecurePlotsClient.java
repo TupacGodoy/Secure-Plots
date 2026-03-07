@@ -69,6 +69,8 @@ public class SecurePlotsClient implements ClientModInitializer {
             return 8f * (float) Math.sin(p * Math.PI);
         }
 
+        public int effectiveRadius() { return (int) effectiveRadiusF(); }
+
         /** Lerped radius for this frame, plus any expand pulse. */
         public float effectiveRadiusF() {
             float base;
@@ -93,7 +95,7 @@ public class SecurePlotsClient implements ClientModInitializer {
         ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) ->
                 HologramTestCommand.register(dispatcher));
 
-        // PlotHologramClient.register(); — disabled, hologram is now a server-side TextDisplayEntity
+        PlotHologramClient.register();
 
         ClientPlayNetworking.registerGlobalReceiver(ModPackets.OpenPlotScreenPayload.ID,
                 (payload, context) -> {
@@ -108,7 +110,7 @@ public class SecurePlotsClient implements ClientModInitializer {
                     context.client().execute(() -> {
                         MinecraftClient mc = context.client();
 
-                        // PlotHologramClient.show(data, data.getCenter(), 10_000); — disabled
+                        PlotHologramClient.show(data, data.getCenter(), 10_000);
 
                         for (BorderDisplay bd : activeBorders) {
                             if (bd.data.getCenter().equals(data.getCenter())) {
