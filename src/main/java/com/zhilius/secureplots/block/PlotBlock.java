@@ -68,7 +68,7 @@ public class PlotBlock extends BlockWithEntity {
             com.zhilius.secureplots.plot.PlotData data = manager.getPlot(pos);
             if (data != null) {
                 com.zhilius.secureplots.network.ModPackets.sendShowPlotBorder((ServerPlayerEntity) player, data);
-                PlotHologram.spawn((net.minecraft.server.world.ServerWorld) world, pos, data, 6000, player.getYaw());
+                PlotHologram.spawn((net.minecraft.server.world.ServerWorld) world, pos, data, 200, player.getYaw());
             }
         }
         return ActionResult.SUCCESS;
@@ -107,7 +107,7 @@ public class PlotBlock extends BlockWithEntity {
             player.sendMessage(Text.literal("  Usá el §6Plano de Protección §7para gestionarla.").formatted(Formatting.GRAY), false);
             player.sendMessage(Text.literal("═══════════════════════════").formatted(Formatting.GOLD), false);
 
-            PlotHologram.spawn((net.minecraft.server.world.ServerWorld) world, pos, data, 6000, placer.getYaw());
+            PlotHologram.spawn((net.minecraft.server.world.ServerWorld) world, pos, data, 200, placer.getYaw());
             com.zhilius.secureplots.network.ModPackets.sendShowPlotBorder(player, data);
         }
     }

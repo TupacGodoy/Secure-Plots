@@ -83,7 +83,7 @@ public class PlotHologram {
         nbt.put("Rotation", rotation);
         nbt.putByte("billboard", (byte) 0); // FIXED
         nbt.putString("text", buildJson(data));
-        nbt.putInt("background", 0x7F000000); // semi-transparent black background
+        nbt.putInt("background", 0xC0000000); // semi-transparent black background
         nbt.putInt("line_width", 200);
         nbt.putByte("text_opacity", (byte) 255);
         nbt.putByte("shadow", (byte) 0);
@@ -120,38 +120,47 @@ public class PlotHologram {
         timers.clear();
     }
 
+
     private static String tierColorCode(int tier) {
         return switch (tier) {
-            case 0 -> "§6";  // bronze/gold
-            case 1 -> "§e";  // gold/yellow
-            case 2 -> "§a";  // emerald/green
-            case 3 -> "§b";  // diamond/aqua
-            case 4 -> "§5";  // netherite/purple
-            default -> "§f";
+            case 0 -> "\u00a76";  // Bronce - dorado
+            case 1 -> "\u00a7e";  // Oro - amarillo
+            case 2 -> "\u00a7a";  // Esmeralda - verde
+            case 3 -> "\u00a7b";  // Diamante - aqua
+            case 4 -> "\u00a75";  // Netherita - purpura
+            default -> "\u00a7f";
         };
     }
 
     private static String buildJson(PlotData data) {
         String name = (data.getPlotName() != null && !data.getPlotName().isBlank())
                 ? data.getPlotName().toUpperCase() : "PARCELA PROTEGIDA";
-        PlotSize next  = data.getSize().next();
-        String nextStr = next != null ? "⬆ " + next.displayName : "★ Nivel Máximo";
+        PlotSize next = data.getSize().next();
         String tc = tierColorCode(data.getSize().tier);
 
-        // Build text with tier-colored top/bottom border lines inside the panel
-        String text =
-            tc + "§l▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n" +
-            "§6§l " + name + "\n" +
-            "§7 Dueño:    §f" + data.getOwnerName() + "\n" +
-            "§7 Nivel:    §b" + data.getSize().displayName + "\n" +
-            "§7 Tamaño:   §b" + data.getSize().radius + "×" + data.getSize().radius + "\n" +
-            "§7 Miembros: §a" + data.getMembers().size() + "\n" +
-            "§8 ─────────────────\n" +
-            "§e " + nextStr + "\n" +
-            tc + "§l▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬";
+        String nextLine = (next != null)
+                ? "\u00a77 Siguiente: " + tierColorCode(next.tier) + "\u00a7l" + next.displayName
+                : "\u00a76\u00a7l \u2605 Nivel Maximo \u2605";
 
-        // Escape backslashes then quotes for JSON string value
-        text = text.replace("\\", "\\\\").replace("\"", "\\\"");
+        // Top/bottom border: tier color + bold dashes (mimics the HUD panel borders)
+        String border  = tc + "\u00a7l\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550";
+        // Subdivider under name: dark gray thin line
+        String divider = "\u00a78\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500";
+        String NL = "\\n";
+
+        String text =
+            border + NL +
+            tc + "\u00a7l " + name + NL +
+            divider + NL +
+            "\u00a77 Due\u00f1o:    \u00a7f" + data.getOwnerName() + NL +
+            "\u00a77 Nivel:    " + tc + "\u00a7l" + data.getSize().displayName + NL +
+            "\u00a77 Tama\u00f1o:   \u00a7b" + data.getSize().radius + "x" + data.getSize().radius + NL +
+            "\u00a77 Miembros: \u00a7a" + data.getMembers().size() + NL +
+            divider + NL +
+            nextLine + NL +
+            border;
+
+        text = text.replace("\"", "\\\"");
         return "{\"text\":\"" + text + "\"}";
     }
 }

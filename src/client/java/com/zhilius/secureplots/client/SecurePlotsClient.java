@@ -93,7 +93,7 @@ public class SecurePlotsClient implements ClientModInitializer {
         ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) ->
                 HologramTestCommand.register(dispatcher));
 
-        PlotHologramClient.register();
+        // PlotHologramClient.register(); — disabled, hologram is now a server-side TextDisplayEntity
 
         ClientPlayNetworking.registerGlobalReceiver(ModPackets.OpenPlotScreenPayload.ID,
                 (payload, context) -> {
@@ -108,7 +108,7 @@ public class SecurePlotsClient implements ClientModInitializer {
                     context.client().execute(() -> {
                         MinecraftClient mc = context.client();
 
-                        PlotHologramClient.show(data, data.getCenter(), 10_000);
+                        // PlotHologramClient.show(data, data.getCenter(), 10_000); — disabled
 
                         for (BorderDisplay bd : activeBorders) {
                             if (bd.data.getCenter().equals(data.getCenter())) {
