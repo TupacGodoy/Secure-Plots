@@ -12,8 +12,12 @@ import net.minecraft.nbt.NbtList;
 import net.minecraft.nbt.NbtFloat;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.world.ServerWorld;
+import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.text.Text;
 import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.hit.BlockHitResult;
+import net.minecraft.util.hit.HitResult;
+import net.minecraft.world.RaycastContext;
 import net.minecraft.util.math.Box;
 import net.minecraft.util.math.Vec3d;
 
@@ -56,6 +60,11 @@ public class PlotHologram {
 
     public static void spawn(ServerWorld world, BlockPos blockPos, PlotData data,
                               int durationTicks, float playerYaw) {
+        spawn(world, blockPos, data, durationTicks, playerYaw, null);
+    }
+
+    public static void spawn(ServerWorld world, BlockPos blockPos, PlotData data,
+                              int durationTicks, float playerYaw, ServerPlayerEntity player) {
         // Remove previous hologram at this position
         UUID prev = active.remove(blockPos);
         if (prev != null) {
@@ -64,10 +73,27 @@ public class PlotHologram {
             if (e != null) e.discard();
         }
 
-        // Spawn 2.5 blocks above the plot block
+        // Spawn 1.5 blocks above the plot block (was 2.5)
         double x = blockPos.getX() + 0.5;
-        double y = blockPos.getY() + 2.5;
+        double y = blockPos.getY() + 1.5;
         double z = blockPos.getZ() + 0.5;
+
+        // Raycast: if blocks obstruct view from player to hologram, send chat instead
+        if (player != null) {
+            Vec3d playerEye = player.getEyePos();
+            Vec3d holoPos   = new Vec3d(x, y, z);
+            BlockHitResult hit = world.raycast(new RaycastContext(
+                playerEye, holoPos,
+                RaycastContext.ShapeType.VISUAL,
+                RaycastContext.FluidHandling.NONE,
+                player
+            ));
+            if (hit.getType() == HitResult.Type.BLOCK && !hit.getBlockPos().equals(blockPos)) {
+                // Something is blocking the view — send info to chat instead
+                sendToChat(player, data);
+                return;
+            }
+        }
 
         DisplayEntity.TextDisplayEntity disp = EntityType.TEXT_DISPLAY.create(world);
         if (disp == null) {
@@ -121,6 +147,32 @@ public class PlotHologram {
     }
 
 
+    private static void sendToChat(ServerPlayerEntity player, PlotData data) {
+        String tc = tierColorCode(data.getSize().tier);
+        String name = (data.getPlotName() != null && !data.getPlotName().isBlank())
+                ? data.getPlotName() : "Parcela Protegida";
+        PlotSize next = data.getSize().next();
+        String nextLine = (next != null)
+                ? "\u00a77Siguiente: " + tierColorCode(next.tier) + "\u00a7l" + next.displayName
+                : "\u00a76\u00a7lNivel M\u00e1ximo";
+
+        player.sendMessage(net.minecraft.text.Text.literal(
+            tc + "\u00a7l" + name.toUpperCase()), false);
+        player.sendMessage(net.minecraft.text.Text.literal(
+            "\u00a78- - - - - - - - - - - - -"), false);
+        player.sendMessage(net.minecraft.text.Text.literal(
+            "\u00a77Due\u00f1o:    \u00a7f" + data.getOwnerName()), false);
+        player.sendMessage(net.minecraft.text.Text.literal(
+            "\u00a77Nivel:    " + tc + "\u00a7l" + data.getSize().displayName), false);
+        player.sendMessage(net.minecraft.text.Text.literal(
+            "\u00a77Tama\u00f1o:   \u00a7b" + data.getSize().radius + "x" + data.getSize().radius), false);
+        player.sendMessage(net.minecraft.text.Text.literal(
+            "\u00a77Miembros: \u00a7a" + data.getMembers().size()), false);
+        player.sendMessage(net.minecraft.text.Text.literal(
+            "\u00a78- - - - - - - - - - - - -"), false);
+        player.sendMessage(net.minecraft.text.Text.literal(nextLine), false);
+    }
+
     private static String tierColorCode(int tier) {
         return switch (tier) {
             case 0 -> "\u00a76";  // Bronce - dorado
@@ -132,20 +184,55 @@ public class PlotHologram {
         };
     }
 
+    /** Measure string width in Minecraft font pixels (no color codes) */
+    private static int mcWidth(String s) {
+        String clean = s.replaceAll("§.", "");
+        int w = 0;
+        for (char ch : clean.toCharArray()) {
+            if (ch == ' ') { w += 4; }
+            else if (ch == 'i' || ch == '!' || ch == '.' || ch == ':' || ch == ';' || ch == '|') { w += 2; }
+            else if (ch == 'l') { w += 3; }
+            else if (ch == 'f' || ch == 'k' || ch == 't') { w += 5; }
+            else { w += 6; }
+        }
+        return w;
+    }
+
     private static String buildJson(PlotData data) {
         String name = (data.getPlotName() != null && !data.getPlotName().isBlank())
                 ? data.getPlotName().toUpperCase() : "PARCELA PROTEGIDA";
         PlotSize next = data.getSize().next();
         String tc = tierColorCode(data.getSize().tier);
 
+        // Arrow: thin vertical bar body + triangle tip (unicode)
+        String ntc = next != null ? tierColorCode(next.tier) : "";
         String nextLine = (next != null)
-                ? "\u00a77 Siguiente: " + tierColorCode(next.tier) + "\u00a7l" + next.displayName
-                : "\u00a76\u00a7l \u2605 Nivel Maximo \u2605";
+                ? "\u00a7e\u2b06 \u00a77Siguiente: " + ntc + "\u00a7l" + next.displayName
+                : "\u00a76\u00a7l\u2605 Nivel Maximo \u2605";
 
-        // Top/bottom border: tier color + bold dashes (mimics the HUD panel borders)
-        String border  = tc + "\u00a7l\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550";
-        // Subdivider under name: dark gray thin line
-        String divider = "\u00a78\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500";
+        // Measure each visible line in Minecraft font pixels
+        // § codes are stripped inside mcWidth()
+        String raw_name    = " " + name;
+        String raw_dueno   = " Dueño:    " + data.getOwnerName();
+        String raw_nivel   = " Nivel:    " + data.getSize().displayName;
+        String raw_tamano  = " Tamaño:   " + data.getSize().radius + "x" + data.getSize().radius;
+        String raw_members = " Miembros: " + data.getMembers().size();
+        String raw_next    = next != null
+                ? " ⬡ Siguiente: " + next.displayName
+                : " ★ Nivel Maximo ★";
+
+        int maxPx = 0;
+        for (String l : new String[]{raw_name, raw_dueno, raw_nivel, raw_tamano, raw_members, raw_next}) {
+            maxPx = Math.max(maxPx, mcWidth(l));
+        }
+
+        // '-' = 6px wide in Minecraft font — use it for both border and divider
+        int dashCount = maxPx / 6 + 4; // +2 dashes each side
+        StringBuilder borderSB  = new StringBuilder();
+        StringBuilder dividerSB = new StringBuilder();
+        for (int i = 0; i < dashCount; i++) { borderSB.append("-"); dividerSB.append("-"); }
+        String border  = tc  + "\u00a7l" + borderSB;
+        String divider = "\u00a78" + dividerSB;
         String NL = "\\n";
 
         String text =
@@ -157,7 +244,7 @@ public class PlotHologram {
             "\u00a77 Tama\u00f1o:   \u00a7b" + data.getSize().radius + "x" + data.getSize().radius + NL +
             "\u00a77 Miembros: \u00a7a" + data.getMembers().size() + NL +
             divider + NL +
-            nextLine + NL +
+            " " + nextLine + NL +
             border;
 
         text = text.replace("\"", "\\\"");
