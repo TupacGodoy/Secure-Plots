@@ -73,6 +73,9 @@ public class SpCommand {
                 // /sp clearholos — elimina todos los holograms renderizados
                 .then(CommandManager.literal("clearholos")
                         .executes(ctx -> executeClearHolos(ctx.getSource())))
+                // /sp testholo — spawna un TextDisplay de prueba donde estás parado
+                .then(CommandManager.literal("testholo")
+                        .executes(ctx -> executeTestHolo(ctx.getSource())))
             );
         }
     }
@@ -363,5 +366,42 @@ public class SpCommand {
             case 4 -> Formatting.DARK_PURPLE;
             default -> Formatting.WHITE;
         };
+    }
+
+    private static int executeTestHolo(ServerCommandSource source) {
+        net.minecraft.server.network.ServerPlayerEntity player = source.getPlayer();
+        if (player == null) return 0;
+        if (!(source.getWorld() instanceof net.minecraft.server.world.ServerWorld sw)) return 0;
+
+        net.minecraft.entity.decoration.DisplayEntity.TextDisplayEntity disp =
+                net.minecraft.entity.EntityType.TEXT_DISPLAY.create(sw);
+        if (disp == null) {
+            player.sendMessage(net.minecraft.text.Text.literal("§cERROR: create() null"), false);
+            return 0;
+        }
+
+        net.minecraft.nbt.NbtCompound nbt = new net.minecraft.nbt.NbtCompound();
+        net.minecraft.nbt.NbtList rotation = new net.minecraft.nbt.NbtList();
+        rotation.add(net.minecraft.nbt.NbtFloat.of(player.getYaw() + 180f));
+        rotation.add(net.minecraft.nbt.NbtFloat.of(0f));
+        nbt.put("Rotation", rotation);
+        nbt.putByte("billboard", (byte) 0);
+        nbt.putString("text", "{\"text\":\"§6§lTEST FIJO\\n§7Si ves esto fijo, funciona.\"}");
+        nbt.putInt("background", 0x60000000);
+        nbt.putInt("line_width", 200);
+        disp.readNbt(nbt);
+        disp.setPos(player.getX(), player.getY() + 2.0, player.getZ());
+
+        boolean ok = sw.spawnEntity(disp);
+        player.sendMessage(net.minecraft.text.Text.literal(ok ? "§aOK spawned" : "§cFAIL"), false);
+        com.zhilius.secureplots.SecurePlots.LOGGER.info("[testholo] ok={}", ok);
+
+        final java.util.UUID id = disp.getUuid();
+        new java.util.Timer().schedule(new java.util.TimerTask() {
+            @Override public void run() {
+                sw.getServer().execute(() -> { net.minecraft.entity.Entity e = sw.getEntity(id); if (e != null) e.discard(); });
+            }
+        }, 10000);
+        return 1;
     }
 }

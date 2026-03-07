@@ -80,9 +80,7 @@ public class PlotHologramRenderer3D {
         matrices.push();
         matrices.translate(wx, wy, wz);
 
-        // Billboard yaw-only
-        float yaw = (float) Math.atan2(-wx, -wz);
-        matrices.multiply(new Quaternionf().rotationY(yaw));
+        // Holograma fijo en el espacio 3D — sin rotación billboard
 
         // Todo en espacio font: escalar una sola vez
         matrices.scale(TEXT_SCALE, -TEXT_SCALE, TEXT_SCALE);
