@@ -144,6 +144,27 @@ public class PlotMenuHandler extends GenericContainerScreenHandler {
                 "§6✏ Renombrar parcela",
                 "§7Clic para cambiar el nombre"));
         }
+
+        // Inactivity expiry info (only shown if the feature is enabled)
+        SecurePlotsConfig cfg = SecurePlotsConfig.INSTANCE;
+        if (cfg != null && cfg.inactivityExpiry.enabled) {
+            if (!(player.getWorld() instanceof ServerWorld sw)) return;
+            long currentTick = sw.getTime();
+            long daysInactive = data.getDaysInactive(currentTick);
+            long maxDays = cfg.inactivityExpiry.baseDays + ((long) cfg.inactivityExpiry.daysPerTier * data.getSize().tier);
+            long daysLeft = Math.max(0, maxDays - daysInactive);
+
+            String statusColor = daysLeft > 7 ? "§a" : daysLeft > 0 ? "§e" : "§c";
+            String expiryLine = daysLeft > 0
+                ? statusColor + daysLeft + " §7días para expirar"
+                : "§c⚠ ¡Protección expirada!";
+
+            menuInv.setStack(30, namedLore(Items.CLOCK,
+                "§eInactividad del dueño",
+                "§7Días inactivo: §f" + daysInactive,
+                "§7Máx. días: §f" + maxDays,
+                expiryLine));
+        }
     }
 
     // ── MEMBERS PAGE ─────────────────────────────────────────────────────────

@@ -10,6 +10,7 @@ import com.zhilius.secureplots.hologram.PlotHologram;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.event.player.AttackBlockCallback;
 import net.fabricmc.fabric.api.event.player.UseBlockCallback;
+import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.minecraft.text.Text;
 import net.minecraft.util.ActionResult;
 import net.minecraft.util.Formatting;
@@ -49,14 +50,35 @@ public class SecurePlots implements ModInitializer {
         // Register area entry HUD messages
         com.zhilius.secureplots.plot.PlotAreaTracker.register();
 
-        // Protect plots from modification by non-members
+        // Register protection events
         registerProtectionEvents();
+
+        // Track owner activity for inactivity expiry
+        registerActivityTracking();
 
         LOGGER.info("Secure Plots listo!");
     }
 
     // How many blocks outside the plot border members can still interact from
     private static final int MEMBER_REACH_BONUS = 5;
+
+    private void registerActivityTracking() {
+        // Update lastOwnerSeenTick whenever a player joins or leaves the server
+        ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> {
+            var player = handler.player;
+            var world = server.getOverworld();
+            long tick = world.getTime();
+            com.zhilius.secureplots.plot.PlotManager.getOrCreate(world)
+                .updateOwnerSeen(player.getUuid(), tick);
+        });
+        ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> {
+            var player = handler.player;
+            var world = server.getOverworld();
+            long tick = world.getTime();
+            com.zhilius.secureplots.plot.PlotManager.getOrCreate(world)
+                .updateOwnerSeen(player.getUuid(), tick);
+        });
+    }
 
     private void registerProtectionEvents() {
         // Breaking blocks: only allowed if player has permission AND

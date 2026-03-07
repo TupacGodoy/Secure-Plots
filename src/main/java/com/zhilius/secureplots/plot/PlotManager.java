@@ -112,6 +112,18 @@ public class PlotManager extends PersistentState {
         return result;
     }
 
+    /** Called when the owner logs in or out; updates lastOwnerSeenTick on all their plots. */
+    public void updateOwnerSeen(UUID ownerId, long currentTick) {
+        boolean changed = false;
+        for (PlotData data : plots.values()) {
+            if (data.getOwnerId().equals(ownerId)) {
+                data.setLastOwnerSeenTick(currentTick);
+                changed = true;
+            }
+        }
+        if (changed) markDirty();
+    }
+
     public void removeExpiredPlots(long currentTick) {
         List<BlockPos> toRemove = new ArrayList<>();
         for (Map.Entry<BlockPos, PlotData> entry : plots.entrySet()) {

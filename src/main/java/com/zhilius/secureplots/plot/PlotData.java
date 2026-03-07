@@ -1,5 +1,6 @@
 package com.zhilius.secureplots.plot;
 
+import com.zhilius.secureplots.config.SecurePlotsConfig;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.nbt.NbtList;
 import net.minecraft.util.math.BlockPos;
@@ -27,6 +28,8 @@ public class PlotData {
     private boolean hasRank;
 
     private long placedAtTick;
+    // Tick of the last time the owner was seen online (used for inactivity expiry)
+    private long lastOwnerSeenTick;
 
     private Map<UUID, Role> members = new HashMap<>();
     private Map<UUID, String> memberNames = new HashMap<>();
@@ -41,6 +44,7 @@ public class PlotData {
         this.center = center;
         this.size = size;
         this.placedAtTick = currentTick;
+        this.lastOwnerSeenTick = currentTick;
         this.plotName = ownerName + "'s Plot";
         this.hasRank = false;
     }
@@ -59,6 +63,8 @@ public class PlotData {
     public String getPlotName() { return plotName; }
     public void setPlotName(String plotName) { this.plotName = plotName; }
     public long getPlacedAtTick() { return placedAtTick; }
+    public long getLastOwnerSeenTick() { return lastOwnerSeenTick; }
+    public void setLastOwnerSeenTick(long tick) { this.lastOwnerSeenTick = tick; }
     public Map<UUID, Role> getMembers() { return members; }
 
     public void addMember(UUID uuid, String name, Role role) {
@@ -123,18 +129,25 @@ public class PlotData {
 
     public boolean isExpired(long currentTick) {
         if (hasRank) return false;
-        long ticksAlive = currentTick - placedAtTick;
-        long daysAlive = ticksAlive / 24000L;
-        long maxDays = 25L + (5L * size.tier);
-        return daysAlive > maxDays;
+        SecurePlotsConfig cfg = SecurePlotsConfig.INSTANCE;
+        if (cfg == null || !cfg.inactivityExpiry.enabled) return false;
+        long inactiveTicks = currentTick - lastOwnerSeenTick;
+        long inactiveDays = inactiveTicks / 24000L;
+        long maxDays = cfg.inactivityExpiry.baseDays + ((long) cfg.inactivityExpiry.daysPerTier * size.tier);
+        return inactiveDays > maxDays;
+    }
+
+    public long getDaysInactive(long currentTick) {
+        return (currentTick - lastOwnerSeenTick) / 24000L;
     }
 
     public long getDaysRemaining(long currentTick) {
         if (hasRank) return Long.MAX_VALUE;
-        long ticksAlive = currentTick - placedAtTick;
-        long daysAlive = ticksAlive / 24000L;
-        long maxDays = 25L + (5L * size.tier);
-        return Math.max(0, maxDays - daysAlive);
+        SecurePlotsConfig cfg = SecurePlotsConfig.INSTANCE;
+        if (cfg == null || !cfg.inactivityExpiry.enabled) return Long.MAX_VALUE;
+        long inactiveDays = (currentTick - lastOwnerSeenTick) / 24000L;
+        long maxDays = cfg.inactivityExpiry.baseDays + ((long) cfg.inactivityExpiry.daysPerTier * size.tier);
+        return Math.max(0, maxDays - inactiveDays);
     }
 
     public String getMemberName(UUID uuid) {
@@ -153,6 +166,7 @@ public class PlotData {
         nbt.putInt("sizeTier", size.tier);
         nbt.putBoolean("hasRank", hasRank);
         nbt.putLong("placedAt", placedAtTick);
+        nbt.putLong("lastOwnerSeen", lastOwnerSeenTick);
         nbt.putString("plotName", plotName);
 
         NbtList membersList = new NbtList();
@@ -182,6 +196,8 @@ public class PlotData {
         data.size = PlotSize.fromTier(nbt.getInt("sizeTier"));
         data.hasRank = nbt.getBoolean("hasRank");
         data.placedAtTick = nbt.getLong("placedAt");
+        // Fallback: if never stored, treat owner as seen when plot was placed
+        data.lastOwnerSeenTick = nbt.contains("lastOwnerSeen") ? nbt.getLong("lastOwnerSeen") : data.placedAtTick;
         data.plotName = nbt.getString("plotName");
 
         NbtList membersList = nbt.getList("members", 10);

@@ -21,6 +21,18 @@ public class SecurePlotsConfig {
     // Max plots per player (0 = unlimited)
     public int maxPlotsPerPlayer = 3;
 
+    // Inactivity expiry: remove protection after owner is inactive for N days
+    public InactivityExpiry inactivityExpiry = new InactivityExpiry();
+
+    public static class InactivityExpiry {
+        // Whether inactivity expiry is enabled (default: disabled)
+        public boolean enabled = false;
+        // Base days of inactivity before expiry (default: 45)
+        public int baseDays = 45;
+        // Extra days per protection upgrade tier (default: 5)
+        public int daysPerTier = 5;
+    }
+
     // Cobblecoins mod item ID
     public String cobblescoinsItemId = "cobbleverse:cobblecoin";
 
