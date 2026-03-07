@@ -347,6 +347,8 @@ public class PlotMenuHandler extends GenericContainerScreenHandler {
 
         // Cerrar menú para ver las partículas
         player.closeHandledScreen();
+        // Enviar nuevo borde al cliente — esto dispara la transición animada
+        com.zhilius.secureplots.network.ModPackets.sendShowPlotBorder(player, fresh);
         player.sendMessage(Text.literal("§a✔ ¡Protección mejorada a §e" + next.displayName + "§a!"), false);
     }
 

@@ -11,13 +11,9 @@ import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.client.gui.widget.TextFieldWidget;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
-import net.minecraft.util.Identifier;
 import net.minecraft.util.math.BlockPos;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 
 public class PlotScreen extends Screen {
 
@@ -33,11 +29,9 @@ public class PlotScreen extends Screen {
     private TextFieldWidget nameField;
     private TextFieldWidget addPlayerField;
 
-    // Textura de inventario vanilla (179x166)
-    private static final Identifier INVENTORY_BG =
-            Identifier.ofVanilla("textures/gui/container/inventory.png");
+    // If non-null, we're showing the permission sub-screen for this member
+    private UUID selectedMember = null;
 
-    // Panel — mismo tamaño que chest grande (176×166 escalado)
     private static final int PW = 300;
     private static final int PH = 230;
 
@@ -56,20 +50,59 @@ public class PlotScreen extends Screen {
         myRole = data.getRoleOf(this.client.player.getUuid());
         int px = px(), py = py();
 
-        // ── Tabs estilo Minecraft: 3 botones pegados al panel ─────────────────
+        // If showing member permissions sub-screen, only add back button + perm toggles
+        if (selectedMember != null) {
+            initPermissionsSubScreen(px, py);
+            return;
+        }
+
         int tw = PW / 3;
-        addDrawableChild(ButtonWidget.builder(Text.literal("Info"), b -> { activeTab = TAB_INFO; clearAndInit(); })
+        addDrawableChild(ButtonWidget.builder(Text.literal("Info"), b -> { activeTab = TAB_INFO; selectedMember = null; clearAndInit(); })
                 .dimensions(px,        py - 20, tw - 1, 20).build());
-        addDrawableChild(ButtonWidget.builder(Text.literal("Miembros"), b -> { activeTab = TAB_MEMBERS; clearAndInit(); })
+        addDrawableChild(ButtonWidget.builder(Text.literal("Miembros"), b -> { activeTab = TAB_MEMBERS; selectedMember = null; clearAndInit(); })
                 .dimensions(px + tw,   py - 20, tw - 1, 20).build());
-        addDrawableChild(ButtonWidget.builder(Text.literal("Mejorar"), b -> { activeTab = TAB_UPGRADE; clearAndInit(); })
+        addDrawableChild(ButtonWidget.builder(Text.literal("Mejorar"), b -> { activeTab = TAB_UPGRADE; selectedMember = null; clearAndInit(); })
                 .dimensions(px + tw*2, py - 20, tw,     20).build());
 
-        int cy = py + 28; // área de contenido
+        int cy = py + 28;
 
         if (activeTab == TAB_INFO)    initInfoTab(px, cy);
         if (activeTab == TAB_MEMBERS) initMembersTab(px, cy);
         if (activeTab == TAB_UPGRADE) initUpgradeTab(px, cy);
+    }
+
+    // ── PERMISSIONS SUB-SCREEN ───────────────────────────────────────────────
+    private void initPermissionsSubScreen(int px, int py) {
+        boolean canManage = myRole == PlotData.Role.OWNER || myRole == PlotData.Role.ADMIN;
+        // Back button
+        addDrawableChild(ButtonWidget.builder(Text.literal("← Volver"), b -> {
+            selectedMember = null; activeTab = TAB_MEMBERS; clearAndInit();
+        }).dimensions(px, py - 20, 80, 20).build());
+
+        if (!canManage) return;
+
+        int cy = py + 50;
+        int btnW = PW - 30;
+
+        for (PlotData.Permission perm : PlotData.Permission.values()) {
+            boolean has = data.hasPermission(selectedMember, perm);
+            String label = (has ? "§a✔ " : "§c✗ ") + permLabel(perm) + " §7— " + permDesc(perm);
+            final PlotData.Permission p = perm;
+            addDrawableChild(ButtonWidget.builder(Text.literal(label), b -> {
+                boolean current = data.hasPermission(selectedMember, p);
+                ClientPlayNetworking.send(new ModPackets.SetPermissionPayload(
+                    plotPos, selectedMember.toString(), p.name(), !current));
+            }).dimensions(px + 12, cy, btnW, 18).build());
+            cy += 22;
+        }
+
+        // Remove member button
+        cy += 8;
+        String memberName = data.getMemberName(selectedMember);
+        addDrawableChild(ButtonWidget.builder(
+            Text.literal("§c🗑 Eliminar a " + memberName + " de la plot"), b ->
+                ClientPlayNetworking.send(new ModPackets.RemoveMemberPayload(plotPos, memberName))
+        ).dimensions(px + 12, cy, btnW, 18).build());
     }
 
     // ── INFO ─────────────────────────────────────────────────────────────────
@@ -106,15 +139,31 @@ public class PlotScreen extends Screen {
             }).dimensions(px + PW - 88, cy + 15, 84, 18).build());
         }
 
+        int sepY = cy + (canManage ? 40 : 4);
         List<Map.Entry<UUID, PlotData.Role>> members = new ArrayList<>(data.getMembers().entrySet());
-        int rowY = cy + 44;
+        int rowY = sepY + 20;
+
         for (Map.Entry<UUID, PlotData.Role> entry : members) {
-            if (rowY + 14 > py() + PH - 14) break;
-            String memberName = data.getMemberName(entry.getKey());
-            addDrawableChild(ButtonWidget.builder(Text.literal("✕"), b ->
+            if (rowY + 18 > py() + PH - 14) break;
+            UUID uuid = entry.getKey();
+            String memberName = data.getMemberName(uuid);
+
+            // Click row → open permissions sub-screen
+            if (canManage) {
+                addDrawableChild(ButtonWidget.builder(
+                    Text.literal("⚙ " + memberName), b -> {
+                        selectedMember = uuid;
+                        clearAndInit();
+                    }).dimensions(px + 8, rowY - 2, PW - 40, 16).build());
+            }
+
+            // Quick remove (✕) button
+            if (canManage) {
+                addDrawableChild(ButtonWidget.builder(Text.literal("✕"), b ->
                     ClientPlayNetworking.send(new ModPackets.RemoveMemberPayload(plotPos, memberName)))
                     .dimensions(px + PW - 26, rowY - 2, 16, 14).build());
-            rowY += 16;
+            }
+            rowY += 18;
         }
     }
 
@@ -132,46 +181,61 @@ public class PlotScreen extends Screen {
     // ── RENDER ───────────────────────────────────────────────────────────────
     @Override
     public void render(DrawContext ctx, int mouseX, int mouseY, float delta) {
-        // Fondo vanilla oscuro (sin blur world)
         renderBackground(ctx, mouseX, mouseY, delta);
 
         int px = px(), py = py();
 
-        // Panel tipo inventario: fondo gris plano vanilla
-        // Borde exterior
         ctx.fill(px - 1, py - 1, px + PW + 1, py + PH + 1, 0xFF373737);
-        // Fondo
         ctx.fill(px, py, px + PW, py + PH, 0xFFC6C6C6);
-        // Sombra interior top-left
         ctx.fill(px + 1, py + 1, px + PW, py + 2,        0xFF8B8B8B);
         ctx.fill(px + 1, py + 1, px + 2,  py + PH,       0xFF8B8B8B);
-        // Resalte interior bottom-right
         ctx.fill(px + 1, py + PH - 2, px + PW - 1, py + PH - 1, 0xFFFFFFFF);
         ctx.fill(px + PW - 2, py + 1,  px + PW - 1, py + PH - 1, 0xFFFFFFFF);
 
-        // Barra de título
         ctx.fill(px, py, px + PW, py + 24, 0xFF555555);
         ctx.fill(px, py, px + PW, py + 23, 0xFF666666);
+
+        // Title
+        String title = selectedMember != null
+            ? "⚙ Permisos de " + data.getMemberName(selectedMember)
+            : "🛡 " + data.getPlotName();
         ctx.drawTextWithShadow(textRenderer,
-                Text.literal("🛡 " + data.getPlotName()).formatted(Formatting.YELLOW),
+                Text.literal(title).formatted(Formatting.YELLOW),
                 px + 6, py + 7, 0xFFFFFF);
 
-        // Resaltar tab activo
-        int tw = PW / 3;
-        int tabX = px + activeTab * tw;
-        ctx.fill(tabX, py - 20, tabX + tw - (activeTab == 2 ? 0 : 1), py, 0x55FFFFFF);
-
-        // Línea separadora bajo título
         ctx.fill(px + 4, py + 24, px + PW - 4, py + 25, 0xFF8B8B8B);
+
+        // Tab highlight (only when not in sub-screen)
+        if (selectedMember == null) {
+            int tw = PW / 3;
+            int tabX = px + activeTab * tw;
+            ctx.fill(tabX, py - 20, tabX + tw - (activeTab == 2 ? 0 : 1), py, 0x55FFFFFF);
+        }
 
         int cy = py + 28;
         int x  = px + 8;
 
-        if (activeTab == TAB_INFO)    renderInfo(ctx, x, cy);
-        if (activeTab == TAB_MEMBERS) renderMembers(ctx, x, cy);
-        if (activeTab == TAB_UPGRADE) renderUpgrade(ctx, x, cy);
+        if (selectedMember != null) {
+            renderPermissions(ctx, x, cy);
+        } else {
+            if (activeTab == TAB_INFO)    renderInfo(ctx, x, cy);
+            if (activeTab == TAB_MEMBERS) renderMembers(ctx, x, cy);
+            if (activeTab == TAB_UPGRADE) renderUpgrade(ctx, x, cy);
+        }
 
         super.render(ctx, mouseX, mouseY, delta);
+    }
+
+    // ── Render Permissions ───────────────────────────────────────────────────
+    private void renderPermissions(DrawContext ctx, int x, int y) {
+        if (selectedMember == null) return;
+        String name = data.getMemberName(selectedMember);
+        PlotData.Role role = data.getRoleOf(selectedMember);
+        ctx.drawTextWithShadow(textRenderer,
+            Text.literal(name + " §8[" + role.name().toLowerCase() + "]"), x, y + 4, roleRgb(role));
+        ctx.drawTextWithShadow(textRenderer,
+            Text.literal("Activá o desactivá permisos individuales:").formatted(Formatting.DARK_GRAY),
+            x, y + 18, 0x555555);
     }
 
     // ── Render Info ──────────────────────────────────────────────────────────
@@ -179,7 +243,6 @@ public class PlotScreen extends Screen {
         assert this.client != null;
         long time = this.client.world != null ? this.client.world.getTime() : 0;
 
-        // Fila nombre
         ctx.drawTextWithShadow(textRenderer,
                 Text.literal("Nombre:").formatted(Formatting.DARK_GRAY), x, y + 6, 0x000000);
         if (myRole != PlotData.Role.OWNER) {
@@ -224,27 +287,11 @@ public class PlotScreen extends Screen {
 
         int memberCount = data.getMembers().size();
         ctx.drawTextWithShadow(textRenderer,
-                Text.literal("Miembros (" + memberCount + ")"), x, sepY + 4, 0x333333);
+                Text.literal("Miembros (" + memberCount + ")  §8— clic para ver permisos"), x, sepY + 4, 0x333333);
 
         if (data.getMembers().isEmpty()) {
             ctx.drawTextWithShadow(textRenderer,
-                    Text.literal("Ninguno todavía."), x, sepY + 18, 0x777777);
-            return;
-        }
-
-        int rowY = sepY + 18;
-        for (Map.Entry<UUID, PlotData.Role> entry : data.getMembers().entrySet()) {
-            if (rowY + 16 > py() + PH - 14) {
-                ctx.drawTextWithShadow(textRenderer, Text.literal("..."), x, rowY, 0x555555);
-                break;
-            }
-            String name = data.getMemberName(entry.getKey());
-            PlotData.Role role = entry.getValue();
-            ctx.drawTextWithShadow(textRenderer,
-                    Text.literal("• " + name + " ").formatted(Formatting.BLACK)
-                            .append(Text.literal("[" + role.name().toLowerCase() + "]")),
-                    x, rowY, roleRgb(role));
-            rowY += 16;
+                    Text.literal("Ninguno todavía."), x, sepY + 22, 0x777777);
         }
     }
 
@@ -310,6 +357,24 @@ public class PlotScreen extends Screen {
             case ADMIN   -> 0xAA0000;
             case MEMBER  -> 0x005500;
             case VISITOR -> 0x555555;
+        };
+    }
+
+    private static String permLabel(PlotData.Permission perm) {
+        return switch (perm) {
+            case BUILD      -> "Construir";
+            case INTERACT   -> "Interactuar";
+            case CONTAINERS -> "Abrir cofres";
+            case PVP        -> "PvP";
+        };
+    }
+
+    private static String permDesc(PlotData.Permission perm) {
+        return switch (perm) {
+            case BUILD      -> "Colocar y romper bloques";
+            case INTERACT   -> "Usar palancas, puertas, etc.";
+            case CONTAINERS -> "Abrir cofres e inventarios";
+            case PVP        -> "Atacar jugadores en la plot";
         };
     }
 

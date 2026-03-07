@@ -68,13 +68,7 @@ public class PlotBlock extends BlockWithEntity {
             com.zhilius.secureplots.plot.PlotData data = manager.getPlot(pos);
             if (data != null) {
                 com.zhilius.secureplots.network.ModPackets.sendShowPlotBorder((ServerPlayerEntity) player, data);
-
-                boolean spaceAvailable = PlotHologram.hasSpace((net.minecraft.server.world.ServerWorld) world, pos);
-                if (spaceAvailable) {
-                    PlotHologram.spawn((net.minecraft.server.world.ServerWorld) world, pos, data, 200, player.getYaw());
-                } else {
-                    sendInfoToChat((ServerPlayerEntity) player, data);
-                }
+                PlotHologram.spawn((net.minecraft.server.world.ServerWorld) world, pos, data, 200, player.getYaw());
             }
         }
         return ActionResult.SUCCESS;

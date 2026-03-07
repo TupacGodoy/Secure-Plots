@@ -91,6 +91,14 @@ public class ModPackets {
         @Override public Id<? extends CustomPayload> getId() { return ID; }
     }
 
+    public record SetPermissionPayload(BlockPos pos, String memberUuid, String permission, boolean enabled) implements CustomPayload {
+        public static final Id<SetPermissionPayload> ID = new Id<>(Identifier.of(SecurePlots.MOD_ID, "set_permission"));
+        public static final PacketCodec<PacketByteBuf, SetPermissionPayload> CODEC = PacketCodec.of(
+                (value, buf) -> { buf.writeBlockPos(value.pos()); buf.writeString(value.memberUuid()); buf.writeString(value.permission()); buf.writeBoolean(value.enabled()); },
+                buf -> new SetPermissionPayload(buf.readBlockPos(), buf.readString(), buf.readString(), buf.readBoolean()));
+        @Override public Id<? extends CustomPayload> getId() { return ID; }
+    }
+
     public record UpgradePlotPayload(BlockPos pos) implements CustomPayload {
         public static final Id<UpgradePlotPayload> ID = new Id<>(Identifier.of(SecurePlots.MOD_ID, "upgrade_plot"));
         public static final PacketCodec<PacketByteBuf, UpgradePlotPayload> CODEC = PacketCodec.of(
@@ -120,6 +128,7 @@ public class ModPackets {
         PayloadTypeRegistry.playC2S().register(UpdatePlotPayload.ID, UpdatePlotPayload.CODEC);
         PayloadTypeRegistry.playC2S().register(UpgradePlotPayload.ID, UpgradePlotPayload.CODEC);
         PayloadTypeRegistry.playC2S().register(AddMemberPayload.ID, AddMemberPayload.CODEC);
+        PayloadTypeRegistry.playC2S().register(SetPermissionPayload.ID, SetPermissionPayload.CODEC);
         PayloadTypeRegistry.playC2S().register(RemoveMemberPayload.ID, RemoveMemberPayload.CODEC);
     }
 
@@ -267,6 +276,26 @@ public class ModPackets {
                             .formatted(net.minecraft.util.Formatting.RED), false);
                 }
                 sendOpenPlotScreen(player, pos, data);
+            });
+        });
+        // Set permission handler
+        ServerPlayNetworking.registerGlobalReceiver(SetPermissionPayload.ID, (payload, context) -> {
+            BlockPos pos = payload.pos();
+            ServerPlayerEntity player = context.player();
+            context.server().execute(() -> {
+                if (!(player.getWorld() instanceof net.minecraft.server.world.ServerWorld serverWorld)) return;
+                var manager = com.zhilius.secureplots.plot.PlotManager.getOrCreate(serverWorld);
+                PlotData data = manager.getPlot(pos);
+                if (data == null) return;
+                boolean isAdmin = player.getCommandTags().contains("plot_admin");
+                if (!data.getOwnerId().equals(player.getUuid()) && !isAdmin) return;
+                try {
+                    java.util.UUID memberUuid = java.util.UUID.fromString(payload.memberUuid());
+                    PlotData.Permission perm = PlotData.Permission.valueOf(payload.permission());
+                    data.setPermission(memberUuid, perm, payload.enabled());
+                    manager.markDirty();
+                    sendOpenPlotScreen(player, pos, data);
+                } catch (Exception ignored) {}
             });
         });
     }

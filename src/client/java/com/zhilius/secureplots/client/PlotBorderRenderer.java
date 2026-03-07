@@ -26,31 +26,47 @@ public class PlotBorderRenderer {
         { 0.45f, 0.20f, 0.60f,   0.22f, 0.05f, 0.32f,   0.78f, 0.58f, 0.90f }, // netherite
     };
 
-    public static void render(WorldRenderContext context, PlotData data) {
+    public static void render(WorldRenderContext context, SecurePlotsClient.BorderDisplay display) {
+        PlotData data = display.data;
         MinecraftClient client = MinecraftClient.getInstance();
         if (client.player == null) return;
 
-        PlotSize size = data.getSize();
+        float halfF = display.effectiveRadiusF() / 2f;
         BlockPos center = data.getCenter();
-        int half = size.radius / 2;
+
+        // Lerped tier for color blending
+        float transP = display.transitionProgress();
+        int fromTier = display.prevTier < 0 ? data.getSize().tier : display.prevTier;
+        int toTier   = data.getSize().tier;
+        // Clamp tiers
+        fromTier = Math.max(0, Math.min(fromTier, TIER_COLORS.length - 1));
+        toTier   = Math.max(0, Math.min(toTier,   TIER_COLORS.length - 1));
 
         double camX = context.camera().getPos().x;
         double camY = context.camera().getPos().y;
         double camZ = context.camera().getPos().z;
 
-        double minX = (center.getX() + 0.5) - half - camX;
-        double maxX = (center.getX() + 0.5) + half - camX;
-        double minZ = (center.getZ() + 0.5) - half - camZ;
-        double maxZ = (center.getZ() + 0.5) + half - camZ;
+        double minX = (center.getX() + 0.5) - halfF - camX;
+        double maxX = (center.getX() + 0.5) + halfF - camX;
+        double minZ = (center.getZ() + 0.5) - halfF - camZ;
+        double maxZ = (center.getZ() + 0.5) + halfF - camZ;
 
         double baseY = center.getY() - camY;
         double topY  = baseY + 25;
 
-        int tier = Math.max(0, Math.min(size.tier, TIER_COLORS.length - 1));
-        float[] c = TIER_COLORS[tier];
-        float r  = c[0], g  = c[1], b  = c[2];
-        float gr = c[3], gg = c[4], gb = c[5];
-        float wr = c[6], wg = c[7], wb = c[8];
+        int tier = toTier; // keep for reference
+        float[] cf = TIER_COLORS[fromTier];
+        float[] ct = TIER_COLORS[toTier];
+        // Lerp all 9 color channels
+        float r  = cf[0] + transP * (ct[0] - cf[0]);
+        float g  = cf[1] + transP * (ct[1] - cf[1]);
+        float b  = cf[2] + transP * (ct[2] - cf[2]);
+        float gr = cf[3] + transP * (ct[3] - cf[3]);
+        float gg = cf[4] + transP * (ct[4] - cf[4]);
+        float gb = cf[5] + transP * (ct[5] - cf[5]);
+        float wr = cf[6] + transP * (ct[6] - cf[6]);
+        float wg = cf[7] + transP * (ct[7] - cf[7]);
+        float wb = cf[8] + transP * (ct[8] - cf[8]);
 
         long  time  = System.currentTimeMillis();
         float t     = (time % 2000) / 2000.0f;
@@ -181,6 +197,42 @@ public class PlotBorderRenderer {
                 quadBeamX(buf, mx, minX, ry, minZ, maxZ, RW*0.4f, wr, wg, wb, alpha * 0.6f);
                 quadBeamX(buf, mx, maxX, ry, minZ, maxZ, RW*0.4f, wr, wg, wb, alpha * 0.6f);
             }
+            BufferRenderer.drawWithGlobalProgram(buf.end());
+        }
+
+        // ── 7. ANILLO DE EXPANSIÓN (solo durante upgrade) ─────────────────
+        float expandExtra = display.expandPulseRadius();
+        if (expandExtra > 0.1f) {
+            float[] ct2 = TIER_COLORS[toTier];
+            float ep = expandExtra / 8f; // 0..1 normalized
+            float pulseAlpha = ep * (1.0f - ep) * 2.8f; // peaks at midpoint
+            float eMinX = (float)((center.getX() + 0.5) - halfF + expandExtra - camX);
+            float eMaxX = (float)((center.getX() + 0.5) + halfF - expandExtra + camX * 0 - camX);
+            // Recalc: the pulse ring is at halfF position (new border) expanding outward
+            double pMinX = (center.getX() + 0.5) - halfF - camX;
+            double pMaxX = (center.getX() + 0.5) + halfF - camX;
+            double pMinZ = (center.getZ() + 0.5) - halfF - camZ;
+            double pMaxZ = (center.getZ() + 0.5) + halfF - camZ;
+            float PW = 0.18f + expandExtra * 0.04f;
+            BufferBuilder buf = tess.begin(VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_COLOR);
+            // Full glowing ring at current border position
+            quadBeamZ(buf, mx, pMinX, pMaxX, baseY + 2,  pMinZ, PW, ct2[0], ct2[1], ct2[2], pulseAlpha);
+            quadBeamZ(buf, mx, pMinX, pMaxX, baseY + 2,  pMaxZ, PW, ct2[0], ct2[1], ct2[2], pulseAlpha);
+            quadBeamX(buf, mx, pMinX, baseY + 2, pMinZ, pMaxZ, PW, ct2[0], ct2[1], ct2[2], pulseAlpha);
+            quadBeamX(buf, mx, pMaxX, baseY + 2, pMinZ, pMaxZ, PW, ct2[0], ct2[1], ct2[2], pulseAlpha);
+            quadBeamZ(buf, mx, pMinX, pMaxX, topY - 2,  pMinZ, PW, ct2[6], ct2[7], ct2[8], pulseAlpha * 0.7f);
+            quadBeamZ(buf, mx, pMinX, pMaxX, topY - 2,  pMaxZ, PW, ct2[6], ct2[7], ct2[8], pulseAlpha * 0.7f);
+            quadBeamX(buf, mx, pMinX, topY - 2, pMinZ, pMaxZ, PW, ct2[6], ct2[7], ct2[8], pulseAlpha * 0.7f);
+            quadBeamX(buf, mx, pMaxX, topY - 2, pMinZ, pMaxZ, PW, ct2[6], ct2[7], ct2[8], pulseAlpha * 0.7f);
+            // Vertical pillars at corners flashing
+            quadPillarX(buf, mx, pMinX, pMinZ, baseY, topY, PW, ct2[0], ct2[1], ct2[2], pulseAlpha);
+            quadPillarZ(buf, mx, pMinX, pMinZ, baseY, topY, PW, ct2[0], ct2[1], ct2[2], pulseAlpha);
+            quadPillarX(buf, mx, pMaxX, pMinZ, baseY, topY, PW, ct2[0], ct2[1], ct2[2], pulseAlpha);
+            quadPillarZ(buf, mx, pMaxX, pMinZ, baseY, topY, PW, ct2[0], ct2[1], ct2[2], pulseAlpha);
+            quadPillarX(buf, mx, pMinX, pMaxZ, baseY, topY, PW, ct2[0], ct2[1], ct2[2], pulseAlpha);
+            quadPillarZ(buf, mx, pMinX, pMaxZ, baseY, topY, PW, ct2[0], ct2[1], ct2[2], pulseAlpha);
+            quadPillarX(buf, mx, pMaxX, pMaxZ, baseY, topY, PW, ct2[0], ct2[1], ct2[2], pulseAlpha);
+            quadPillarZ(buf, mx, pMaxX, pMaxZ, baseY, topY, PW, ct2[0], ct2[1], ct2[2], pulseAlpha);
             BufferRenderer.drawWithGlobalProgram(buf.end());
         }
 

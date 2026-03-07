@@ -2,7 +2,6 @@ package com.zhilius.secureplots.plot;
 
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.nbt.NbtList;
-import net.minecraft.nbt.NbtString;
 import net.minecraft.util.math.BlockPos;
 
 import java.util.*;
@@ -13,20 +12,27 @@ public class PlotData {
         OWNER, ADMIN, MEMBER, VISITOR
     }
 
+    // Fine-grained permissions a member can have overridden
+    public enum Permission {
+        BUILD,      // colocar/romper bloques
+        INTERACT,   // usar palancas, puertas, cofres, etc.
+        CONTAINERS, // abrir cofres/inventarios
+        PVP         // atacar jugadores dentro de la plot
+    }
+
     private UUID ownerId;
     private String ownerName;
     private BlockPos center;
     private PlotSize size;
     private boolean hasRank;
 
-    // Days since placed (stored in ticks)
     private long placedAtTick;
 
-    // Members: UUID -> Role
     private Map<UUID, Role> members = new HashMap<>();
     private Map<UUID, String> memberNames = new HashMap<>();
+    // Per-member permission overrides (only stored when different from role default)
+    private Map<UUID, Set<Permission>> memberPerms = new HashMap<>();
 
-    // Name of the plot
     private String plotName;
 
     public PlotData(UUID ownerId, String ownerName, BlockPos center, PlotSize size, long currentTick) {
@@ -58,11 +64,14 @@ public class PlotData {
     public void addMember(UUID uuid, String name, Role role) {
         members.put(uuid, role);
         memberNames.put(uuid, name);
+        // Default perms based on role
+        memberPerms.put(uuid, defaultPermsFor(role));
     }
 
     public void removeMember(UUID uuid) {
         members.remove(uuid);
         memberNames.remove(uuid);
+        memberPerms.remove(uuid);
     }
 
     public Role getRoleOf(UUID uuid) {
@@ -70,9 +79,46 @@ public class PlotData {
         return members.getOrDefault(uuid, Role.VISITOR);
     }
 
+    // Default permissions granted by a role
+    public static Set<Permission> defaultPermsFor(Role role) {
+        Set<Permission> perms = new HashSet<>();
+        switch (role) {
+            case OWNER, ADMIN -> {
+                perms.add(Permission.BUILD);
+                perms.add(Permission.INTERACT);
+                perms.add(Permission.CONTAINERS);
+                perms.add(Permission.PVP);
+            }
+            case MEMBER -> {
+                perms.add(Permission.BUILD);
+                perms.add(Permission.INTERACT);
+                perms.add(Permission.CONTAINERS);
+            }
+            case VISITOR -> {
+                perms.add(Permission.INTERACT);
+            }
+        }
+        return perms;
+    }
+
+    public Set<Permission> getPermsOf(UUID uuid) {
+        if (uuid.equals(ownerId)) return EnumSet.allOf(Permission.class);
+        return memberPerms.getOrDefault(uuid, defaultPermsFor(getRoleOf(uuid)));
+    }
+
+    public void setPermission(UUID uuid, Permission perm, boolean enabled) {
+        Set<Permission> perms = memberPerms.computeIfAbsent(uuid,
+            k -> new HashSet<>(defaultPermsFor(getRoleOf(k))));
+        if (enabled) perms.add(perm); else perms.remove(perm);
+    }
+
+    public boolean hasPermission(UUID uuid, Permission perm) {
+        if (uuid.equals(ownerId)) return true;
+        return getPermsOf(uuid).contains(perm);
+    }
+
     public boolean canBuild(UUID uuid) {
-        Role role = getRoleOf(uuid);
-        return role == Role.OWNER || role == Role.ADMIN || role == Role.MEMBER;
+        return hasPermission(uuid, Permission.BUILD);
     }
 
     public boolean isExpired(long currentTick) {
@@ -115,6 +161,12 @@ public class PlotData {
             m.putString("uuid", entry.getKey().toString());
             m.putString("role", entry.getValue().name());
             m.putString("name", memberNames.getOrDefault(entry.getKey(), "Unknown"));
+            // Serialize permissions
+            Set<Permission> perms = memberPerms.getOrDefault(entry.getKey(),
+                defaultPermsFor(entry.getValue()));
+            StringBuilder sb = new StringBuilder();
+            for (Permission p : perms) { if (sb.length() > 0) sb.append(","); sb.append(p.name()); }
+            m.putString("perms", sb.toString());
             membersList.add(m);
         }
         nbt.put("members", membersList);
@@ -140,6 +192,17 @@ public class PlotData {
             String name = m.getString("name");
             data.members.put(uuid, role);
             data.memberNames.put(uuid, name);
+            // Deserialize permissions (fallback to role defaults if missing)
+            String permsStr = m.getString("perms");
+            if (permsStr != null && !permsStr.isEmpty()) {
+                Set<Permission> perms = new HashSet<>();
+                for (String ps : permsStr.split(",")) {
+                    try { perms.add(Permission.valueOf(ps.trim())); } catch (Exception ignored) {}
+                }
+                data.memberPerms.put(uuid, perms);
+            } else {
+                data.memberPerms.put(uuid, defaultPermsFor(role));
+            }
         }
 
         return data;
