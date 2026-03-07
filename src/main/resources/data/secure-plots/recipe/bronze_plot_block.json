@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "CBC",
+    "BHB",
+    "CBC"
+  ],
+  "key": {
+    "C": { "item": "minecraft:copper_block" },
+    "B": { "item": "minecraft:redstone_block" },
+    "H": { "item": "minecraft:heart_of_the_sea" }
+  },
+  "result": {
+    "id": "secure-plots:bronze_plot_block",
+    "count": 1
+  }
+}

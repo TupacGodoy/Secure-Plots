@@ -66,39 +66,29 @@ public class SecurePlotsConfig {
     private static SecurePlotsConfig createDefault() {
         SecurePlotsConfig config = new SecurePlotsConfig();
 
-        // Tier 0 (15x15) -> Tier 1 (30x30)
+        // Bronze (tier 0, 15x15) → Gold (tier 1, 30x30): 15 bloques de oro
         UpgradeCost u1 = new UpgradeCost();
-        u1.fromTier = 0; u1.toTier = 1; u1.cobblecoins = 500;
-        u1.items.add(new UpgradeCost.ItemCost("minecraft:iron_ingot", 32));
+        u1.fromTier = 0; u1.toTier = 1; u1.cobblecoins = 0;
+        u1.items.add(new UpgradeCost.ItemCost("minecraft:gold_block", 15));
         config.upgradeCosts.add(u1);
 
-        // Tier 1 (30x30) -> Tier 2 (50x50)
+        // Gold (tier 1, 30x30) → Emerald (tier 2, 50x50): 10 bloques de esmeralda
         UpgradeCost u2 = new UpgradeCost();
-        u2.fromTier = 1; u2.toTier = 2; u2.cobblecoins = 1500;
-        u2.items.add(new UpgradeCost.ItemCost("minecraft:gold_ingot", 32));
-        u2.items.add(new UpgradeCost.ItemCost("minecraft:iron_ingot", 64));
+        u2.fromTier = 1; u2.toTier = 2; u2.cobblecoins = 0;
+        u2.items.add(new UpgradeCost.ItemCost("minecraft:emerald_block", 10));
         config.upgradeCosts.add(u2);
 
-        // Tier 2 (50x50) -> Tier 3 (70x70)
+        // Emerald (tier 2, 50x50) → Diamond (tier 3, 75x75): 64 diamantes
         UpgradeCost u3 = new UpgradeCost();
-        u3.fromTier = 2; u3.toTier = 3; u3.cobblecoins = 3000;
-        u3.items.add(new UpgradeCost.ItemCost("minecraft:diamond", 16));
-        u3.items.add(new UpgradeCost.ItemCost("minecraft:gold_ingot", 64));
+        u3.fromTier = 2; u3.toTier = 3; u3.cobblecoins = 0;
+        u3.items.add(new UpgradeCost.ItemCost("minecraft:diamond", 64));
         config.upgradeCosts.add(u3);
 
-        // Tier 3 (70x70) -> Tier 4 (100x100)
+        // Diamond (tier 3, 75x75) → Netherite (tier 4, 100x100): 1 bloque de netherite
         UpgradeCost u4 = new UpgradeCost();
-        u4.fromTier = 3; u4.toTier = 4; u4.cobblecoins = 6000;
-        u4.items.add(new UpgradeCost.ItemCost("minecraft:diamond", 32));
-        u4.items.add(new UpgradeCost.ItemCost("minecraft:netherite_scrap", 8));
+        u4.fromTier = 3; u4.toTier = 4; u4.cobblecoins = 0;
+        u4.items.add(new UpgradeCost.ItemCost("minecraft:netherite_block", 1));
         config.upgradeCosts.add(u4);
-
-        // Tier 4 (100x100) -> Tier 5 (200x200)
-        UpgradeCost u5 = new UpgradeCost();
-        u5.fromTier = 4; u5.toTier = 5; u5.cobblecoins = 15000;
-        u5.items.add(new UpgradeCost.ItemCost("minecraft:netherite_ingot", 4));
-        u5.items.add(new UpgradeCost.ItemCost("minecraft:diamond", 64));
-        config.upgradeCosts.add(u5);
 
         return config;
     }

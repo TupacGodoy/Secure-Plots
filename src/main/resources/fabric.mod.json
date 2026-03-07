@@ -4,14 +4,20 @@
   "version": "1.0.0",
   "name": "Secure Plots",
   "description": "Protección de territorios con menú, roles y mejoras.",
-  "authors": ["zhilius"],
+  "authors": [
+    "zhilius"
+  ],
   "contact": {},
   "license": "MIT",
   "icon": "assets/secure-plots/icon.png",
   "environment": "*",
   "entrypoints": {
-    "main": ["com.zhilius.secureplots.SecurePlots"],
-    "client": ["com.zhilius.secureplots.client.SecurePlotsClient"]
+    "main": [
+      "com.zhilius.secureplots.SecurePlots"
+    ],
+    "client": [
+      "com.zhilius.secureplots.client.SecurePlotsClient"
+    ]
   },
   "mixins": [
     "secure-plots.mixins.json",
@@ -26,5 +32,6 @@
     "java": ">=21",
     "fabric-api": "*"
   },
-  "suggests": {}
+  "suggests": {},
+  "accessWidener": "secure-plots.accesswidener"
 }

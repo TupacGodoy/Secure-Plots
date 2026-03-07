@@ -103,14 +103,28 @@ public class ModPackets {
         }
     }
 
+    public record ShowPlotInfoPayload(BlockPos pos, NbtCompound nbt) implements CustomPayload {
+        public static final Id<ShowPlotInfoPayload> ID = new Id<>(
+                Identifier.of(SecurePlots.MOD_ID, "show_plot_info"));
+        public static final PacketCodec<PacketByteBuf, ShowPlotInfoPayload> CODEC = PacketCodec.of(
+                (value, buf) -> { buf.writeBlockPos(value.pos()); buf.writeNbt(value.nbt()); },
+                buf -> new ShowPlotInfoPayload(buf.readBlockPos(), buf.readNbt()));
+        @Override public Id<? extends CustomPayload> getId() { return ID; }
+    }
+
     public static void registerPayloads() {
         PayloadTypeRegistry.playS2C().register(OpenPlotScreenPayload.ID, OpenPlotScreenPayload.CODEC);
         PayloadTypeRegistry.playS2C().register(ShowPlotBorderPayload.ID, ShowPlotBorderPayload.CODEC);
         PayloadTypeRegistry.playS2C().register(HidePlotBorderPayload.ID, HidePlotBorderPayload.CODEC);
+        PayloadTypeRegistry.playS2C().register(ShowPlotInfoPayload.ID, ShowPlotInfoPayload.CODEC);
         PayloadTypeRegistry.playC2S().register(UpdatePlotPayload.ID, UpdatePlotPayload.CODEC);
         PayloadTypeRegistry.playC2S().register(UpgradePlotPayload.ID, UpgradePlotPayload.CODEC);
         PayloadTypeRegistry.playC2S().register(AddMemberPayload.ID, AddMemberPayload.CODEC);
         PayloadTypeRegistry.playC2S().register(RemoveMemberPayload.ID, RemoveMemberPayload.CODEC);
+    }
+
+    public static void sendShowPlotInfo(ServerPlayerEntity player, BlockPos pos, PlotData data) {
+        ServerPlayNetworking.send(player, new ShowPlotInfoPayload(pos, data.toNbt()));
     }
 
     public static void sendOpenPlotScreen(ServerPlayerEntity player, BlockPos pos, PlotData data) {

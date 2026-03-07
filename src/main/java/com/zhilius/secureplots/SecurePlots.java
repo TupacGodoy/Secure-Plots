@@ -43,43 +43,66 @@ public class SecurePlots implements ModInitializer {
         // Register hologram ticker
         PlotHologram.registerTicker();
 
+        // Register chat listener for pending rename/add
+        com.zhilius.secureplots.screen.PlotChatListener.register();
+
+        // Register area entry HUD messages
+        com.zhilius.secureplots.plot.PlotAreaTracker.register();
+
         // Protect plots from modification by non-members
         registerProtectionEvents();
 
         LOGGER.info("Secure Plots listo!");
     }
 
+    // How many blocks outside the plot border members can still interact from
+    private static final int MEMBER_REACH_BONUS = 5;
+
     private void registerProtectionEvents() {
-        // Prevent non-members from breaking blocks inside a plot
+        // Breaking blocks: only allowed if player has permission AND
+        // the target block is inside the plot
         AttackBlockCallback.EVENT.register((player, world, hand, pos, direction) -> {
             if (world.isClient) return ActionResult.PASS;
-
-            var serverWorld = (net.minecraft.server.world.ServerWorld) world;
-            var manager = com.zhilius.secureplots.plot.PlotManager.getOrCreate(serverWorld);
+            var sw = (net.minecraft.server.world.ServerWorld) world;
+            var manager = com.zhilius.secureplots.plot.PlotManager.getOrCreate(sw);
             var plot = manager.getPlotAt(pos);
-
-            if (plot != null && !plot.canBuild(player.getUuid())) {
-                player.sendMessage(Text.literal("✗ Esta zona está protegida.").formatted(Formatting.RED), true);
-                return ActionResult.FAIL;
-            }
-            return ActionResult.PASS;
+            if (plot == null) return ActionResult.PASS;
+            // Has direct permission → always allow break
+            if (plot.canBuild(player.getUuid())) return ActionResult.PASS;
+            player.sendMessage(Text.literal("✗ Esta zona está protegida.").formatted(Formatting.RED), true);
+            return ActionResult.FAIL;
         });
 
-        // Prevent non-members from placing blocks inside a plot
         UseBlockCallback.EVENT.register((player, world, hand, hitResult) -> {
             if (world.isClient) return ActionResult.PASS;
-            var heldStack = player.getStackInHand(hand);
-            if (!(heldStack.getItem() instanceof net.minecraft.item.BlockItem)) return ActionResult.PASS;
+            var sw = (net.minecraft.server.world.ServerWorld) world;
+            var manager = com.zhilius.secureplots.plot.PlotManager.getOrCreate(sw);
+            net.minecraft.util.math.BlockPos target = hitResult.getBlockPos();
+            boolean isPlacing = player.getStackInHand(hand).getItem() instanceof net.minecraft.item.BlockItem;
+            net.minecraft.util.math.BlockPos effectiveTarget = isPlacing
+                ? target.offset(hitResult.getSide()) : target;
+            var plot = manager.getPlotAt(effectiveTarget);
+            if (plot == null) return ActionResult.PASS;
 
-            var serverWorld = (net.minecraft.server.world.ServerWorld) world;
-            var manager = com.zhilius.secureplots.plot.PlotManager.getOrCreate(serverWorld);
-            var plot = manager.getPlotAt(hitResult.getBlockPos().offset(hitResult.getSide()));
+            // Direct permission (player is inside or was already checked canBuild)
+            if (plot.canBuild(player.getUuid())) return ActionResult.PASS;
 
-            if (plot != null && !plot.canBuild(player.getUuid())) {
-                player.sendMessage(Text.literal("✗ Esta zona está protegida.").formatted(Formatting.RED), true);
-                return ActionResult.FAIL;
+            // Extended reach: members standing up to MEMBER_REACH_BONUS blocks outside
+            // the plot border can still interact with non-placement actions (doors, levers, etc.)
+            if (!isPlacing && plot.canBuild(player.getUuid())) {
+                // Player has permission but isn't inside the plot — check distance to border
+                net.minecraft.util.math.BlockPos center = plot.getCenter();
+                int r = plot.getSize().radius;
+                net.minecraft.util.math.BlockPos pp = player.getBlockPos();
+                int dx = Math.max(0, Math.abs(pp.getX() - center.getX()) - r);
+                int dz = Math.max(0, Math.abs(pp.getZ() - center.getZ()) - r);
+                if (dx <= MEMBER_REACH_BONUS && dz <= MEMBER_REACH_BONUS) {
+                    return ActionResult.PASS;
+                }
             }
-            return ActionResult.PASS;
+
+            player.sendMessage(Text.literal("✗ Esta zona está protegida.").formatted(Formatting.RED), true);
+            return ActionResult.FAIL;
         });
     }
 }

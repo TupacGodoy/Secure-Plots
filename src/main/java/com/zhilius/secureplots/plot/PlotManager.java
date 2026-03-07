@@ -54,8 +54,25 @@ public class PlotManager extends PersistentState {
     }
 
     public void addPlot(PlotData data) {
+        // Asignar nombre único: "Nombre's Plot", "Nombre's Plot 2", "Nombre's Plot 3", etc.
+        String baseName = data.getOwnerName() + "'s Plot";
+        String finalName = baseName;
+        int counter = 2;
+        while (isNameTaken(data.getOwnerId(), finalName)) {
+            finalName = baseName + " " + counter;
+            counter++;
+        }
+        data.setPlotName(finalName);
         plots.put(data.getCenter(), data);
         markDirty();
+    }
+
+    public boolean isNameTaken(java.util.UUID ownerId, String name) {
+        for (PlotData p : plots.values()) {
+            if (p.getOwnerId().equals(ownerId) && p.getPlotName().equalsIgnoreCase(name))
+                return true;
+        }
+        return false;
     }
 
     public void removePlot(BlockPos center) {

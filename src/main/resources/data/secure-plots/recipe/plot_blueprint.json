@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "SPS",
+    "PCP",
+    "SPS"
+  ],
+  "key": {
+    "S": { "item": "minecraft:amethyst_shard" },
+    "P": { "item": "minecraft:paper" },
+    "C": { "item": "minecraft:compass" }
+  },
+  "result": {
+    "id": "secure-plots:plot_blueprint",
+    "count": 1
+  }
+}

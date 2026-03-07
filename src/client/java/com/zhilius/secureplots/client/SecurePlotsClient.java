@@ -5,6 +5,7 @@ import com.zhilius.secureplots.plot.PlotData;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
+import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderEvents;
 import net.minecraft.util.math.BlockPos;
 
@@ -48,9 +49,15 @@ public class SecurePlotsClient implements ClientModInitializer {
 
         ClientPlayNetworking.registerGlobalReceiver(ModPackets.HidePlotBorderPayload.ID,
                 (payload, context) -> {
-                    net.minecraft.util.math.BlockPos pos = payload.pos();
+                    BlockPos pos = payload.pos();
                     context.client().execute(() -> activeBorders.removeIf(b -> b.data.getCenter().equals(pos)));
                 });
+
+        // Limpiar holograms y bordes al entrar/salir del mundo
+        ClientPlayConnectionEvents.JOIN.register((handler, sender, client) ->
+                client.execute(() -> activeBorders.clear()));
+        ClientPlayConnectionEvents.DISCONNECT.register((handler, client) ->
+                activeBorders.clear());
 
         WorldRenderEvents.AFTER_TRANSLUCENT.register(context -> {
             long now = System.currentTimeMillis();

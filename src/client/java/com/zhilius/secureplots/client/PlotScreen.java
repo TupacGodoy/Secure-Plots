@@ -11,6 +11,7 @@ import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.client.gui.widget.TextFieldWidget;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
+import net.minecraft.util.Identifier;
 import net.minecraft.util.math.BlockPos;
 
 import java.util.ArrayList;
@@ -32,11 +33,16 @@ public class PlotScreen extends Screen {
     private TextFieldWidget nameField;
     private TextFieldWidget addPlayerField;
 
-    private static final int PW = 320;
-    private static final int PH = 270;
+    // Textura de inventario vanilla (179x166)
+    private static final Identifier INVENTORY_BG =
+            Identifier.ofVanilla("textures/gui/container/inventory.png");
+
+    // Panel — mismo tamaño que chest grande (176×166 escalado)
+    private static final int PW = 300;
+    private static final int PH = 230;
 
     public PlotScreen(BlockPos plotPos, PlotData data) {
-        super(Text.literal("Secure Plots"));
+        super(Text.literal("Parcela"));
         this.plotPos = plotPos;
         this.data    = data;
     }
@@ -48,45 +54,28 @@ public class PlotScreen extends Screen {
     protected void init() {
         assert this.client != null;
         myRole = data.getRoleOf(this.client.player.getUuid());
-
         int px = px(), py = py();
-        int cy = py + 58; // content area starts here
 
-        // Tabs
-        addDrawableChild(ButtonWidget.builder(Text.literal("📋 Info"),
-                b -> { activeTab = TAB_INFO; clearAndInit(); })
-                .dimensions(px + 10, py + 28, 88, 20).build());
-        addDrawableChild(ButtonWidget.builder(Text.literal("👥 Miembros"),
-                b -> { activeTab = TAB_MEMBERS; clearAndInit(); })
-                .dimensions(px + 116, py + 28, 88, 20).build());
-        addDrawableChild(ButtonWidget.builder(Text.literal("⬆ Mejorar"),
-                b -> { activeTab = TAB_UPGRADE; clearAndInit(); })
-                .dimensions(px + 222, py + 28, 88, 20).build());
+        // ── Tabs estilo Minecraft: 3 botones pegados al panel ─────────────────
+        int tw = PW / 3;
+        addDrawableChild(ButtonWidget.builder(Text.literal("Info"), b -> { activeTab = TAB_INFO; clearAndInit(); })
+                .dimensions(px,        py - 20, tw - 1, 20).build());
+        addDrawableChild(ButtonWidget.builder(Text.literal("Miembros"), b -> { activeTab = TAB_MEMBERS; clearAndInit(); })
+                .dimensions(px + tw,   py - 20, tw - 1, 20).build());
+        addDrawableChild(ButtonWidget.builder(Text.literal("Mejorar"), b -> { activeTab = TAB_UPGRADE; clearAndInit(); })
+                .dimensions(px + tw*2, py - 20, tw,     20).build());
 
-        // Close
-        addDrawableChild(ButtonWidget.builder(Text.literal("✕"), b -> this.close())
-                .dimensions(px + PW - 22, py + 4, 18, 18).build());
+        int cy = py + 28; // área de contenido
 
-        // Tab-specific widgets
         if (activeTab == TAB_INFO)    initInfoTab(px, cy);
         if (activeTab == TAB_MEMBERS) initMembersTab(px, cy);
         if (activeTab == TAB_UPGRADE) initUpgradeTab(px, cy);
     }
 
-    // ── INFO TAB ─────────────────────────────────────────────────────────────
-    // Layout:
-    //   cy+0   → label "Nombre:" + field (si owner) | solo texto si no
-    //   cy+26  → Dueño
-    //   cy+42  → Nivel
-    //   cy+58  → Tamaño
-    //   cy+74  → Tu rol
-    //   cy+90  → Expira / Permanente
-    //   cy+106 → Coords
-    //   cy+130 → [Guardar] button (si owner, debajo del campo)
+    // ── INFO ─────────────────────────────────────────────────────────────────
     private void initInfoTab(int px, int cy) {
         if (myRole == PlotData.Role.OWNER) {
-            // Name field aligned to the right of the "Nombre:" label (label is at x+10, y+0)
-            nameField = new TextFieldWidget(this.textRenderer, px + 75, cy, 180, 16, Text.empty());
+            nameField = new TextFieldWidget(textRenderer, px + 72, cy + 2, PW - 150, 16, Text.empty());
             nameField.setText(data.getPlotName());
             nameField.setMaxLength(32);
             addDrawableChild(nameField);
@@ -94,21 +83,18 @@ public class PlotScreen extends Screen {
             addDrawableChild(ButtonWidget.builder(Text.literal("Guardar"), b -> {
                 data.setPlotName(nameField.getText());
                 ClientPlayNetworking.send(new ModPackets.UpdatePlotPayload(plotPos, data.toNbt()));
-                this.client.player.sendMessage(Text.literal("✓ Nombre guardado").formatted(Formatting.GREEN), true);
-            }).dimensions(px + 260, cy - 1, 50, 18).build());
+                assert this.client != null;
+                this.client.player.sendMessage(Text.literal("✓ Guardado").formatted(Formatting.GREEN), true);
+            }).dimensions(px + PW - 74, cy + 1, 66, 18).build());
         }
     }
 
-    // ── MEMBERS TAB ──────────────────────────────────────────────────────────
-    // Layout:
-    //   cy-10  → "Agregar jugador:" label
-    //   cy+8   → [field] [+ Agregar]    ← widgets
-    //   cy+32  → "Miembros (N):" label
-    //   cy+48+ → list rows with [✕] buttons
+    // ── MIEMBROS ─────────────────────────────────────────────────────────────
     private void initMembersTab(int px, int cy) {
-        if (myRole == PlotData.Role.OWNER || myRole == PlotData.Role.ADMIN) {
-            addPlayerField = new TextFieldWidget(this.textRenderer, px + 10, cy + 8, 155, 16, Text.empty());
-            addPlayerField.setPlaceholder(Text.literal("Nombre del jugador...").formatted(Formatting.DARK_GRAY));
+        boolean canManage = myRole == PlotData.Role.OWNER || myRole == PlotData.Role.ADMIN;
+        if (canManage) {
+            addPlayerField = new TextFieldWidget(textRenderer, px + 8, cy + 16, PW - 100, 16, Text.empty());
+            addPlayerField.setPlaceholder(Text.literal("Jugador (online)...").formatted(Formatting.DARK_GRAY));
             addDrawableChild(addPlayerField);
 
             addDrawableChild(ButtonWidget.builder(Text.literal("+ Agregar"), b -> {
@@ -117,183 +103,216 @@ public class PlotScreen extends Screen {
                     ClientPlayNetworking.send(new ModPackets.AddMemberPayload(plotPos, name));
                     addPlayerField.setText("");
                 }
-            }).dimensions(px + 173, cy + 7, 80, 18).build());
+            }).dimensions(px + PW - 88, cy + 15, 84, 18).build());
         }
 
-        // Remove buttons — one per member row
         List<Map.Entry<UUID, PlotData.Role>> members = new ArrayList<>(data.getMembers().entrySet());
-        int rowY = cy + 48;
+        int rowY = cy + 44;
         for (Map.Entry<UUID, PlotData.Role> entry : members) {
+            if (rowY + 14 > py() + PH - 14) break;
             String memberName = data.getMemberName(entry.getKey());
             addDrawableChild(ButtonWidget.builder(Text.literal("✕"), b ->
                     ClientPlayNetworking.send(new ModPackets.RemoveMemberPayload(plotPos, memberName)))
-                    .dimensions(px + PW - 38, rowY - 3, 18, 14).build());
+                    .dimensions(px + PW - 26, rowY - 2, 16, 14).build());
             rowY += 16;
-            if (rowY > py() + PH - 30) break;
         }
     }
 
-    // ── UPGRADE TAB ──────────────────────────────────────────────────────────
+    // ── MEJORAR ──────────────────────────────────────────────────────────────
     private void initUpgradeTab(int px, int cy) {
         if (myRole != PlotData.Role.OWNER) return;
         PlotSize next = data.getSize().next();
         if (next == null) return;
-
         addDrawableChild(ButtonWidget.builder(
-                Text.literal("⬆ Confirmar mejora a " + next.displayName),
+                Text.literal("Mejorar a " + next.displayName + "  ▶"),
                 b -> ClientPlayNetworking.send(new ModPackets.UpgradePlotPayload(plotPos)))
-                .dimensions(px + 20, cy + 120, 280, 20).build());
+                .dimensions(px + 14, py() + PH - 32, PW - 28, 20).build());
     }
 
     // ── RENDER ───────────────────────────────────────────────────────────────
     @Override
     public void render(DrawContext ctx, int mouseX, int mouseY, float delta) {
+        // Fondo vanilla oscuro (sin blur world)
         renderBackground(ctx, mouseX, mouseY, delta);
 
         int px = px(), py = py();
 
-        // Panel
-        ctx.fill(px - 2, py - 2, px + PW + 2, py + PH + 2, 0xFF16213E);
-        ctx.fill(px, py, px + PW, py + PH, 0xEE0D0D1A);
-        // Title bar
-        ctx.fill(px, py, px + PW, py + 24, 0xFF0F3460);
-        ctx.drawCenteredTextWithShadow(textRenderer,
-                Text.literal("🛡 " + data.getPlotName()).formatted(Formatting.GOLD),
-                px + PW / 2, py + 7, 0xFFFFFF);
+        // Panel tipo inventario: fondo gris plano vanilla
+        // Borde exterior
+        ctx.fill(px - 1, py - 1, px + PW + 1, py + PH + 1, 0xFF373737);
+        // Fondo
+        ctx.fill(px, py, px + PW, py + PH, 0xFFC6C6C6);
+        // Sombra interior top-left
+        ctx.fill(px + 1, py + 1, px + PW, py + 2,        0xFF8B8B8B);
+        ctx.fill(px + 1, py + 1, px + 2,  py + PH,       0xFF8B8B8B);
+        // Resalte interior bottom-right
+        ctx.fill(px + 1, py + PH - 2, px + PW - 1, py + PH - 1, 0xFFFFFFFF);
+        ctx.fill(px + PW - 2, py + 1,  px + PW - 1, py + PH - 1, 0xFFFFFFFF);
 
-        int cy = py + 58;
-        int x  = px + 10;
+        // Barra de título
+        ctx.fill(px, py, px + PW, py + 24, 0xFF555555);
+        ctx.fill(px, py, px + PW, py + 23, 0xFF666666);
+        ctx.drawTextWithShadow(textRenderer,
+                Text.literal("🛡 " + data.getPlotName()).formatted(Formatting.YELLOW),
+                px + 6, py + 7, 0xFFFFFF);
 
-        if (activeTab == TAB_INFO)    renderInfoTab(ctx, x, cy);
-        if (activeTab == TAB_MEMBERS) renderMembersTab(ctx, x, cy);
-        if (activeTab == TAB_UPGRADE) renderUpgradeTab(ctx, x, cy);
+        // Resaltar tab activo
+        int tw = PW / 3;
+        int tabX = px + activeTab * tw;
+        ctx.fill(tabX, py - 20, tabX + tw - (activeTab == 2 ? 0 : 1), py, 0x55FFFFFF);
+
+        // Línea separadora bajo título
+        ctx.fill(px + 4, py + 24, px + PW - 4, py + 25, 0xFF8B8B8B);
+
+        int cy = py + 28;
+        int x  = px + 8;
+
+        if (activeTab == TAB_INFO)    renderInfo(ctx, x, cy);
+        if (activeTab == TAB_MEMBERS) renderMembers(ctx, x, cy);
+        if (activeTab == TAB_UPGRADE) renderUpgrade(ctx, x, cy);
 
         super.render(ctx, mouseX, mouseY, delta);
     }
 
-    private void renderInfoTab(DrawContext ctx, int x, int y) {
+    // ── Render Info ──────────────────────────────────────────────────────────
+    private void renderInfo(DrawContext ctx, int x, int y) {
         assert this.client != null;
         long time = this.client.world != null ? this.client.world.getTime() : 0;
 
-        // Row 0: Nombre label (widget field sits at y+0 to the right)
-        ctx.drawTextWithShadow(textRenderer, Text.literal("Nombre:").formatted(Formatting.GRAY), x, y + 4, 0xFFFFFF);
+        // Fila nombre
+        ctx.drawTextWithShadow(textRenderer,
+                Text.literal("Nombre:").formatted(Formatting.DARK_GRAY), x, y + 6, 0x000000);
         if (myRole != PlotData.Role.OWNER) {
-            ctx.drawTextWithShadow(textRenderer, Text.literal(data.getPlotName()).formatted(Formatting.GOLD), x + 65, y + 4, 0xFFFFFF);
+            ctx.drawTextWithShadow(textRenderer,
+                    Text.literal(data.getPlotName()).formatted(Formatting.BLACK), x + 66, y + 6, 0x111111);
         }
 
-        // Row 1+
-        ctx.drawTextWithShadow(textRenderer, Text.literal("Dueño: ").formatted(Formatting.GRAY)
-                .append(Text.literal(data.getOwnerName()).formatted(Formatting.WHITE)), x, y + 26, 0xFFFFFF);
+        int row = y + 26; int gap = 16;
 
-        ctx.drawTextWithShadow(textRenderer, Text.literal("Nivel: ").formatted(Formatting.GRAY)
-                .append(Text.literal(data.getSize().displayName).formatted(Formatting.AQUA)), x, y + 42, 0xFFFFFF);
-
-        int size = data.getSize().radius;
-        ctx.drawTextWithShadow(textRenderer, Text.literal("Tamaño: ").formatted(Formatting.GRAY)
-                .append(Text.literal(size + "x" + size + " bloques").formatted(Formatting.AQUA)), x, y + 58, 0xFFFFFF);
-
-        ctx.drawTextWithShadow(textRenderer, Text.literal("Tu rol: ").formatted(Formatting.GRAY)
-                .append(Text.literal(myRole.name()).formatted(roleColor(myRole))), x, y + 74, 0xFFFFFF);
+        row(ctx, x, row, "Dueño",    data.getOwnerName(),               0x333333, 0x000000); row += gap;
+        row(ctx, x, row, "Nivel",    data.getSize().displayName,        0x333333, 0x006688); row += gap;
+        int sz = data.getSize().radius;
+        row(ctx, x, row, "Tamaño",   sz + "x" + sz + " bloques",       0x333333, 0x006688); row += gap;
+        row(ctx, x, row, "Tu rol",   myRole.name(),                     0x333333, roleRgb(myRole)); row += gap;
 
         if (!data.hasRank()) {
             long days = data.getDaysRemaining(time);
-            Formatting col = days < 5 ? Formatting.RED : days < 10 ? Formatting.YELLOW : Formatting.GREEN;
-            ctx.drawTextWithShadow(textRenderer, Text.literal("Expira en: ").formatted(Formatting.GRAY)
-                    .append(Text.literal(days + " días").formatted(col)), x, y + 90, 0xFFFFFF);
+            int col = days < 5 ? 0xAA0000 : days < 10 ? 0xAA7700 : 0x007700;
+            row(ctx, x, row, "Expira en", days + " días", 0x333333, col);
         } else {
             ctx.drawTextWithShadow(textRenderer,
-                    Text.literal("⚡ Permanente (Rango activo)").formatted(Formatting.GREEN), x, y + 90, 0xFFFFFF);
+                    Text.literal("⚡ Permanente").formatted(Formatting.DARK_GREEN), x, row, 0x005500);
         }
+        row += gap;
 
         BlockPos c = data.getCenter();
         ctx.drawTextWithShadow(textRenderer,
-                Text.literal("Coords: " + c.getX() + ", " + c.getY() + ", " + c.getZ()).formatted(Formatting.DARK_GRAY),
-                x, y + 106, 0xFFFFFF);
+                Text.literal(c.getX() + ", " + c.getY() + ", " + c.getZ()), x, row, 0x555555);
     }
 
-    private void renderMembersTab(DrawContext ctx, int x, int y) {
+    // ── Render Miembros ──────────────────────────────────────────────────────
+    private void renderMembers(DrawContext ctx, int x, int y) {
         boolean canManage = myRole == PlotData.Role.OWNER || myRole == PlotData.Role.ADMIN;
-
         if (canManage) {
             ctx.drawTextWithShadow(textRenderer,
-                    Text.literal("Agregar (debe estar en línea):").formatted(Formatting.GRAY), x, y - 10, 0xFFFFFF);
+                    Text.literal("Agregar miembro:"), x, y + 2, 0x333333);
         }
+
+        int sepY = y + (canManage ? 36 : 4);
+        ctx.fill(x - 2, sepY, x + PW - 14, sepY + 1, 0xFF8B8B8B);
+        ctx.fill(x - 2, sepY + 1, x + PW - 14, sepY + 2, 0xFFFFFFFF);
 
         int memberCount = data.getMembers().size();
         ctx.drawTextWithShadow(textRenderer,
-                Text.literal("Miembros (" + memberCount + "):").formatted(Formatting.GOLD), x, y + 32, 0xFFFFFF);
+                Text.literal("Miembros (" + memberCount + ")"), x, sepY + 4, 0x333333);
 
         if (data.getMembers().isEmpty()) {
             ctx.drawTextWithShadow(textRenderer,
-                    Text.literal("Sin miembros todavía.").formatted(Formatting.DARK_GRAY), x, y + 48, 0xFFFFFF);
+                    Text.literal("Ninguno todavía."), x, sepY + 18, 0x777777);
             return;
         }
 
-        int rowY = y + 48;
+        int rowY = sepY + 18;
         for (Map.Entry<UUID, PlotData.Role> entry : data.getMembers().entrySet()) {
+            if (rowY + 16 > py() + PH - 14) {
+                ctx.drawTextWithShadow(textRenderer, Text.literal("..."), x, rowY, 0x555555);
+                break;
+            }
             String name = data.getMemberName(entry.getKey());
             PlotData.Role role = entry.getValue();
             ctx.drawTextWithShadow(textRenderer,
-                    Text.literal("• " + name + "  ").formatted(Formatting.WHITE)
-                            .append(Text.literal("[" + role.name().toLowerCase() + "]").formatted(roleColor(role))),
-                    x, rowY, 0xFFFFFF);
+                    Text.literal("• " + name + " ").formatted(Formatting.BLACK)
+                            .append(Text.literal("[" + role.name().toLowerCase() + "]")),
+                    x, rowY, roleRgb(role));
             rowY += 16;
-            if (rowY > py() + PH - 30) {
-                ctx.drawTextWithShadow(textRenderer, Text.literal("...").formatted(Formatting.GRAY), x, rowY, 0xFFFFFF);
-                break;
-            }
         }
     }
 
-    private void renderUpgradeTab(DrawContext ctx, int x, int y) {
-        PlotSize current = data.getSize();
-        PlotSize next = current.next();
+    // ── Render Mejorar ───────────────────────────────────────────────────────
+    private void renderUpgrade(DrawContext ctx, int x, int y) {
+        PlotSize cur = data.getSize();
+        PlotSize next = cur.next();
 
-        ctx.drawTextWithShadow(textRenderer, Text.literal("Nivel actual: ").formatted(Formatting.GRAY)
-                .append(Text.literal(current.displayName + " (" + current.radius + "x" + current.radius + ")").formatted(Formatting.AQUA)),
-                x, y, 0xFFFFFF);
+        int row = y; int gap = 16;
+
+        row(ctx, x, row, "Nivel actual", cur.displayName + " (" + cur.radius + "x" + cur.radius + ")",
+                0x333333, 0x006688); row += gap;
 
         if (next == null) {
             ctx.drawTextWithShadow(textRenderer,
-                    Text.literal("⭐ ¡Máximo nivel alcanzado!").formatted(Formatting.GOLD), x, y + 20, 0xFFFFFF);
+                    Text.literal("⭐ ¡Máximo nivel alcanzado!"), x, row, 0x886600);
             return;
         }
 
-        ctx.drawTextWithShadow(textRenderer, Text.literal("Siguiente: ").formatted(Formatting.GRAY)
-                .append(Text.literal(next.displayName + " (" + next.radius + "x" + next.radius + ")").formatted(Formatting.GREEN)),
-                x, y + 18, 0xFFFFFF);
+        row(ctx, x, row, "Siguiente", next.displayName + " (" + next.radius + "x" + next.radius + ")",
+                0x333333, 0x005500); row += gap + 4;
+
+        ctx.fill(x - 2, row, x + PW - 14, row + 1, 0xFF8B8B8B);
+        ctx.fill(x - 2, row + 1, x + PW - 14, row + 2, 0xFFFFFFFF);
+        row += 8;
 
         SecurePlotsConfig cfg = SecurePlotsConfig.INSTANCE;
-        SecurePlotsConfig.UpgradeCost cost = cfg != null ? cfg.getUpgradeCost(current.tier) : null;
+        SecurePlotsConfig.UpgradeCost cost = cfg != null ? cfg.getUpgradeCost(cur.tier) : null;
 
         if (cost != null) {
-            ctx.drawTextWithShadow(textRenderer, Text.literal("Costo:").formatted(Formatting.YELLOW), x, y + 42, 0xFFFFFF);
-            ctx.drawTextWithShadow(textRenderer,
-                    Text.literal("  • " + cost.cobblecoins + " Cobblecoins").formatted(Formatting.WHITE), x, y + 56, 0xFFFFFF);
-            int iy = y + 70;
-            for (SecurePlotsConfig.UpgradeCost.ItemCost item : cost.items) {
+            ctx.drawTextWithShadow(textRenderer, Text.literal("Materiales:"), x, row, 0x333333);
+            row += gap;
+            if (cost.cobblecoins > 0) {
                 ctx.drawTextWithShadow(textRenderer,
-                        Text.literal("  • " + item.amount + "x " + item.itemId).formatted(Formatting.WHITE), x, iy, 0xFFFFFF);
-                iy += 14;
+                        Text.literal("  • " + cost.cobblecoins + " Cobblecoins"), x, row, 0x000000);
+                row += gap;
+            }
+            for (SecurePlotsConfig.UpgradeCost.ItemCost item : cost.items) {
+                String raw = item.itemId.contains(":") ? item.itemId.split(":")[1] : item.itemId;
+                String name = Character.toUpperCase(raw.charAt(0)) + raw.substring(1).replace("_", " ");
+                ctx.drawTextWithShadow(textRenderer,
+                        Text.literal("  • " + item.amount + "x " + name), x, row, 0x000000);
+                row += gap;
             }
         }
 
         if (myRole != PlotData.Role.OWNER) {
             ctx.drawTextWithShadow(textRenderer,
-                    Text.literal("Solo el dueño puede mejorar.").formatted(Formatting.RED), x, y + 130, 0xFFFFFF);
+                    Text.literal("Solo el dueño puede mejorar."), x, py() + PH - 40, 0xAA0000);
         }
     }
 
-    private Formatting roleColor(PlotData.Role role) {
+    // ── Helpers ──────────────────────────────────────────────────────────────
+    private void row(DrawContext ctx, int x, int y, String label, String value, int labelColor, int valColor) {
+        ctx.drawTextWithShadow(textRenderer, Text.literal(label + ": "), x, y, labelColor);
+        int offset = textRenderer.getWidth(label + ": ");
+        ctx.drawTextWithShadow(textRenderer, Text.literal(value), x + offset, y, valColor);
+    }
+
+    private int roleRgb(PlotData.Role role) {
         return switch (role) {
-            case OWNER   -> Formatting.GOLD;
-            case ADMIN   -> Formatting.RED;
-            case MEMBER  -> Formatting.GREEN;
-            case VISITOR -> Formatting.GRAY;
+            case OWNER   -> 0x886600;
+            case ADMIN   -> 0xAA0000;
+            case MEMBER  -> 0x005500;
+            case VISITOR -> 0x555555;
         };
     }
 
     protected void clearAndInit() { clearChildren(); init(); }
-
     @Override public boolean shouldPause() { return false; }
 }
