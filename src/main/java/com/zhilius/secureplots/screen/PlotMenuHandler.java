@@ -5,7 +5,6 @@ import com.zhilius.secureplots.config.SecurePlotsConfig;
 import com.zhilius.secureplots.plot.PlotData;
 import com.zhilius.secureplots.plot.PlotManager;
 import com.zhilius.secureplots.plot.PlotSize;
-import com.zhilius.secureplots.screen.SignInputManager;
 import net.minecraft.component.DataComponentTypes;
 import net.minecraft.component.type.LoreComponent;
 import net.minecraft.component.type.ProfileComponent;
@@ -17,6 +16,7 @@ import net.minecraft.item.Items;
 import net.minecraft.particle.ParticleTypes;
 import net.minecraft.screen.GenericContainerScreenHandler;
 import net.minecraft.screen.ScreenHandlerType;
+import net.minecraft.screen.SimpleNamedScreenHandlerFactory;
 import net.minecraft.screen.slot.SlotActionType;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
@@ -26,16 +26,12 @@ import net.minecraft.text.Text;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 
 public class PlotMenuHandler extends GenericContainerScreenHandler {
 
-    public enum MenuPage { INFO, MEMBERS, UPGRADE }
-    public enum PendingAction { NONE, RENAME, ADD_MEMBER }
+    public enum MenuPage { INFO, MEMBERS, PERMS, FLAGS, UPGRADE }
+    public enum PendingAction { NONE, RENAME, ADD_MEMBER, CREATE_GROUP }
 
     private final BlockPos plotPos;
     private PlotData data;
@@ -44,12 +40,20 @@ public class PlotMenuHandler extends GenericContainerScreenHandler {
     private MenuPage page;
     private final SimpleInventory menuInv;
 
+    // Para sub-páginas de miembros (ver permisos de uno específico)
+    private UUID viewingMemberUuid = null;
+    // Para sub-página de grupos
+    private String viewingGroupName = null;
+
     private static final int ROWS = 6;
     private static final int SIZE = ROWS * 9;
 
+    // Tabs en fila superior
     private static final int SLOT_TAB_INFO    = 0;
     private static final int SLOT_TAB_MEMBERS = 1;
-    private static final int SLOT_TAB_UPGRADE = 2;
+    private static final int SLOT_TAB_PERMS   = 2;
+    private static final int SLOT_TAB_FLAGS   = 3;
+    private static final int SLOT_TAB_UPGRADE = 4;
     private static final int SLOT_CLOSE       = 8;
     private static final int SLOT_UPGRADE_BTN = 49;
 
@@ -61,14 +65,12 @@ public class PlotMenuHandler extends GenericContainerScreenHandler {
         super(ScreenHandlerType.GENERIC_9X6, syncId, playerInv, inv, ROWS);
         this.plotPos = plotPos;
         this.data    = data;
-        // plot_admin tag overrides role check — treat as OWNER for menu purposes
         boolean isPlotAdmin = ((ServerPlayerEntity) playerInv.player).getCommandTags().contains("plot_admin");
         this.myRole  = isPlotAdmin ? PlotData.Role.OWNER : data.getRoleOf(playerInv.player.getUuid());
         this.player  = (ServerPlayerEntity) playerInv.player;
         this.page    = page;
         this.menuInv = inv;
         buildMenu();
-        // Sonido al abrir
         playSound(SoundEvents.BLOCK_CHEST_OPEN, 0.5f, 1.2f);
     }
 
@@ -79,7 +81,13 @@ public class PlotMenuHandler extends GenericContainerScreenHandler {
         buildTabs();
         switch (page) {
             case INFO    -> buildInfoPage();
-            case MEMBERS -> buildMembersPage();
+            case MEMBERS -> {
+                if (viewingMemberUuid != null) buildMemberPermsPage(viewingMemberUuid);
+                else if (viewingGroupName != null) buildGroupPage(viewingGroupName);
+                else buildMembersPage();
+            }
+            case PERMS   -> buildPermsPage();
+            case FLAGS   -> buildFlagsPage();
             case UPGRADE -> buildUpgradePage();
         }
         menuInv.setStack(SLOT_CLOSE, named(Items.BARRIER, "§c✕ Cerrar"));
@@ -93,12 +101,20 @@ public class PlotMenuHandler extends GenericContainerScreenHandler {
     }
 
     private void buildTabs() {
+        boolean canManage = myRole == PlotData.Role.OWNER || myRole == PlotData.Role.ADMIN;
+
         menuInv.setStack(SLOT_TAB_INFO,
             namedLore(page == MenuPage.INFO ? Items.LIME_STAINED_GLASS_PANE : Items.WHITE_STAINED_GLASS_PANE,
                 "§e📋 Info", "§7Ver información de la parcela"));
         menuInv.setStack(SLOT_TAB_MEMBERS,
             namedLore(page == MenuPage.MEMBERS ? Items.LIME_STAINED_GLASS_PANE : Items.WHITE_STAINED_GLASS_PANE,
-                "§e👥 Miembros", "§7Gestionar acceso"));
+                "§e👥 Miembros", "§7Gestionar acceso y grupos"));
+        menuInv.setStack(SLOT_TAB_PERMS,
+            namedLore(page == MenuPage.PERMS ? Items.LIME_STAINED_GLASS_PANE : Items.WHITE_STAINED_GLASS_PANE,
+                "§e🔑 Permisos", "§7Permisos por rol por defecto"));
+        menuInv.setStack(SLOT_TAB_FLAGS,
+            namedLore(page == MenuPage.FLAGS ? Items.LIME_STAINED_GLASS_PANE : Items.WHITE_STAINED_GLASS_PANE,
+                "§e🚩 Flags", "§7Flags globales de la parcela"));
         menuInv.setStack(SLOT_TAB_UPGRADE,
             namedLore(page == MenuPage.UPGRADE ? Items.LIME_STAINED_GLASS_PANE : Items.WHITE_STAINED_GLASS_PANE,
                 "§e⬆ Mejorar", "§7Subir el nivel de protección"));
@@ -109,99 +125,282 @@ public class PlotMenuHandler extends GenericContainerScreenHandler {
         List<PlotData> owned = getOwnedPlots();
         int plotIndex = owned.indexOf(data) + 1;
 
-        // Name tag: nombre del plot + ID
         menuInv.setStack(19, namedLore(Items.NAME_TAG,
-            "§6" + data.getPlotName(),
-            "§7ID: §f#" + plotIndex));
+            "§6" + data.getPlotName(), "§7ID: §f#" + plotIndex));
 
-        // Cabeza con skin real del dueño
         menuInv.setStack(20, makePlayerHeadFromServer(data.getOwnerId(), data.getOwnerName(),
             "§eDueño", "§f" + data.getOwnerName()));
 
-        // Nivel
         menuInv.setStack(21, namedLore(itemForSize(data.getSize()),
             tierColor(data.getSize()) + "Nivel: " + data.getSize().displayName,
             "§7Tamaño: §b" + data.getSize().radius + "x" + data.getSize().radius + " bloques"));
 
-        // Miembros (solo info)
         menuInv.setStack(22, namedLore(Items.PAPER,
             "§eIntegrantes",
-            "§f" + data.getMembers().size() + " §7miembro(s)"));
+            "§f" + data.getMembers().size() + " §7miembro(s)",
+            "§f" + data.getGroups().size() + " §7grupo(s)"));
 
-        // Coordenadas
         BlockPos c = data.getCenter();
         menuInv.setStack(23, namedLore(Items.COMPASS,
             "§eUbicación",
             "§7X: §f" + c.getX() + "  §7Y: §f" + c.getY() + "  §7Z: §f" + c.getZ()));
 
-        // Tu rol
         menuInv.setStack(24, namedLore(Items.SHIELD,
             "§eTu rol", roleColor(myRole) + myRole.name()));
 
-        // Yunque = renombrar (solo owner)
+        // Renombrar (owner)
         if (myRole == PlotData.Role.OWNER) {
             menuInv.setStack(29, namedLore(Items.ANVIL,
-                "§6✏ Renombrar parcela",
-                "§7Clic para cambiar el nombre"));
+                "§6✏ Renombrar parcela", "§7Clic para cambiar el nombre"));
         }
 
-        // Inactivity expiry info (only shown if the feature is enabled)
+        // TP a la plot (si el flag está activo o es owner/admin)
+        boolean tpEnabled = data.hasFlag(PlotData.Flag.ALLOW_TP);
+        boolean canTp = tpEnabled || myRole == PlotData.Role.OWNER || myRole == PlotData.Role.ADMIN;
+        if (canTp) {
+            menuInv.setStack(31, namedLore(Items.ENDER_PEARL,
+                "§b✈ Teleportarse",
+                tpEnabled ? "§7TP público habilitado" : "§7Solo para admins/owner",
+                "§eClic para tp a esta parcela"));
+        }
+
+        // Inactividad (si está habilitado)
         SecurePlotsConfig cfg = SecurePlotsConfig.INSTANCE;
         if (cfg != null && cfg.inactivityExpiry.enabled) {
-            if (!(player.getWorld() instanceof ServerWorld sw)) return;
-            long currentTick = sw.getTime();
-            long daysInactive = data.getDaysInactive(currentTick);
-            long maxDays = cfg.inactivityExpiry.baseDays + ((long) cfg.inactivityExpiry.daysPerTier * data.getSize().tier);
-            long daysLeft = Math.max(0, maxDays - daysInactive);
-
-            String statusColor = daysLeft > 7 ? "§a" : daysLeft > 0 ? "§e" : "§c";
-            String expiryLine = daysLeft > 0
-                ? statusColor + daysLeft + " §7días para expirar"
-                : "§c⚠ ¡Protección expirada!";
-
-            menuInv.setStack(30, namedLore(Items.CLOCK,
-                "§eInactividad del dueño",
-                "§7Días inactivo: §f" + daysInactive,
-                "§7Máx. días: §f" + maxDays,
-                expiryLine));
+            if (player.getWorld() instanceof ServerWorld sw) {
+                long currentTick = sw.getTime();
+                long daysInactive = data.getDaysInactive(currentTick);
+                long maxDays = cfg.inactivityExpiry.baseDays + ((long) cfg.inactivityExpiry.daysPerTier * data.getSize().tier);
+                long daysLeft = Math.max(0, maxDays - daysInactive);
+                String statusColor = daysLeft > 7 ? "§a" : daysLeft > 0 ? "§e" : "§c";
+                String expiryLine = daysLeft > 0
+                    ? statusColor + daysLeft + " §7días para expirar"
+                    : "§c⚠ ¡Protección expirada!";
+                menuInv.setStack(33, namedLore(Items.CLOCK,
+                    "§eInactividad del dueño",
+                    "§7Días inactivo: §f" + daysInactive,
+                    "§7Máx. días: §f" + maxDays,
+                    expiryLine));
+            }
         }
     }
 
-    // ── MEMBERS PAGE ─────────────────────────────────────────────────────────
+    // ── MEMBERS PAGE ──────────────────────────────────────────────────────────
     private void buildMembersPage() {
-        boolean canManage = myRole == PlotData.Role.OWNER || myRole == PlotData.Role.ADMIN;
+        boolean canManage = data.hasPermission(player.getUuid(), PlotData.Permission.MANAGE_MEMBERS);
 
-        // Botón agregar (solo en esta sección)
         if (canManage) {
-            menuInv.setStack(19, namedLore(Items.EMERALD,
+            menuInv.setStack(10, namedLore(Items.EMERALD,
                 "§a+ Agregar miembro",
                 "§7Clic para agregar un jugador",
                 "§8El jugador debe estar online"));
+
+            menuInv.setStack(11, namedLore(Items.BOOKSHELF,
+                "§d+ Crear grupo",
+                "§7Clic para crear un grupo de permisos",
+                "§8Permite asignar permisos en bloque"));
         }
 
-        List<Map.Entry<UUID, PlotData.Role>> members = new ArrayList<>(data.getMembers().entrySet());
-        int[] slots = {20,21,22,23,24,25,28,29,30,31,32,33,34,37,38};
+        // Grupos
+        List<PlotData.PermissionGroup> groups = data.getGroups();
+        int[] groupSlots = {19, 20, 21};
+        for (int i = 0; i < groups.size() && i < groupSlots.length; i++) {
+            PlotData.PermissionGroup g = groups.get(i);
+            String memberCount = "§7" + g.members.size() + " miembro(s)";
+            String permCount = "§7" + g.permissions.size() + " permiso(s)";
+            menuInv.setStack(groupSlots[i], namedLore(Items.WRITABLE_BOOK,
+                "§d[G] " + g.name,
+                memberCount, permCount,
+                canManage ? "§eClic para editar" : "§8Solo lectura"));
+        }
+
+        // Miembros
+        List<Map.Entry<UUID, PlotData.Role>> memberList = new ArrayList<>(data.getMembers().entrySet());
+        int[] slots = {28,29,30,31,32,33,34,37,38,39,40,41,42,43};
         int idx = 0;
-        for (Map.Entry<UUID, PlotData.Role> entry : members) {
+        for (Map.Entry<UUID, PlotData.Role> entry : memberList) {
             if (idx >= slots.length) break;
             String name = data.getMemberName(entry.getKey());
             PlotData.Role role = entry.getValue();
             List<String> lore = new ArrayList<>();
             lore.add(roleColor(role) + role.name());
-            if (canManage) lore.add("§c🗑 Clic para remover");
+            // Grupo del miembro
+            for (PlotData.PermissionGroup g : groups) {
+                if (g.members.contains(entry.getKey())) lore.add("§d[" + g.name + "]");
+            }
+            if (canManage) {
+                lore.add("§eClic: editar permisos");
+                lore.add("§cShift+Clic: remover");
+            }
             menuInv.setStack(slots[idx], makePlayerHeadFromServer(entry.getKey(), name,
                 "§f" + name, lore.toArray(new String[0])));
             idx++;
         }
 
-        if (members.isEmpty()) {
+        if (memberList.isEmpty() && groups.isEmpty()) {
             menuInv.setStack(22, namedLore(Items.BARRIER,
                 "§7Sin miembros todavía",
                 "§8Usá el botón verde para agregar"));
         }
+
+        // Botón volver si estamos en sub-vista (no aplica aquí pero útil)
     }
 
-    // ── UPGRADE PAGE ─────────────────────────────────────────────────────────
+    // ── MEMBER PERMS PAGE (sub-página) ────────────────────────────────────────
+    private void buildMemberPermsPage(UUID uuid) {
+        String name = data.getMemberName(uuid);
+        PlotData.Role role = data.getRoleOf(uuid);
+        boolean canEdit = data.hasPermission(player.getUuid(), PlotData.Permission.MANAGE_PERMS);
+
+        menuInv.setStack(10, makePlayerHeadFromServer(uuid, name,
+            "§f" + name, roleColor(role) + role.name(), "§7Editando permisos"));
+
+        menuInv.setStack(12, namedLore(Items.ARROW, "§7← Volver", "§8Clic para regresar"));
+
+        // Mostrar toggle por cada permiso (excepto OWNER-only)
+        PlotData.Permission[] perms = PlotData.Permission.values();
+        int[] slots = {19,20,21,22,23,24,25, 28,29,30,31,32,33,34};
+        Set<PlotData.Permission> current = data.getPermsOf(uuid);
+        for (int i = 0; i < perms.length && i < slots.length; i++) {
+            PlotData.Permission perm = perms[i];
+            boolean has = current.contains(perm);
+            menuInv.setStack(slots[i], namedLore(
+                has ? Items.LIME_DYE : Items.GRAY_DYE,
+                (has ? "§a✔ " : "§c✗ ") + permLabel(perm),
+                "§7" + permDesc(perm),
+                canEdit ? (has ? "§cClic para desactivar" : "§aClic para activar") : "§8Sin permisos de edición"
+            ));
+        }
+
+        // Cambiar rol
+        if (canEdit) {
+            menuInv.setStack(16, namedLore(Items.EXPERIENCE_BOTTLE,
+                "§eRol: " + roleColor(role) + role.name(),
+                "§7Clic para cambiar el rol",
+                "§8Cicla: MEMBER → ADMIN → MEMBER"));
+        }
+    }
+
+    // ── GROUP PAGE (sub-página) ───────────────────────────────────────────────
+    private void buildGroupPage(String groupName) {
+        PlotData.PermissionGroup group = data.getGroup(groupName);
+        if (group == null) { viewingGroupName = null; buildMembersPage(); return; }
+
+        boolean canEdit = data.hasPermission(player.getUuid(), PlotData.Permission.MANAGE_GROUPS);
+
+        menuInv.setStack(10, namedLore(Items.WRITABLE_BOOK, "§d[Grupo] " + group.name,
+            "§7" + group.members.size() + " miembro(s)",
+            "§7" + group.permissions.size() + " permiso(s)"));
+        menuInv.setStack(12, namedLore(Items.ARROW, "§7← Volver", "§8Clic para regresar"));
+
+        if (canEdit) {
+            menuInv.setStack(14, namedLore(Items.TNT, "§cEliminar grupo", "§7Clic para borrar este grupo"));
+        }
+
+        // Permisos del grupo
+        PlotData.Permission[] perms = PlotData.Permission.values();
+        int[] permSlots = {19,20,21,22,23,24,25};
+        for (int i = 0; i < perms.length && i < permSlots.length; i++) {
+            PlotData.Permission perm = perms[i];
+            boolean has = group.permissions.contains(perm);
+            menuInv.setStack(permSlots[i], namedLore(
+                has ? Items.LIME_DYE : Items.GRAY_DYE,
+                (has ? "§a✔ " : "§c✗ ") + permLabel(perm),
+                "§7" + permDesc(perm),
+                canEdit ? (has ? "§cClic para desactivar" : "§aClic para activar") : "§8Sin permisos de edición"
+            ));
+        }
+
+        // Miembros del grupo
+        int[] memberSlots = {28,29,30,31,32,33,34};
+        int idx = 0;
+        for (UUID uuid : group.members) {
+            if (idx >= memberSlots.length) break;
+            String mName = data.getMemberName(uuid);
+            menuInv.setStack(memberSlots[idx], makePlayerHeadFromServer(uuid, mName,
+                "§f" + mName,
+                canEdit ? "§cClic para quitar del grupo" : ""));
+            idx++;
+        }
+    }
+
+    // ── PERMS PAGE (permisos por defecto por rol) ─────────────────────────────
+    private void buildPermsPage() {
+        boolean canEdit = data.hasPermission(player.getUuid(), PlotData.Permission.MANAGE_PERMS);
+
+        menuInv.setStack(10, namedLore(Items.BOOK,
+            "§ePermisos por Rol",
+            "§7Estos son los permisos que cada rol",
+            "§7tiene por defecto al ser agregado.",
+            canEdit ? "§ePueden modificarse individualmente" : "§8Solo lectura"));
+
+        // Mostrar tabla: columna = rol, fila = permiso
+        // Rol MEMBER (columna 19-25) y VISITOR (columna 28-34)
+        PlotData.Permission[] perms = PlotData.Permission.values();
+        int[] memberSlots = {19,20,21,22,23,24,25};
+        int[] visitorSlots = {28,29,30,31,32,33,34};
+
+        Set<PlotData.Permission> memberDefaults = PlotData.defaultPermsFor(PlotData.Role.MEMBER);
+        Set<PlotData.Permission> visitorDefaults = PlotData.defaultPermsFor(PlotData.Role.VISITOR);
+        Set<PlotData.Permission> adminDefaults = PlotData.defaultPermsFor(PlotData.Role.ADMIN);
+
+        menuInv.setStack(18, namedLore(Items.IRON_SWORD, "§7Rol: §aMEMBER", "§8Permisos por defecto"));
+        menuInv.setStack(27, namedLore(Items.WOODEN_SWORD, "§7Rol: §7VISITOR", "§8Permisos por defecto"));
+
+        for (int i = 0; i < perms.length && i < memberSlots.length; i++) {
+            PlotData.Permission perm = perms[i];
+            boolean has = memberDefaults.contains(perm);
+            menuInv.setStack(memberSlots[i], namedLore(
+                has ? Items.LIME_DYE : Items.GRAY_DYE,
+                (has ? "§a✔ " : "§c✗ ") + permLabel(perm),
+                "§7" + permDesc(perm)));
+        }
+        for (int i = 0; i < perms.length && i < visitorSlots.length; i++) {
+            PlotData.Permission perm = perms[i];
+            boolean has = visitorDefaults.contains(perm);
+            menuInv.setStack(visitorSlots[i], namedLore(
+                has ? Items.LIME_DYE : Items.GRAY_DYE,
+                (has ? "§a✔ " : "§c✗ ") + permLabel(perm),
+                "§7" + permDesc(perm)));
+        }
+
+        menuInv.setStack(36, namedLore(Items.DIAMOND_SWORD, "§7Rol: §cADMIN", "§8Permisos por defecto"));
+        int[] adminSlots = {37,38,39,40,41,42,43};
+        for (int i = 0; i < perms.length && i < adminSlots.length; i++) {
+            PlotData.Permission perm = perms[i];
+            boolean has = adminDefaults.contains(perm);
+            menuInv.setStack(adminSlots[i], namedLore(
+                has ? Items.LIME_DYE : Items.GRAY_DYE,
+                (has ? "§a✔ " : "§c✗ ") + permLabel(perm),
+                "§7" + permDesc(perm)));
+        }
+    }
+
+    // ── FLAGS PAGE ────────────────────────────────────────────────────────────
+    private void buildFlagsPage() {
+        boolean canEdit = data.hasPermission(player.getUuid(), PlotData.Permission.MANAGE_FLAGS);
+
+        menuInv.setStack(10, namedLore(Items.ORANGE_BANNER,
+            "§eFlags Globales",
+            "§7Las flags afectan a TODOS los jugadores",
+            "§7dentro de la parcela.",
+            canEdit ? "§eClic para toggle" : "§8Solo el dueño/admin puede cambiar"));
+
+        PlotData.Flag[] flagValues = PlotData.Flag.values();
+        int[] flagSlots = {19,20,21,22,23,24,25, 28,29,30,31};
+        for (int i = 0; i < flagValues.length && i < flagSlots.length; i++) {
+            PlotData.Flag flag = flagValues[i];
+            boolean on = data.hasFlag(flag);
+            menuInv.setStack(flagSlots[i], namedLore(
+                on ? Items.LIME_CONCRETE : Items.RED_CONCRETE,
+                (on ? "§a[ON] " : "§c[OFF] ") + flagLabel(flag),
+                "§7" + flagDesc(flag),
+                canEdit ? (on ? "§cClic para desactivar" : "§aClic para activar") : "§8Sin permisos"
+            ));
+        }
+    }
+
+    // ── UPGRADE PAGE ──────────────────────────────────────────────────────────
     private void buildUpgradePage() {
         PlotSize cur  = data.getSize();
         PlotSize next = cur.next();
@@ -221,7 +420,6 @@ public class PlotMenuHandler extends GenericContainerScreenHandler {
             tierColor(next) + "Siguiente: " + next.displayName,
             "§7Tamaño: §b" + next.radius + "x" + next.radius + " bloques"));
 
-        // Costo en PAPEL con checkmarks de materiales
         SecurePlotsConfig cfg = SecurePlotsConfig.INSTANCE;
         SecurePlotsConfig.UpgradeCost cost = cfg != null ? cfg.getUpgradeCost(cur.tier) : null;
 
@@ -237,28 +435,21 @@ public class PlotMenuHandler extends GenericContainerScreenHandler {
                 if (!ok) canAfford = false;
                 String raw = itemCost.itemId.contains(":") ? itemCost.itemId.split(":")[1] : itemCost.itemId;
                 String itemName = Character.toUpperCase(raw.charAt(0)) + raw.substring(1).replace("_", " ");
-                String check = ok ? "§a✔" : "§c✗";
-                String amountColor = ok ? "§a" : "§c";
-                costLore.add(check + " §7" + itemName + ": " + amountColor + has + "§7/" + itemCost.amount);
+                costLore.add((ok ? "§a✔" : "§c✗") + " §7" + itemName + ": " + (ok ? "§a" : "§c") + has + "§7/" + itemCost.amount);
             }
             menuInv.setStack(23, namedLoreDynamic(Items.PAPER, "§eMateriales requeridos", costLore));
         }
 
-        // Botón mejorar: yunque encantado si puede, normal si no
         if (myRole == PlotData.Role.OWNER) {
             if (canAfford) {
-                ItemStack btn = namedLore(Items.ANVIL,
-                    "§a⬆ Mejorar a " + next.displayName,
-                    "§7Tenés todos los materiales");
+                ItemStack btn = namedLore(Items.ANVIL, "§a⬆ Mejorar a " + next.displayName, "§7Tenés todos los materiales");
                 btn.set(DataComponentTypes.ENCHANTMENT_GLINT_OVERRIDE, true);
                 menuInv.setStack(SLOT_UPGRADE_BTN, btn);
             } else {
-                menuInv.setStack(SLOT_UPGRADE_BTN, namedLore(Items.ANVIL,
-                    "§c✗ No podés mejorar todavía"));
+                menuInv.setStack(SLOT_UPGRADE_BTN, namedLore(Items.ANVIL, "§c✗ No podés mejorar todavía"));
             }
         } else {
-            menuInv.setStack(SLOT_UPGRADE_BTN, namedLore(Items.BARRIER,
-                "§cSolo el dueño puede mejorar"));
+            menuInv.setStack(SLOT_UPGRADE_BTN, namedLore(Items.BARRIER, "§cSolo el dueño puede mejorar"));
         }
     }
 
@@ -266,53 +457,224 @@ public class PlotMenuHandler extends GenericContainerScreenHandler {
     @Override
     public void onSlotClick(int slotIndex, int button, SlotActionType actionType, PlayerEntity actor) {
         if (slotIndex < 0 || slotIndex >= SIZE) return;
-
         ItemStack clicked = menuInv.getStack(slotIndex);
         if (clicked.isEmpty()) return;
 
-        if (slotIndex == SLOT_TAB_INFO)    { page = MenuPage.INFO;    refreshMenu(); return; }
-        if (slotIndex == SLOT_TAB_MEMBERS) { page = MenuPage.MEMBERS; refreshMenu(); return; }
-        if (slotIndex == SLOT_TAB_UPGRADE) { page = MenuPage.UPGRADE; refreshMenu(); return; }
-        if (slotIndex == SLOT_CLOSE)       { player.closeHandledScreen(); return; }
+        // Tabs
+        if (slotIndex == SLOT_TAB_INFO)    { page = MenuPage.INFO;    viewingMemberUuid = null; viewingGroupName = null; refreshMenu(); return; }
+        if (slotIndex == SLOT_TAB_MEMBERS) { page = MenuPage.MEMBERS; viewingMemberUuid = null; viewingGroupName = null; refreshMenu(); return; }
+        if (slotIndex == SLOT_TAB_PERMS)   { page = MenuPage.PERMS;   viewingMemberUuid = null; viewingGroupName = null; refreshMenu(); return; }
+        if (slotIndex == SLOT_TAB_FLAGS)   { page = MenuPage.FLAGS;   viewingMemberUuid = null; viewingGroupName = null; refreshMenu(); return; }
+        if (slotIndex == SLOT_TAB_UPGRADE) { page = MenuPage.UPGRADE; viewingMemberUuid = null; viewingGroupName = null; refreshMenu(); return; }
+        if (slotIndex == SLOT_CLOSE) { player.closeHandledScreen(); return; }
 
-        // Botón mejorar
-        if (slotIndex == SLOT_UPGRADE_BTN && myRole == PlotData.Role.OWNER) {
-            handleUpgrade(); return;
+        // Botón upgrade
+        if (slotIndex == SLOT_UPGRADE_BTN && myRole == PlotData.Role.OWNER) { handleUpgrade(); return; }
+
+        // ── INFO page ──────────────────────────────────────────────────────────
+        if (page == MenuPage.INFO) {
+            // Renombrar
+            if (clicked.getItem() == Items.ANVIL && myRole == PlotData.Role.OWNER) {
+                openSignForInput(PendingAction.RENAME); return;
+            }
+            // TP
+            if (clicked.getItem() == Items.ENDER_PEARL) {
+                handleTp(); return;
+            }
         }
 
-        // Yunque → renombrar (abrir cartel)
-        if (clicked.getItem() == Items.ANVIL && page == MenuPage.INFO && myRole == PlotData.Role.OWNER) {
-            openSignForInput(PendingAction.RENAME);
-            return;
+        // ── MEMBERS page ──────────────────────────────────────────────────────
+        if (page == MenuPage.MEMBERS) {
+            if (viewingMemberUuid != null) {
+                handleMemberPermsClick(slotIndex, button, clicked);
+                return;
+            }
+            if (viewingGroupName != null) {
+                handleGroupPageClick(slotIndex, button, clicked);
+                return;
+            }
+
+            boolean canManage = data.hasPermission(player.getUuid(), PlotData.Permission.MANAGE_MEMBERS);
+
+            // Volver
+            if (clicked.getItem() == Items.ARROW) {
+                viewingMemberUuid = null; viewingGroupName = null; refreshMenu(); return;
+            }
+            // Agregar miembro
+            if (clicked.getItem() == Items.EMERALD && canManage) {
+                openSignForInput(PendingAction.ADD_MEMBER); return;
+            }
+            // Crear grupo
+            if (clicked.getItem() == Items.BOOKSHELF && canManage) {
+                openSignForInput(PendingAction.CREATE_GROUP); return;
+            }
+            // Clic en grupo
+            if (clicked.getItem() == Items.WRITABLE_BOOK) {
+                Text nameText = clicked.get(DataComponentTypes.CUSTOM_NAME);
+                if (nameText != null) {
+                    String gn = nameText.getString().replaceAll("§.", "").replace("[G] ", "").replace("[Grupo] ", "").trim();
+                    if (data.getGroup(gn) != null) { viewingGroupName = gn; refreshMenu(); return; }
+                }
+            }
+            // Clic en cabeza de miembro
+            if (clicked.getItem() == Items.PLAYER_HEAD && canManage) {
+                Text nameText = clicked.get(DataComponentTypes.CUSTOM_NAME);
+                String memberName = nameText != null ? nameText.getString().replaceAll("§.", "").trim() : "";
+                if (!memberName.isEmpty()) {
+                    // Shift-click = remover, click normal = editar permisos
+                    if (button == 1) { // right click / shift en algunos contextos
+                        removeMemberByName(memberName);
+                    } else if (actionType == SlotActionType.PICKUP_ALL) {
+                        removeMemberByName(memberName);
+                    } else {
+                        // Buscar UUID y abrir sub-página
+                        for (UUID uuid : data.getMembers().keySet()) {
+                            if (data.getMemberName(uuid).equalsIgnoreCase(memberName)) {
+                                viewingMemberUuid = uuid; refreshMenu(); return;
+                            }
+                        }
+                    }
+                }
+                return;
+            }
         }
 
-        // Esmeralda → agregar miembro (abrir cartel) — SOLO en tab miembros
-        if (clicked.getItem() == Items.EMERALD && page == MenuPage.MEMBERS &&
-                (myRole == PlotData.Role.OWNER || myRole == PlotData.Role.ADMIN)) {
-            openSignForInput(PendingAction.ADD_MEMBER);
-            return;
-        }
+        // ── FLAGS page ────────────────────────────────────────────────────────
+        if (page == MenuPage.FLAGS) {
+            boolean canEdit = data.hasPermission(player.getUuid(), PlotData.Permission.MANAGE_FLAGS);
+            if (!canEdit) return;
 
-        // Clic en cabeza → remover miembro
-        if (page == MenuPage.MEMBERS && clicked.getItem() == Items.PLAYER_HEAD &&
-                (myRole == PlotData.Role.OWNER || myRole == PlotData.Role.ADMIN)) {
-            Text nameText = clicked.get(DataComponentTypes.CUSTOM_NAME);
-            String memberName = nameText != null ? nameText.getString().replaceAll("§.", "").trim() : "";
-            if (!memberName.isEmpty()) removeMemberByName(memberName);
-            return;
+            PlotData.Flag[] flagValues = PlotData.Flag.values();
+            int[] flagSlots = {19,20,21,22,23,24,25, 28,29,30,31};
+            for (int i = 0; i < flagValues.length && i < flagSlots.length; i++) {
+                if (slotIndex == flagSlots[i]) {
+                    if (!(player.getWorld() instanceof ServerWorld sw)) return;
+                    PlotManager manager = PlotManager.getOrCreate(sw);
+                    PlotData fresh = manager.getPlot(plotPos);
+                    if (fresh == null) return;
+                    fresh.setFlag(flagValues[i], !fresh.hasFlag(flagValues[i]));
+                    manager.markDirty();
+                    this.data = fresh;
+                    playSound(SoundEvents.UI_BUTTON_CLICK.value(), 0.4f, 1.2f);
+                    refreshMenu();
+                    return;
+                }
+            }
         }
     }
 
-    // ── Sign Input UI ─────────────────────────────────────────────────────────
+    private void handleMemberPermsClick(int slotIndex, int button, ItemStack clicked) {
+        if (clicked.getItem() == Items.ARROW) {
+            viewingMemberUuid = null; refreshMenu(); return;
+        }
+        boolean canEdit = data.hasPermission(player.getUuid(), PlotData.Permission.MANAGE_PERMS);
+        if (!canEdit) return;
+
+        // Cambiar rol
+        if (clicked.getItem() == Items.EXPERIENCE_BOTTLE) {
+            cycleRole(viewingMemberUuid); return;
+        }
+
+        // Toggle permiso
+        PlotData.Permission[] perms = PlotData.Permission.values();
+        int[] slots = {19,20,21,22,23,24,25, 28,29,30,31,32,33,34};
+        for (int i = 0; i < perms.length && i < slots.length; i++) {
+            if (slotIndex == slots[i]) {
+                if (!(player.getWorld() instanceof ServerWorld sw)) return;
+                PlotManager manager = PlotManager.getOrCreate(sw);
+                PlotData fresh = manager.getPlot(plotPos);
+                if (fresh == null) return;
+                boolean current = fresh.hasPermission(viewingMemberUuid, perms[i]);
+                fresh.setPermission(viewingMemberUuid, perms[i], !current);
+                manager.markDirty();
+                this.data = fresh;
+                playSound(SoundEvents.UI_BUTTON_CLICK.value(), 0.4f, 1.2f);
+                refreshMenu();
+                return;
+            }
+        }
+    }
+
+    private void handleGroupPageClick(int slotIndex, int button, ItemStack clicked) {
+        if (clicked.getItem() == Items.ARROW) {
+            viewingGroupName = null; refreshMenu(); return;
+        }
+        boolean canEdit = data.hasPermission(player.getUuid(), PlotData.Permission.MANAGE_GROUPS);
+        if (!canEdit) return;
+
+        if (!(player.getWorld() instanceof ServerWorld sw)) return;
+        PlotManager manager = PlotManager.getOrCreate(sw);
+        PlotData fresh = manager.getPlot(plotPos);
+        if (fresh == null) return;
+
+        PlotData.PermissionGroup group = fresh.getGroup(viewingGroupName);
+        if (group == null) { viewingGroupName = null; refreshMenu(); return; }
+
+        // Eliminar grupo
+        if (clicked.getItem() == Items.TNT) {
+            fresh.removeGroup(viewingGroupName);
+            manager.markDirty();
+            this.data = fresh;
+            viewingGroupName = null;
+            playSound(SoundEvents.ENTITY_ITEM_BREAK, 1f, 0.8f);
+            refreshMenu(); return;
+        }
+
+        // Toggle perm del grupo
+        PlotData.Permission[] perms = PlotData.Permission.values();
+        int[] permSlots = {19,20,21,22,23,24,25};
+        for (int i = 0; i < perms.length && i < permSlots.length; i++) {
+            if (slotIndex == permSlots[i]) {
+                boolean has = group.permissions.contains(perms[i]);
+                if (has) group.permissions.remove(perms[i]); else group.permissions.add(perms[i]);
+                manager.markDirty();
+                this.data = fresh;
+                playSound(SoundEvents.UI_BUTTON_CLICK.value(), 0.4f, 1.2f);
+                refreshMenu(); return;
+            }
+        }
+
+        // Quitar miembro del grupo
+        if (clicked.getItem() == Items.PLAYER_HEAD) {
+            Text nameText = clicked.get(DataComponentTypes.CUSTOM_NAME);
+            String mName = nameText != null ? nameText.getString().replaceAll("§.", "").trim() : "";
+            group.members.removeIf(u -> fresh.getMemberName(u).equalsIgnoreCase(mName));
+            manager.markDirty();
+            this.data = fresh;
+            refreshMenu(); return;
+        }
+    }
+
+    // ── TP ────────────────────────────────────────────────────────────────────
+    private void handleTp() {
+        boolean tpEnabled = data.hasFlag(PlotData.Flag.ALLOW_TP);
+        boolean canTp = tpEnabled || myRole == PlotData.Role.OWNER || myRole == PlotData.Role.ADMIN;
+        if (!canTp) {
+            player.sendMessage(Text.literal("§c✗ El TP no está habilitado en esta parcela."), false);
+            return;
+        }
+        if (!(player.getWorld() instanceof ServerWorld sw)) return;
+        BlockPos c = data.getCenter();
+        // Teleport encima del bloque central
+        double tpY = sw.getTopPosition(net.minecraft.world.Heightmap.Type.MOTION_BLOCKING_NO_LEAVES,
+            new BlockPos(c.getX(), c.getY(), c.getZ())).getY();
+        player.closeHandledScreen();
+        player.teleport(sw, c.getX() + 0.5, tpY, c.getZ() + 0.5,
+            java.util.Set.of(), player.getYaw(), player.getPitch());
+        player.sendMessage(Text.literal("§a✔ Teleportado a §e" + data.getPlotName()), false);
+        sw.playSound(null, player.getBlockPos(), SoundEvents.ENTITY_ENDERMAN_TELEPORT, SoundCategory.PLAYERS, 1f, 1f);
+    }
+
+    // ── Sign Input ────────────────────────────────────────────────────────────
     private void openSignForInput(PendingAction action) {
         player.closeHandledScreen();
-        // Single tick delay so client processes the close before the sign editor open
         if (!(player.getWorld() instanceof ServerWorld sw)) return;
         sw.getServer().execute(() -> {
-            if (action == PendingAction.RENAME) {
-                SignInputManager.openForRename(player, plotPos);
-            } else {
-                SignInputManager.openForAddMember(player, plotPos);
+            switch (action) {
+                case RENAME       -> SignInputManager.openForRename(player, plotPos);
+                case ADD_MEMBER   -> SignInputManager.openForAddMember(player, plotPos);
+                case CREATE_GROUP -> SignInputManager.openForCreateGroup(player, plotPos);
+                default           -> {}
             }
         });
     }
@@ -325,76 +687,70 @@ public class PlotMenuHandler extends GenericContainerScreenHandler {
         if (fresh == null) return;
 
         PlotSize next = fresh.getSize().next();
-        if (next == null) {
-            playSound(SoundEvents.ENTITY_VILLAGER_NO, 1f, 1f);
-            return;
-        }
+        if (next == null) { playSound(SoundEvents.ENTITY_VILLAGER_NO, 1f, 1f); return; }
 
         SecurePlotsConfig cfg = SecurePlotsConfig.INSTANCE;
         SecurePlotsConfig.UpgradeCost cost = cfg != null ? cfg.getUpgradeCost(fresh.getSize().tier) : null;
 
         if (cost != null) {
-            for (SecurePlotsConfig.UpgradeCost.ItemCost itemCost : cost.items) {
-                net.minecraft.util.Identifier id = net.minecraft.util.Identifier.of(itemCost.itemId);
+            for (SecurePlotsConfig.UpgradeCost.ItemCost ic : cost.items) {
+                net.minecraft.util.Identifier id = net.minecraft.util.Identifier.of(ic.itemId);
                 net.minecraft.item.Item item = net.minecraft.registry.Registries.ITEM.get(id);
-                if (countItem(player, item) < itemCost.amount) {
-                    // Sonido "no podés"
+                if (countItem(player, item) < ic.amount) {
                     playSound(SoundEvents.ENTITY_VILLAGER_NO, 1f, 0.8f);
-                    refreshMenu();
-                    return;
+                    refreshMenu(); return;
                 }
             }
-            for (SecurePlotsConfig.UpgradeCost.ItemCost itemCost : cost.items) {
-                net.minecraft.util.Identifier id = net.minecraft.util.Identifier.of(itemCost.itemId);
+            for (SecurePlotsConfig.UpgradeCost.ItemCost ic : cost.items) {
+                net.minecraft.util.Identifier id = net.minecraft.util.Identifier.of(ic.itemId);
                 net.minecraft.item.Item item = net.minecraft.registry.Registries.ITEM.get(id);
-                removeItem(player, item, itemCost.amount);
+                removeItem(player, item, ic.amount);
             }
         }
 
-        PlotSize oldSize = fresh.getSize();
         fresh.setSize(next);
-
         net.minecraft.block.Block newBlock = com.zhilius.secureplots.block.ModBlocks.fromTier(next.tier);
         sw.setBlockState(plotPos, newBlock.getDefaultState());
-
         manager.markDirty();
 
-        // Sonido de mejora
         sw.playSound(null, plotPos, SoundEvents.UI_TOAST_CHALLENGE_COMPLETE, SoundCategory.PLAYERS, 1f, 1f);
         sw.playSound(null, plotPos, SoundEvents.ENTITY_PLAYER_LEVELUP, SoundCategory.PLAYERS, 0.8f, 1.2f);
-
-        // Partículas en el bloque
         spawnUpgradeParticles(sw, plotPos);
 
-        // Cerrar menú para ver las partículas
         player.closeHandledScreen();
-        // Enviar nuevo borde al cliente — esto dispara la transición animada
         com.zhilius.secureplots.network.ModPackets.sendShowPlotBorder(player, fresh);
         player.sendMessage(Text.literal("§a✔ ¡Protección mejorada a §e" + next.displayName + "§a!"), false);
     }
 
     private void spawnUpgradeParticles(ServerWorld sw, BlockPos pos) {
         Vec3d center = Vec3d.ofCenter(pos);
-        // Espiral de partículas happy_villager + totem
         for (int i = 0; i < 30; i++) {
             double angle = i * (Math.PI * 2 / 30);
-            double r = 1.5;
             sw.spawnParticles(ParticleTypes.HAPPY_VILLAGER,
-                center.x + Math.cos(angle) * r,
-                center.y + 0.5 + (i * 0.05),
-                center.z + Math.sin(angle) * r,
+                center.x + Math.cos(angle) * 1.5, center.y + 0.5 + (i * 0.05), center.z + Math.sin(angle) * 1.5,
                 1, 0, 0, 0, 0);
         }
         for (int i = 0; i < 15; i++) {
             sw.spawnParticles(ParticleTypes.TOTEM_OF_UNDYING,
-                center.x + (Math.random() - 0.5) * 2,
-                center.y + Math.random() * 2,
-                center.z + (Math.random() - 0.5) * 2,
+                center.x + (Math.random() - 0.5) * 2, center.y + Math.random() * 2, center.z + (Math.random() - 0.5) * 2,
                 1, 0, 0.1, 0, 0.1);
         }
-        sw.spawnParticles(ParticleTypes.ENCHANT,
-            center.x, center.y + 1, center.z,
-            40, 0.5, 0.5, 0.5, 0.5);
+        sw.spawnParticles(ParticleTypes.ENCHANT, center.x, center.y + 1, center.z, 40, 0.5, 0.5, 0.5, 0.5);
+    }
+
+    private void cycleRole(UUID uuid) {
+        if (!(player.getWorld() instanceof ServerWorld sw)) return;
+        PlotManager manager = PlotManager.getOrCreate(sw);
+        PlotData fresh = manager.getPlot(plotPos);
+        if (fresh == null) return;
+        PlotData.Role current = fresh.getRoleOf(uuid);
+        PlotData.Role next = current == PlotData.Role.MEMBER ? PlotData.Role.ADMIN : PlotData.Role.MEMBER;
+        fresh.getMembers().put(uuid, next);
+        // Reset perms to role default
+        fresh.getMembers().put(uuid, next);
+        manager.markDirty();
+        this.data = fresh;
+        refreshMenu();
     }
 
     private void removeMemberByName(String name) {
@@ -402,38 +758,86 @@ public class PlotMenuHandler extends GenericContainerScreenHandler {
         PlotManager manager = PlotManager.getOrCreate(sw);
         PlotData fresh = manager.getPlot(plotPos);
         if (fresh == null) return;
-
         UUID target = null;
         for (UUID uuid : fresh.getMembers().keySet()) {
             if (fresh.getMemberName(uuid).equalsIgnoreCase(name)) { target = uuid; break; }
         }
         if (target == null) return;
-
         fresh.removeMember(target);
         manager.markDirty();
         this.data = fresh;
-
-        // Sonido al eliminar miembro
         playSound(SoundEvents.ENTITY_ITEM_BREAK, 1f, 0.8f);
-
         player.sendMessage(Text.literal("§a✔ " + name + " eliminado."), false);
         refreshMenu();
     }
 
-    private void refreshMenu() {
-        buildMenu();
-        this.sendContentUpdates();
-    }
+    private void refreshMenu() { buildMenu(); sendContentUpdates(); }
 
     private void playSound(net.minecraft.sound.SoundEvent sound, float volume, float pitch) {
-        if (player.getWorld() instanceof ServerWorld sw) {
+        if (player.getWorld() instanceof ServerWorld sw)
             sw.playSound(null, player.getBlockPos(), sound, SoundCategory.PLAYERS, volume, pitch);
-        }
     }
 
     private List<PlotData> getOwnedPlots() {
         if (!(player.getWorld() instanceof ServerWorld sw)) return List.of(data);
         return PlotManager.getOrCreate(sw).getPlayerPlots(player.getUuid());
+    }
+
+    // ── Labels de permisos / flags ────────────────────────────────────────────
+    private static String permLabel(PlotData.Permission perm) {
+        return switch (perm) {
+            case BUILD          -> "Construir";
+            case INTERACT       -> "Interactuar";
+            case CONTAINERS     -> "Contenedores";
+            case PVP            -> "PvP";
+            case MANAGE_MEMBERS -> "Gestionar Miembros";
+            case MANAGE_PERMS   -> "Gestionar Permisos";
+            case MANAGE_FLAGS   -> "Gestionar Flags";
+            case MANAGE_GROUPS  -> "Gestionar Grupos";
+            case TP             -> "Teleportar";
+            case FLY            -> "Volar";
+            case ENTER          -> "Entrar";
+        };
+    }
+
+    private static String permDesc(PlotData.Permission perm) {
+        return switch (perm) {
+            case BUILD          -> "Colocar y romper bloques";
+            case INTERACT       -> "Palancas, puertas, botones";
+            case CONTAINERS     -> "Abrir cofres e inventarios";
+            case PVP            -> "Atacar a otros jugadores";
+            case MANAGE_MEMBERS -> "Agregar y remover miembros";
+            case MANAGE_PERMS   -> "Cambiar permisos de miembros";
+            case MANAGE_FLAGS   -> "Cambiar flags globales";
+            case MANAGE_GROUPS  -> "Crear y editar grupos";
+            case TP             -> "Usar /sp tp para llegar aquí";
+            case FLY            -> "Volar dentro de la parcela";
+            case ENTER          -> "Entrar al área de la parcela";
+        };
+    }
+
+    private static String flagLabel(PlotData.Flag flag) {
+        return switch (flag) {
+            case ALLOW_VISITOR_BUILD      -> "Visitantes: Construir";
+            case ALLOW_VISITOR_INTERACT   -> "Visitantes: Interactuar";
+            case ALLOW_VISITOR_CONTAINERS -> "Visitantes: Contenedores";
+            case ALLOW_PVP                -> "PvP Global";
+            case ALLOW_FLY                -> "Volar Global";
+            case ALLOW_TP                 -> "TP Público";
+            case GREETINGS                -> "Mensajes de Bienvenida";
+        };
+    }
+
+    private static String flagDesc(PlotData.Flag flag) {
+        return switch (flag) {
+            case ALLOW_VISITOR_BUILD      -> "Cualquiera puede construir aquí";
+            case ALLOW_VISITOR_INTERACT   -> "Cualquiera puede interactuar";
+            case ALLOW_VISITOR_CONTAINERS -> "Cualquiera puede abrir cofres";
+            case ALLOW_PVP                -> "PvP habilitado para todos";
+            case ALLOW_FLY                -> "Todos pueden volar aquí";
+            case ALLOW_TP                 -> "Todos pueden /sp tp a esta plot";
+            case GREETINGS                -> "Mostrar mensaje al entrar/salir";
+        };
     }
 
     // ── Item Helpers ──────────────────────────────────────────────────────────
@@ -457,35 +861,21 @@ public class PlotMenuHandler extends GenericContainerScreenHandler {
         return namedLore(item, name, loreLines.toArray(new String[0]));
     }
 
-    /**
-     * Crea una cabeza de jugador con la skin real obtenida del servidor.
-     * Usa el GameProfile cacheado del servidor si el jugador está online,
-     * o construye uno con UUID para que el cliente lo resuelva.
-     */
     private ItemStack makePlayerHeadFromServer(UUID uuid, String playerName, String displayName, String... loreLines) {
         ItemStack stack = namedLore(Items.PLAYER_HEAD, displayName, loreLines);
         try {
-            // Intentar obtener el perfil real con texturas del servidor
             ServerPlayerEntity onlinePlayer = player.getServer().getPlayerManager().getPlayer(uuid);
             GameProfile profile;
             if (onlinePlayer != null) {
                 profile = onlinePlayer.getGameProfile();
             } else {
-                // Jugador offline: buscar en UserCache
                 var userCache = player.getServer().getUserCache();
-                if (userCache != null) {
-                    var cached = userCache.getByUuid(uuid);
-                    profile = cached.orElse(new GameProfile(uuid, playerName));
-                } else {
-                    profile = new GameProfile(uuid, playerName);
-                }
+                profile = (userCache != null) ? userCache.getByUuid(uuid).orElse(new GameProfile(uuid, playerName))
+                                              : new GameProfile(uuid, playerName);
             }
             stack.set(DataComponentTypes.PROFILE,
-                new ProfileComponent(
-                    Optional.ofNullable(profile.getName()),
-                    Optional.of(profile.getId()),
-                    profile.getProperties()
-                ));
+                new ProfileComponent(Optional.ofNullable(profile.getName()),
+                    Optional.of(profile.getId()), profile.getProperties()));
         } catch (Exception ignored) {}
         return stack;
     }

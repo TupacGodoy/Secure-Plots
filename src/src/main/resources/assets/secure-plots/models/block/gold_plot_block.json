@@ -1,6 +1,0 @@
-{
-  "parent": "minecraft:block/cube_all",
-  "textures": {
-    "all": "secure-plots:block/gold_plot_block"
-  }
-}

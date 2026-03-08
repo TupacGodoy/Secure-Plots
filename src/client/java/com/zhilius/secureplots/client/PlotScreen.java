@@ -362,19 +362,33 @@ public class PlotScreen extends Screen {
 
     private static String permLabel(PlotData.Permission perm) {
         return switch (perm) {
-            case BUILD      -> "Construir";
-            case INTERACT   -> "Interactuar";
-            case CONTAINERS -> "Abrir cofres";
-            case PVP        -> "PvP";
+            case BUILD          -> "Construir";
+            case INTERACT       -> "Interactuar";
+            case CONTAINERS     -> "Abrir cofres";
+            case PVP            -> "PvP";
+            case MANAGE_MEMBERS -> "Gestionar Miembros";
+            case MANAGE_PERMS   -> "Gestionar Permisos";
+            case MANAGE_FLAGS   -> "Gestionar Flags";
+            case MANAGE_GROUPS  -> "Gestionar Grupos";
+            case TP             -> "Teleportar";
+            case FLY            -> "Volar";
+            case ENTER          -> "Entrar";
         };
     }
 
     private static String permDesc(PlotData.Permission perm) {
         return switch (perm) {
-            case BUILD      -> "Colocar y romper bloques";
-            case INTERACT   -> "Usar palancas, puertas, etc.";
-            case CONTAINERS -> "Abrir cofres e inventarios";
-            case PVP        -> "Atacar jugadores en la plot";
+            case BUILD          -> "Colocar y romper bloques";
+            case INTERACT       -> "Usar palancas, puertas, etc.";
+            case CONTAINERS     -> "Abrir cofres e inventarios";
+            case PVP            -> "Atacar jugadores en la plot";
+            case MANAGE_MEMBERS -> "Agregar y remover miembros";
+            case MANAGE_PERMS   -> "Cambiar permisos de miembros";
+            case MANAGE_FLAGS   -> "Cambiar flags globales";
+            case MANAGE_GROUPS  -> "Crear y editar grupos";
+            case TP             -> "Usar /sp tp para llegar aquí";
+            case FLY            -> "Volar dentro de la parcela";
+            case ENTER          -> "Entrar al área de la parcela";
         };
     }
 

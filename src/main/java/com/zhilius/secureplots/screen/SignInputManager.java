@@ -20,16 +20,9 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
-/**
- * Sign input via fake client-side packets only.
- * 1. BlockUpdateS2CPacket     → tells client there's an oak_wall_sign at fakePos
- * 2. BlockEntityUpdateS2CPacket → gives the client a valid SignBlockEntity NBT
- * 3. SignEditorOpenS2CPacket  → opens the sign editor
- * The mixin cancels the UpdateSignC2SPacket response before server validation.
- */
 public class SignInputManager {
 
-    public enum InputType { RENAME, ADD_MEMBER }
+    public enum InputType { RENAME, ADD_MEMBER, CREATE_GROUP }
 
     public record PendingInput(BlockPos fakePos, BlockPos plotPos, InputType type) {}
 
@@ -43,18 +36,17 @@ public class SignInputManager {
         open(player, plotPos, InputType.ADD_MEMBER);
     }
 
-    private static void open(ServerPlayerEntity player, BlockPos plotPos, InputType type) {
-        // Use a position at player's feet Y + 2 so it's always within range
-        // and predictably close to the player
-        BlockPos fakePos = new BlockPos(player.getBlockX(), player.getBlockY() + 2, player.getBlockZ());
+    public static void openForCreateGroup(ServerPlayerEntity player, BlockPos plotPos) {
+        open(player, plotPos, InputType.CREATE_GROUP);
+    }
 
+    private static void open(ServerPlayerEntity player, BlockPos plotPos, InputType type) {
+        BlockPos fakePos = new BlockPos(player.getBlockX(), player.getBlockY() + 2, player.getBlockZ());
         pending.put(player.getUuid(), new PendingInput(fakePos, plotPos, type));
 
-        // 1. Send block state (oak_wall_sign facing north — client needs this)
         player.networkHandler.sendPacket(
             new BlockUpdateS2CPacket(fakePos, Blocks.OAK_WALL_SIGN.getDefaultState()));
 
-        // 2. Send SignBlockEntity NBT via reflection (constructor is private in 1.21)
         try {
             NbtCompound signNbt = new NbtCompound();
             signNbt.putString("id", "minecraft:sign");
@@ -84,7 +76,6 @@ public class SignInputManager {
             com.zhilius.secureplots.SecurePlots.LOGGER.error("SecurePlots: failed to send sign BE packet: {}", e.getMessage());
         }
 
-        // 3. Open the sign editor UI on the client
         player.networkHandler.sendPacket(new SignEditorOpenS2CPacket(fakePos, true));
     }
 
@@ -92,33 +83,28 @@ public class SignInputManager {
         return pending.containsKey(uuid);
     }
 
-    /**
-     * Called from UpdateSignMixin before server-side validation.
-     */
     public static void handleSignUpdate(ServerPlayerEntity player, BlockPos pos, String[] lines) {
         UUID uuid = player.getUuid();
         PendingInput input = pending.remove(uuid);
         if (input == null) return;
         if (!input.fakePos().equals(pos)) {
-            pending.put(uuid, input); // not ours
+            pending.put(uuid, input);
             return;
         }
 
-        // Restore air to the client at fakePos (clean up the fake block)
         player.networkHandler.sendPacket(
             new BlockUpdateS2CPacket(input.fakePos(), Blocks.AIR.getDefaultState()));
 
-        // First non-empty line = input text
         String text = "";
         for (String line : lines) {
             if (line != null && !line.isBlank()) { text = line.trim(); break; }
         }
-
-        if (text.isEmpty()) return; // cancelled
+        if (text.isEmpty()) return;
 
         switch (input.type()) {
-            case RENAME     -> handleRename(player, input.plotPos(), text);
-            case ADD_MEMBER -> handleAddMember(player, input.plotPos(), text);
+            case RENAME       -> handleRename(player, input.plotPos(), text);
+            case ADD_MEMBER   -> handleAddMember(player, input.plotPos(), text);
+            case CREATE_GROUP -> handleCreateGroup(player, input.plotPos(), text);
         }
     }
 
@@ -134,19 +120,19 @@ public class SignInputManager {
         boolean isAdmin = player.getCommandTags().contains("plot_admin");
         if (!data.getOwnerId().equals(player.getUuid()) && !isAdmin) {
             player.sendMessage(Text.literal("✗ Solo el dueño puede renombrar.").formatted(Formatting.RED), false);
-            reopenMenu(player, plotPos);
+            reopenMenu(player, plotPos, PlotMenuHandler.MenuPage.INFO);
             return;
         }
         newName = newName.trim();
         if (newName.isEmpty() || newName.length() > 32) {
             player.sendMessage(Text.literal("✗ Nombre inválido (1-32 caracteres).").formatted(Formatting.RED), false);
-            reopenMenu(player, plotPos);
+            reopenMenu(player, plotPos, PlotMenuHandler.MenuPage.INFO);
             return;
         }
         for (PlotData p : manager.getPlayerPlots(data.getOwnerId())) {
             if (p != data && p.getPlotName().equalsIgnoreCase(newName)) {
                 player.sendMessage(Text.literal("✗ Ya existe una protección con ese nombre.").formatted(Formatting.RED), false);
-                reopenMenu(player, plotPos);
+                reopenMenu(player, plotPos, PlotMenuHandler.MenuPage.INFO);
                 return;
             }
         }
@@ -162,7 +148,7 @@ public class SignInputManager {
                 .append(Text.literal(" → ").formatted(Formatting.GREEN))
                 .append(Text.literal("\"" + newName + "\"").formatted(Formatting.YELLOW)),
             false);
-        reopenMenu(player, plotPos);
+        reopenMenu(player, plotPos, PlotMenuHandler.MenuPage.INFO);
     }
 
     // ── Add Member ────────────────────────────────────────────────────────────
@@ -175,25 +161,24 @@ public class SignInputManager {
             return;
         }
         boolean isAdmin = player.getCommandTags().contains("plot_admin");
-        PlotData.Role myRole = data.getRoleOf(player.getUuid());
-        if (myRole != PlotData.Role.OWNER && myRole != PlotData.Role.ADMIN && !isAdmin) {
-            reopenMenu(player, plotPos);
+        if (!data.hasPermission(player.getUuid(), PlotData.Permission.MANAGE_MEMBERS) && !isAdmin) {
+            reopenMenu(player, plotPos, PlotMenuHandler.MenuPage.MEMBERS);
             return;
         }
         ServerPlayerEntity target = player.getServer().getPlayerManager().getPlayer(targetName);
         if (target == null) {
             player.sendMessage(Text.literal("✗ \"" + targetName + "\" no está online.").formatted(Formatting.RED), false);
-            reopenMenu(player, plotPos);
+            reopenMenu(player, plotPos, PlotMenuHandler.MenuPage.MEMBERS);
             return;
         }
         if (target.getUuid().equals(player.getUuid()) && !isAdmin) {
             player.sendMessage(Text.literal("✗ No podés agregarte a vos mismo.").formatted(Formatting.RED), false);
-            reopenMenu(player, plotPos);
+            reopenMenu(player, plotPos, PlotMenuHandler.MenuPage.MEMBERS);
             return;
         }
         if (data.getRoleOf(target.getUuid()) != PlotData.Role.VISITOR) {
             player.sendMessage(Text.literal("✗ " + targetName + " ya tiene acceso.").formatted(Formatting.YELLOW), false);
-            reopenMenu(player, plotPos);
+            reopenMenu(player, plotPos, PlotMenuHandler.MenuPage.MEMBERS);
             return;
         }
         data.addMember(target.getUuid(), target.getName().getString(), PlotData.Role.MEMBER);
@@ -203,16 +188,48 @@ public class SignInputManager {
             SoundCategory.PLAYERS, 1f, 1.5f);
         player.sendMessage(Text.literal("✔ " + targetName + " agregado como miembro.").formatted(Formatting.GREEN), false);
         target.sendMessage(Text.literal("✔ Fuiste agregado a \"" + data.getPlotName() + "\" de " + player.getName().getString()).formatted(Formatting.GREEN), false);
-        reopenMenu(player, plotPos);
+        reopenMenu(player, plotPos, PlotMenuHandler.MenuPage.MEMBERS);
     }
 
-    private static void reopenMenu(ServerPlayerEntity player, BlockPos plotPos) {
+    // ── Create Group ──────────────────────────────────────────────────────────
+    private static void handleCreateGroup(ServerPlayerEntity player, BlockPos plotPos, String groupName) {
+        if (!(player.getWorld() instanceof ServerWorld sw)) return;
+        PlotManager manager = PlotManager.getOrCreate(sw);
+        PlotData data = manager.getPlot(plotPos);
+        if (data == null) {
+            player.sendMessage(Text.literal("✗ Protección no encontrada.").formatted(Formatting.RED), false);
+            return;
+        }
+        boolean isAdmin = player.getCommandTags().contains("plot_admin");
+        if (!data.hasPermission(player.getUuid(), PlotData.Permission.MANAGE_GROUPS) && !isAdmin) {
+            player.sendMessage(Text.literal("✗ No tenés permiso para crear grupos.").formatted(Formatting.RED), false);
+            reopenMenu(player, plotPos, PlotMenuHandler.MenuPage.MEMBERS);
+            return;
+        }
+        groupName = groupName.trim();
+        if (groupName.isEmpty() || groupName.length() > 24) {
+            player.sendMessage(Text.literal("✗ Nombre de grupo inválido (1-24 caracteres).").formatted(Formatting.RED), false);
+            reopenMenu(player, plotPos, PlotMenuHandler.MenuPage.MEMBERS);
+            return;
+        }
+        if (data.getGroup(groupName) != null) {
+            player.sendMessage(Text.literal("✗ Ya existe un grupo con ese nombre.").formatted(Formatting.YELLOW), false);
+            reopenMenu(player, plotPos, PlotMenuHandler.MenuPage.MEMBERS);
+            return;
+        }
+        data.getOrCreateGroup(groupName);
+        manager.markDirty();
+        player.sendMessage(Text.literal("§a✔ Grupo §d\"" + groupName + "\" §acreado."), false);
+        reopenMenu(player, plotPos, PlotMenuHandler.MenuPage.MEMBERS);
+    }
+
+    private static void reopenMenu(ServerPlayerEntity player, BlockPos plotPos, PlotMenuHandler.MenuPage targetPage) {
         if (!(player.getWorld() instanceof ServerWorld sw)) return;
         PlotManager manager = PlotManager.getOrCreate(sw);
         PlotData fresh = manager.getPlot(plotPos);
         if (fresh == null) return;
         player.openHandledScreen(new SimpleNamedScreenHandlerFactory(
-            (syncId, inv, p) -> new PlotMenuHandler(syncId, inv, plotPos, fresh, PlotMenuHandler.MenuPage.INFO),
+            (syncId, inv, p) -> new PlotMenuHandler(syncId, inv, plotPos, fresh, targetPage),
             Text.literal("🛡 " + fresh.getPlotName())
         ));
     }
