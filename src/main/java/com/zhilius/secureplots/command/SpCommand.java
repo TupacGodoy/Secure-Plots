@@ -2,10 +2,14 @@ package com.zhilius.secureplots.command;
 
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.BoolArgumentType;
+import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
+import com.zhilius.secureplots.config.SecurePlotsConfig;
+import com.zhilius.secureplots.item.PlotStakeItem;
 import com.zhilius.secureplots.network.ModPackets;
 import com.zhilius.secureplots.plot.PlotData;
 import com.zhilius.secureplots.plot.PlotManager;
+import com.zhilius.secureplots.plot.PlotSubdivision;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.minecraft.server.command.CommandManager;
 import net.minecraft.server.command.ServerCommandSource;
@@ -167,6 +171,39 @@ public class SpCommand {
                                                                 StringArgumentType.getString(ctx, "group"),
                                                                 StringArgumentType.getString(ctx, "perm"),
                                                                 BoolArgumentType.getBool(ctx, "value"))))))))
+
+                // /sp sub <finish|delete|list|undo>  — gestión de subdivisiones
+                .then(CommandManager.literal("sub")
+                        .executes(ctx -> executeSubHelp(ctx.getSource()))
+                        // /sp sub finish  — finalizar subdivisión activa
+                        .then(CommandManager.literal("finish")
+                                .executes(ctx -> executeSubFinish(ctx.getSource())))
+                        // /sp sub undo  — quitar último punto
+                        .then(CommandManager.literal("undo")
+                                .executes(ctx -> executeSubUndo(ctx.getSource())))
+                        // /sp sub delete <nombre>  — borrar subdivisión
+                        .then(CommandManager.literal("delete")
+                                .then(CommandManager.argument("nombre", StringArgumentType.greedyString())
+                                        .executes(ctx -> executeSubDelete(
+                                                ctx.getSource(),
+                                                StringArgumentType.getString(ctx, "nombre")))))
+                        // /sp sub list  — listar subdivisiones de la plot actual
+                        .then(CommandManager.literal("list")
+                                .executes(ctx -> executeSubList(ctx.getSource())))
+                        // /sp sub edit <nombre>  — retomar la edición de una subdivisión existente
+                        .then(CommandManager.literal("edit")
+                                .then(CommandManager.argument("nombre", StringArgumentType.word())
+                                        .executes(ctx -> executeSubEdit(
+                                                ctx.getSource(),
+                                                StringArgumentType.getString(ctx, "nombre")))))
+                        // /sp sub yrange <yMin> <yMax>  — ajustar rango Y de la subdivisión activa
+                        .then(CommandManager.literal("yrange")
+                                .then(CommandManager.argument("yMin", IntegerArgumentType.integer(-64, 320))
+                                        .then(CommandManager.argument("yMax", IntegerArgumentType.integer(-64, 320))
+                                                .executes(ctx -> executeSubYRange(
+                                                        ctx.getSource(),
+                                                        IntegerArgumentType.getInteger(ctx, "yMin"),
+                                                        IntegerArgumentType.getInteger(ctx, "yMax")))))))
 
                 // /sp clearholos
                 .then(CommandManager.literal("clearholos")
@@ -866,6 +903,194 @@ public class SpCommand {
             case 4 -> Formatting.DARK_PURPLE;
             default -> Formatting.WHITE;
         };
+    }
+
+    // ── /sp sub ───────────────────────────────────────────────────────────────
+
+    private static int executeSubHelp(ServerCommandSource source) {
+        ServerPlayerEntity player = source.getPlayer();
+        if (player == null) return 0;
+        player.sendMessage(Text.literal("§d=== Subdivisiones ===").formatted(Formatting.LIGHT_PURPLE), false);
+        player.sendMessage(Text.literal("§7Tenés la §dherramienta de subdivisiones§7 en mano:"), false);
+        player.sendMessage(Text.literal("§a  Click derecho §7en bloque → agregar punto"), false);
+        player.sendMessage(Text.literal("§a  Shift+click §7en bloque → quitar último punto"), false);
+        player.sendMessage(Text.literal("§a  Shift+click §7en aire → toggle partición Y"), false);
+        player.sendMessage(Text.literal("§e  /sp sub finish §7→ finalizar forma"), false);
+        player.sendMessage(Text.literal("§e  /sp sub undo §7→ quitar último punto"), false);
+        player.sendMessage(Text.literal("§e  /sp sub delete <nombre> §7→ borrar"), false);
+        player.sendMessage(Text.literal("§e  /sp sub list §7→ ver subdivisiones de esta plot"), false);
+        player.sendMessage(Text.literal("§e  /sp sub edit <nombre> §7→ retomar edición"), false);
+        player.sendMessage(Text.literal("§e  /sp sub yrange <min> <max> §7→ ajustar altura"), false);
+        return 1;
+    }
+
+    private static int executeSubFinish(ServerCommandSource source) {
+        ServerPlayerEntity player = source.getPlayer();
+        if (player == null) return 0;
+        if (!(source.getWorld() instanceof ServerWorld sw)) return 0;
+        boolean ok = PlotStakeItem.finishSubdivision(player, sw);
+        return ok ? 1 : 0;
+    }
+
+    private static int executeSubUndo(ServerCommandSource source) {
+        ServerPlayerEntity player = source.getPlayer();
+        if (player == null) return 0;
+        if (!(source.getWorld() instanceof ServerWorld sw)) return 0;
+
+        net.minecraft.item.ItemStack stack = player.getMainHandStack();
+        if (!(stack.getItem() instanceof PlotStakeItem)) {
+            stack = player.getOffHandStack();
+            if (!(stack.getItem() instanceof PlotStakeItem)) {
+                player.sendMessage(Text.literal("§c✗ Necesitás la herramienta de subdivisiones en mano."), false);
+                return 0;
+            }
+        }
+
+        String subName = PlotStakeItem.getActiveSub(stack);
+        BlockPos plotPos = PlotStakeItem.getActivePlotPos(stack);
+        if (subName.isEmpty() || plotPos == null) {
+            player.sendMessage(Text.literal("§7No hay subdivisión activa."), false);
+            return 0;
+        }
+        PlotData plot = PlotManager.getOrCreate(sw).getPlot(plotPos);
+        if (plot == null) { PlotStakeItem.clearActive(stack); return 0; }
+        PlotSubdivision sub = plot.getSubdivision(subName);
+        if (sub == null) { PlotStakeItem.clearActive(stack); return 0; }
+
+        if (sub.points.isEmpty()) {
+            player.sendMessage(Text.literal("§7No hay puntos para deshacer."), false);
+            return 0;
+        }
+        sub.removeLastPoint();
+        PlotManager.getOrCreate(sw).markDirty();
+        player.sendMessage(Text.literal("§e✗ Punto eliminado. Puntos: " + sub.points.size()), false);
+        ModPackets.sendShowSubdivisions(player, plot);
+        return 1;
+    }
+
+    private static int executeSubDelete(ServerCommandSource source, String nombre) {
+        ServerPlayerEntity player = source.getPlayer();
+        if (player == null) return 0;
+        if (!(source.getWorld() instanceof ServerWorld sw)) return 0;
+
+        PlotManager manager = PlotManager.getOrCreate(sw);
+        PlotData plot = manager.getPlotAt(player.getBlockPos());
+        if (plot == null) {
+            player.sendMessage(Text.literal("§c✗ No estás dentro de ninguna parcela."), false);
+            return 0;
+        }
+        if (!plot.hasPermission(player.getUuid(), PlotData.Permission.MANAGE_SUBDIVISIONS)) {
+            player.sendMessage(Text.literal("§c✗ No tenés permiso de MANAGE_SUBDIVISIONS."), false);
+            return 0;
+        }
+        if (!plot.removeSubdivision(nombre)) {
+            player.sendMessage(Text.literal("§c✗ No encontré la subdivisión \"" + nombre + "\"."), false);
+            return 0;
+        }
+        manager.markDirty();
+        player.sendMessage(Text.literal("§a✔ Subdivisión \"" + nombre + "\" eliminada."), false);
+        ModPackets.sendShowSubdivisions(player, plot);
+        return 1;
+    }
+
+    private static int executeSubList(ServerCommandSource source) {
+        ServerPlayerEntity player = source.getPlayer();
+        if (player == null) return 0;
+        if (!(source.getWorld() instanceof ServerWorld sw)) return 0;
+
+        PlotData plot = PlotManager.getOrCreate(sw).getPlotAt(player.getBlockPos());
+        if (plot == null) {
+            player.sendMessage(Text.literal("§c✗ No estás dentro de ninguna parcela."), false);
+            return 0;
+        }
+
+        java.util.List<PlotSubdivision> subs = plot.getSubdivisions();
+        if (subs.isEmpty()) {
+            player.sendMessage(Text.literal("§7Esta parcela no tiene subdivisiones."), false);
+            return 1;
+        }
+        player.sendMessage(Text.literal("§d=== Subdivisiones de §e" + plot.getPlotName() + " §d==="), false);
+        for (PlotSubdivision sub : subs) {
+            String status = sub.isValid() ? "§a✔" : "§e⚠ (incompleta)";
+            String yInfo = sub.useY ? " §8[Y:" + sub.yMin + "-" + sub.yMax + "]" : "";
+            player.sendMessage(Text.literal(status + " §f" + sub.name
+                + " §8(" + sub.points.size() + " pts)" + yInfo), false);
+        }
+        return 1;
+    }
+
+    private static int executeSubEdit(ServerCommandSource source, String nombre) {
+        ServerPlayerEntity player = source.getPlayer();
+        if (player == null) return 0;
+        if (!(source.getWorld() instanceof ServerWorld sw)) return 0;
+
+        PlotData plot = PlotManager.getOrCreate(sw).getPlotAt(player.getBlockPos());
+        if (plot == null) {
+            player.sendMessage(Text.literal("§c✗ No estás dentro de ninguna parcela."), false);
+            return 0;
+        }
+
+        PlotSubdivision sub = plot.getSubdivision(nombre);
+        if (sub == null) {
+            player.sendMessage(Text.literal("§c✗ No encontré la subdivisión \"" + nombre + "\"."), false);
+            return 0;
+        }
+
+        net.minecraft.item.ItemStack stack = player.getMainHandStack();
+        if (!(stack.getItem() instanceof PlotStakeItem)) {
+            stack = player.getOffHandStack();
+            if (!(stack.getItem() instanceof PlotStakeItem)) {
+                player.sendMessage(Text.literal("§c✗ Necesitás la herramienta de subdivisiones en mano."), false);
+                return 0;
+            }
+        }
+
+        PlotStakeItem.setActiveSub(stack, nombre, plot.getCenter());
+        player.sendMessage(Text.literal("§d✎ Editando subdivisión §e\"" + nombre + "\"§d."), false);
+        ModPackets.sendShowSubdivisions(player, plot);
+        return 1;
+    }
+
+    private static int executeSubYRange(ServerCommandSource source, int yMin, int yMax) {
+        ServerPlayerEntity player = source.getPlayer();
+        if (player == null) return 0;
+        if (!(source.getWorld() instanceof ServerWorld sw)) return 0;
+
+        if (yMin > yMax) {
+            player.sendMessage(Text.literal("§c✗ yMin (" + yMin + ") debe ser ≤ yMax (" + yMax + ")."), false);
+            return 0;
+        }
+
+        net.minecraft.item.ItemStack stack = player.getMainHandStack();
+        if (!(stack.getItem() instanceof PlotStakeItem)) {
+            stack = player.getOffHandStack();
+            if (!(stack.getItem() instanceof PlotStakeItem)) {
+                player.sendMessage(Text.literal("§c✗ Necesitás la herramienta de subdivisiones en mano."), false);
+                return 0;
+            }
+        }
+
+        String subName = PlotStakeItem.getActiveSub(stack);
+        BlockPos plotPos = PlotStakeItem.getActivePlotPos(stack);
+        if (subName.isEmpty() || plotPos == null) {
+            player.sendMessage(Text.literal("§7No hay subdivisión activa."), false);
+            return 0;
+        }
+
+        PlotManager manager = PlotManager.getOrCreate(sw);
+        PlotData plot = manager.getPlot(plotPos);
+        if (plot == null) { PlotStakeItem.clearActive(stack); return 0; }
+        PlotSubdivision sub = plot.getSubdivision(subName);
+        if (sub == null) { PlotStakeItem.clearActive(stack); return 0; }
+
+        sub.useY = true;
+        sub.yMin = yMin;
+        sub.yMax = yMax;
+        manager.markDirty();
+
+        player.sendMessage(Text.literal("§a✔ Rango Y ajustado: §e" + yMin + " §7→ §e" + yMax), false);
+        ModPackets.sendShowSubdivisions(player, plot);
+        return 1;
     }
 
     private static int executeTestHolo(ServerCommandSource source) {

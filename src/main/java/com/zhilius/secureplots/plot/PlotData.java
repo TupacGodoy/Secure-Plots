@@ -14,40 +14,29 @@ public class PlotData {
         OWNER, ADMIN, MEMBER, VISITOR
     }
 
-    /**
-     * Permisos individuales que se pueden asignar por miembro o grupo.
-     * También se usan como flags globales (para VISITOR y MEMBER por defecto).
-     */
     public enum Permission {
-        // Construcción
-        BUILD,          // colocar/romper bloques
-        // Interacción
-        INTERACT,       // palancas, puertas, botones
-        CONTAINERS,     // cofres, baúles, etc.
-        // PvP
-        PVP,            // atacar jugadores dentro de la plot
-        // Admin / gestión
-        MANAGE_MEMBERS, // agregar/remover miembros (equiv. ADMIN)
-        MANAGE_PERMS,   // cambiar permisos de miembros
-        MANAGE_FLAGS,   // cambiar flags globales
-        MANAGE_GROUPS,  // crear/editar grupos de la plot
-        // Teleport
-        TP,             // teletransportarse a la plot (si está habilitado)
-        // Misc
-        FLY,            // volar dentro de la plot (si el servidor lo soporta)
-        ENTER           // entrar al área de la plot
+        BUILD,
+        INTERACT,
+        CONTAINERS,
+        PVP,
+        MANAGE_MEMBERS,
+        MANAGE_PERMS,
+        MANAGE_FLAGS,
+        MANAGE_GROUPS,
+        MANAGE_SUBDIVISIONS, // nuevo: crear/editar subdivisiones
+        TP,
+        FLY,
+        ENTER
     }
 
-    // ── Flags globales ────────────────────────────────────────────────────────
-    // Afectan a TODOS (incluso a no-miembros) si están activados
     public enum Flag {
-        ALLOW_VISITOR_BUILD,     // no-miembros pueden construir
-        ALLOW_VISITOR_INTERACT,  // no-miembros pueden interactuar
-        ALLOW_VISITOR_CONTAINERS,// no-miembros pueden abrir contenedores
-        ALLOW_PVP,               // pvp habilitado en la plot
-        ALLOW_FLY,               // volar habilitado en la plot
-        ALLOW_TP,                // se puede teleportar a la plot (/sp tp)
-        GREETINGS                // mostrar mensaje de bienvenida al entrar
+        ALLOW_VISITOR_BUILD,
+        ALLOW_VISITOR_INTERACT,
+        ALLOW_VISITOR_CONTAINERS,
+        ALLOW_PVP,
+        ALLOW_FLY,
+        ALLOW_TP,
+        GREETINGS
     }
 
     // ── Grupo de permisos ─────────────────────────────────────────────────────
@@ -95,36 +84,35 @@ public class PlotData {
     private long placedAtTick;
     private long lastOwnerSeenTick;
 
-    private Map<UUID, Role> members = new HashMap<>();
-    private Map<UUID, String> memberNames = new HashMap<>();
-    private Map<UUID, Set<Permission>> memberPerms = new HashMap<>();
+    private Map<UUID, Role>             members     = new HashMap<>();
+    private Map<UUID, String>           memberNames = new HashMap<>();
+    private Map<UUID, Set<Permission>>  memberPerms = new HashMap<>();
 
-    // Flags globales activas (por defecto vacío = todas OFF)
-    private Set<Flag> flags = new HashSet<>();
-
-    // Grupos de permisos personalizados
+    private Set<Flag>             flags  = new HashSet<>();
     private List<PermissionGroup> groups = new ArrayList<>();
+
+    /** Subdivisiones de esta plot */
+    private List<PlotSubdivision> subdivisions = new ArrayList<>();
 
     private String plotName;
 
     // ── Constructores ─────────────────────────────────────────────────────────
     public PlotData(UUID ownerId, String ownerName, BlockPos center, PlotSize size, long currentTick) {
-        this.ownerId = ownerId;
+        this.ownerId  = ownerId;
         this.ownerName = ownerName;
-        this.center = center;
-        this.size = size;
+        this.center   = center;
+        this.size     = size;
         this.placedAtTick = currentTick;
         this.lastOwnerSeenTick = currentTick;
         this.plotName = ownerName + "'s Plot";
-        this.hasRank = false;
-        // Flags por defecto
+        this.hasRank  = false;
         this.flags.add(Flag.ALLOW_TP);
         this.flags.add(Flag.GREETINGS);
     }
 
     public PlotData() {}
 
-    // ── Getters / Setters básicos ─────────────────────────────────────────────
+    // ── Getters / Setters ─────────────────────────────────────────────────────
     public UUID getOwnerId()                    { return ownerId; }
     public String getOwnerName()                { return ownerName; }
     public BlockPos getCenter()                 { return center; }
@@ -140,10 +128,10 @@ public class PlotData {
     public Map<UUID, Role> getMembers()         { return members; }
     public List<PermissionGroup> getGroups()    { return groups; }
     public Set<Flag> getFlags()                 { return flags; }
+    public List<PlotSubdivision> getSubdivisions() { return subdivisions; }
 
-    // ── Flags globales ────────────────────────────────────────────────────────
+    // ── Flags ─────────────────────────────────────────────────────────────────
     public boolean hasFlag(Flag flag) { return flags.contains(flag); }
-
     public void setFlag(Flag flag, boolean enabled) {
         if (enabled) flags.add(flag); else flags.remove(flag);
     }
@@ -159,7 +147,6 @@ public class PlotData {
         members.remove(uuid);
         memberNames.remove(uuid);
         memberPerms.remove(uuid);
-        // Quitar de grupos también
         for (PermissionGroup g : groups) g.members.remove(uuid);
     }
 
@@ -168,60 +155,40 @@ public class PlotData {
         return members.getOrDefault(uuid, Role.VISITOR);
     }
 
-    // ── Permisos por defecto según rol ────────────────────────────────────────
     public static Set<Permission> defaultPermsFor(Role role) {
         Set<Permission> perms = new HashSet<>();
         switch (role) {
-            case OWNER -> {
-                perms.addAll(Arrays.asList(Permission.values()));
-            }
+            case OWNER -> { perms.addAll(Arrays.asList(Permission.values())); }
             case ADMIN -> {
-                perms.add(Permission.BUILD);
-                perms.add(Permission.INTERACT);
-                perms.add(Permission.CONTAINERS);
-                perms.add(Permission.PVP);
-                perms.add(Permission.MANAGE_MEMBERS);
-                perms.add(Permission.MANAGE_PERMS);
-                perms.add(Permission.TP);
-                perms.add(Permission.ENTER);
+                perms.add(Permission.BUILD); perms.add(Permission.INTERACT);
+                perms.add(Permission.CONTAINERS); perms.add(Permission.PVP);
+                perms.add(Permission.MANAGE_MEMBERS); perms.add(Permission.MANAGE_PERMS);
+                perms.add(Permission.TP); perms.add(Permission.ENTER);
             }
             case MEMBER -> {
-                perms.add(Permission.BUILD);
-                perms.add(Permission.INTERACT);
-                perms.add(Permission.CONTAINERS);
-                perms.add(Permission.TP);
+                perms.add(Permission.BUILD); perms.add(Permission.INTERACT);
+                perms.add(Permission.CONTAINERS); perms.add(Permission.TP);
                 perms.add(Permission.ENTER);
             }
             case VISITOR -> {
-                perms.add(Permission.INTERACT);
-                perms.add(Permission.ENTER);
+                perms.add(Permission.INTERACT); perms.add(Permission.ENTER);
             }
         }
         return perms;
     }
 
-    // ── Resolver permisos efectivos de un jugador ─────────────────────────────
     public Set<Permission> getPermsOf(UUID uuid) {
         if (uuid.equals(ownerId)) return EnumSet.allOf(Permission.class);
-
-        // Permisos base según rol o asignación individual
         Set<Permission> perms = new HashSet<>(memberPerms.getOrDefault(uuid, defaultPermsFor(getRoleOf(uuid))));
-
-        // Añadir permisos de grupos
         for (PermissionGroup g : groups) {
-            if (g.members.contains(uuid)) {
-                perms.addAll(g.permissions);
-            }
+            if (g.members.contains(uuid)) perms.addAll(g.permissions);
         }
-
-        // Flags globales que aplican permisos a todos
         if (hasFlag(Flag.ALLOW_VISITOR_BUILD))      perms.add(Permission.BUILD);
         if (hasFlag(Flag.ALLOW_VISITOR_INTERACT))   perms.add(Permission.INTERACT);
         if (hasFlag(Flag.ALLOW_VISITOR_CONTAINERS)) perms.add(Permission.CONTAINERS);
         if (hasFlag(Flag.ALLOW_PVP))                perms.add(Permission.PVP);
         if (hasFlag(Flag.ALLOW_FLY))                perms.add(Permission.FLY);
         if (hasFlag(Flag.ALLOW_TP))                 perms.add(Permission.TP);
-
         return perms;
     }
 
@@ -236,9 +203,40 @@ public class PlotData {
         return getPermsOf(uuid).contains(perm);
     }
 
-    public boolean canBuild(UUID uuid)     { return hasPermission(uuid, Permission.BUILD); }
-    public boolean canInteract(UUID uuid)  { return hasPermission(uuid, Permission.INTERACT); }
-    public boolean canManage(UUID uuid)    { return hasPermission(uuid, Permission.MANAGE_MEMBERS); }
+    /**
+     * Resuelve el permiso efectivo para un jugador en un BlockPos dado,
+     * teniendo en cuenta subdivisiones (que sobreescriben la plot principal).
+     */
+    public boolean hasPermissionAt(UUID uuid, Permission perm, BlockPos pos) {
+        if (uuid.equals(ownerId)) return true;
+        // Buscar si hay subdivisión que contenga el pos
+        for (PlotSubdivision sub : subdivisions) {
+            if (sub.isValid() && sub.contains(pos)) {
+                // La subdivisión sobreescribe: primero intenta el permiso de sub,
+                // luego cae al de la plot si no hay override específico
+                if (sub.memberPerms.containsKey(uuid)) {
+                    return sub.hasPermission(uuid, perm);
+                }
+                // Si hay flags de sub, aplicar
+                if (perm == Permission.BUILD      && sub.hasFlag(Flag.ALLOW_VISITOR_BUILD))      return true;
+                if (perm == Permission.INTERACT   && sub.hasFlag(Flag.ALLOW_VISITOR_INTERACT))   return true;
+                if (perm == Permission.CONTAINERS && sub.hasFlag(Flag.ALLOW_VISITOR_CONTAINERS)) return true;
+                if (perm == Permission.PVP        && sub.hasFlag(Flag.ALLOW_PVP))               return true;
+                if (perm == Permission.FLY        && sub.hasFlag(Flag.ALLOW_FLY))               return true;
+                // Si la subdivisión no tiene override para este jugador, usa permiso de la plot
+                return hasPermission(uuid, perm);
+            }
+        }
+        // Sin subdivisión activa → permiso normal de la plot
+        return hasPermission(uuid, perm);
+    }
+
+    public boolean canBuild(UUID uuid)    { return hasPermission(uuid, Permission.BUILD); }
+    public boolean canInteract(UUID uuid) { return hasPermission(uuid, Permission.INTERACT); }
+    public boolean canManage(UUID uuid)   { return hasPermission(uuid, Permission.MANAGE_MEMBERS); }
+
+    public boolean canBuildAt(UUID uuid, BlockPos pos)    { return hasPermissionAt(uuid, Permission.BUILD, pos); }
+    public boolean canInteractAt(UUID uuid, BlockPos pos) { return hasPermissionAt(uuid, Permission.INTERACT, pos); }
 
     // ── Grupos ────────────────────────────────────────────────────────────────
     public PermissionGroup getGroup(String name) {
@@ -247,18 +245,39 @@ public class PlotData {
         }
         return null;
     }
-
     public PermissionGroup getOrCreateGroup(String name) {
         PermissionGroup g = getGroup(name);
-        if (g == null) {
-            g = new PermissionGroup(name);
-            groups.add(g);
-        }
+        if (g == null) { g = new PermissionGroup(name); groups.add(g); }
         return g;
     }
-
     public boolean removeGroup(String name) {
         return groups.removeIf(g -> g.name.equalsIgnoreCase(name));
+    }
+
+    // ── Subdivisiones ─────────────────────────────────────────────────────────
+    public PlotSubdivision getSubdivision(String name) {
+        for (PlotSubdivision s : subdivisions) {
+            if (s.name != null && s.name.equalsIgnoreCase(name)) return s;
+        }
+        return null;
+    }
+
+    public PlotSubdivision getOrCreateSubdivision(String name) {
+        PlotSubdivision s = getSubdivision(name);
+        if (s == null) { s = new PlotSubdivision(name); subdivisions.add(s); }
+        return s;
+    }
+
+    public boolean removeSubdivision(String name) {
+        return subdivisions.removeIf(s -> s.name != null && s.name.equalsIgnoreCase(name));
+    }
+
+    /** Retorna la primera subdivisión que contenga este BlockPos, o null. */
+    public PlotSubdivision getSubdivisionAt(BlockPos pos) {
+        for (PlotSubdivision s : subdivisions) {
+            if (s.isValid() && s.contains(pos)) return s;
+        }
+        return null;
     }
 
     // ── Expiración por inactividad ────────────────────────────────────────────
@@ -288,21 +307,20 @@ public class PlotData {
         return memberNames.getOrDefault(uuid, uuid.toString().substring(0, 8));
     }
 
-    // ── NBT Serialization ─────────────────────────────────────────────────────
+    // ── NBT ───────────────────────────────────────────────────────────────────
     public NbtCompound toNbt() {
         NbtCompound nbt = new NbtCompound();
-        nbt.putString("ownerId", ownerId.toString());
+        nbt.putString("ownerId",   ownerId.toString());
         nbt.putString("ownerName", ownerName);
         nbt.putInt("cx", center.getX());
         nbt.putInt("cy", center.getY());
         nbt.putInt("cz", center.getZ());
         nbt.putInt("sizeTier", size.tier);
         nbt.putBoolean("hasRank", hasRank);
-        nbt.putLong("placedAt", placedAtTick);
-        nbt.putLong("lastOwnerSeen", lastOwnerSeenTick);
-        nbt.putString("plotName", plotName);
+        nbt.putLong("placedAt",        placedAtTick);
+        nbt.putLong("lastOwnerSeen",   lastOwnerSeenTick);
+        nbt.putString("plotName",      plotName);
 
-        // Miembros
         NbtList membersList = new NbtList();
         for (Map.Entry<UUID, Role> entry : members.entrySet()) {
             NbtCompound m = new NbtCompound();
@@ -317,36 +335,38 @@ public class PlotData {
         }
         nbt.put("members", membersList);
 
-        // Flags
         NbtList flagsList = new NbtList();
         for (Flag f : flags) flagsList.add(NbtString.of(f.name()));
         nbt.put("flags", flagsList);
 
-        // Grupos
         NbtList groupsList = new NbtList();
         for (PermissionGroup g : groups) groupsList.add(g.toNbt());
         nbt.put("groups", groupsList);
+
+        // Subdivisiones
+        NbtList subList = new NbtList();
+        for (PlotSubdivision s : subdivisions) subList.add(s.toNbt());
+        nbt.put("subdivisions", subList);
 
         return nbt;
     }
 
     public static PlotData fromNbt(NbtCompound nbt) {
         PlotData data = new PlotData();
-        data.ownerId = UUID.fromString(nbt.getString("ownerId"));
-        data.ownerName = nbt.getString("ownerName");
-        data.center = new BlockPos(nbt.getInt("cx"), nbt.getInt("cy"), nbt.getInt("cz"));
-        data.size = PlotSize.fromTier(nbt.getInt("sizeTier"));
-        data.hasRank = nbt.getBoolean("hasRank");
+        data.ownerId    = UUID.fromString(nbt.getString("ownerId"));
+        data.ownerName  = nbt.getString("ownerName");
+        data.center     = new BlockPos(nbt.getInt("cx"), nbt.getInt("cy"), nbt.getInt("cz"));
+        data.size       = PlotSize.fromTier(nbt.getInt("sizeTier"));
+        data.hasRank    = nbt.getBoolean("hasRank");
         data.placedAtTick = nbt.getLong("placedAt");
         data.lastOwnerSeenTick = nbt.contains("lastOwnerSeen") ? nbt.getLong("lastOwnerSeen") : data.placedAtTick;
-        data.plotName = nbt.getString("plotName");
+        data.plotName   = nbt.getString("plotName");
 
-        // Miembros
         NbtList membersList = nbt.getList("members", 10);
         for (int i = 0; i < membersList.size(); i++) {
             NbtCompound m = membersList.getCompound(i);
-            UUID uuid = UUID.fromString(m.getString("uuid"));
-            Role role = Role.valueOf(m.getString("role"));
+            UUID uuid  = UUID.fromString(m.getString("uuid"));
+            Role role  = Role.valueOf(m.getString("role"));
             String name = m.getString("name");
             data.members.put(uuid, role);
             data.memberNames.put(uuid, name);
@@ -362,23 +382,27 @@ public class PlotData {
             }
         }
 
-        // Flags
         if (nbt.contains("flags")) {
             NbtList flagsList = nbt.getList("flags", 8);
             for (int i = 0; i < flagsList.size(); i++) {
                 try { data.flags.add(Flag.valueOf(flagsList.getString(i))); } catch (Exception ignored) {}
             }
         } else {
-            // Retrocompatibilidad: flags por defecto
             data.flags.add(Flag.ALLOW_TP);
             data.flags.add(Flag.GREETINGS);
         }
 
-        // Grupos
         if (nbt.contains("groups")) {
             NbtList groupsList = nbt.getList("groups", 10);
             for (int i = 0; i < groupsList.size(); i++) {
                 data.groups.add(PermissionGroup.fromNbt(groupsList.getCompound(i)));
+            }
+        }
+
+        if (nbt.contains("subdivisions")) {
+            NbtList subList = nbt.getList("subdivisions", 10);
+            for (int i = 0; i < subList.size(); i++) {
+                data.subdivisions.add(PlotSubdivision.fromNbt(subList.getCompound(i)));
             }
         }
 

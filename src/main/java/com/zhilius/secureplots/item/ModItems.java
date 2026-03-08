@@ -20,6 +20,12 @@ public class ModItems {
                     .maxCount(1)
                     .rarity(Rarity.UNCOMMON)));
 
+    /** Herramienta para dibujar subdivisiones dentro de una plot. */
+    public static final Item PLOT_STAKE = register("plot_stake",
+            new PlotStakeItem(new Item.Settings()
+                    .maxCount(1)
+                    .rarity(Rarity.RARE)));
+
     private static Item register(String name, Item item) {
         return Registry.register(Registries.ITEM, Identifier.of(SecurePlots.MOD_ID, name), item);
     }
@@ -29,6 +35,8 @@ public class ModItems {
 
         ItemGroupEvents.modifyEntriesEvent(ItemGroups.FUNCTIONAL).register(entries -> {
             entries.add(PLOT_blueprint);
+            entries.add(PLOT_STAKE);
+            entries.add(ModBlocks.PLOT_STAKE_BLOCK.asItem());
             entries.add(ModBlocks.BRONZE_PLOT_BLOCK.asItem());
             entries.add(ModBlocks.emerald_PLOT_BLOCK.asItem());
             entries.add(ModBlocks.GOLD_PLOT_BLOCK.asItem());

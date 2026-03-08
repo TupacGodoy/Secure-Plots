@@ -4,5 +4,7 @@
   "block.secure-plots.gold_plot_block": "Bloque de Parcela de Oro",
   "block.secure-plots.diamond_plot_block": "Bloque de Parcela de Diamante",
   "block.secure-plots.netherite_plot_block": "Bloque de Parcela de Netherite",
-  "item.secure-plots.plot_blueprint": "Plano de Parcela"
+  "item.secure-plots.plot_blueprint": "Plano de Parcela",
+  "item.secure-plots.plot_stake": "Estaca de Parcela",
+  "block.secure-plots.plot_stake_block": "Estaca de Parcela"
 }

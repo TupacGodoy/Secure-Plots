@@ -52,6 +52,14 @@ public class ModBlocks {
                     .luminance(state -> 8)
                     .requiresTool(), 4));
 
+    /** Estaca de Parcela — delimita subdivisiones */
+    public static final Block PLOT_STAKE_BLOCK = register("plot_stake_block",
+            new com.zhilius.secureplots.block.PlotStakeBlock(
+                    AbstractBlock.Settings.create()
+                            .mapColor(MapColor.BROWN)
+                            .strength(2f, 6f)
+                            ));
+
     public static Block fromTier(int tier) {
         return switch (tier) {
             case 0 -> BRONZE_PLOT_BLOCK;

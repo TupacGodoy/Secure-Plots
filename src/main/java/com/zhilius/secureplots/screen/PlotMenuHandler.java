@@ -767,7 +767,8 @@ public class PlotMenuHandler extends GenericContainerScreenHandler {
             case MANAGE_MEMBERS -> "Gestionar Miembros";
             case MANAGE_PERMS   -> "Gestionar Permisos";
             case MANAGE_FLAGS   -> "Gestionar Flags";
-            case MANAGE_GROUPS  -> "Gestionar Grupos";
+            case MANAGE_GROUPS        -> "Gestionar Grupos";
+            case MANAGE_SUBDIVISIONS  -> "Gestionar Subdivisiones";
             case TP             -> "Teleportar";
             case FLY            -> "Volar";
             case ENTER          -> "Entrar";
@@ -783,7 +784,8 @@ public class PlotMenuHandler extends GenericContainerScreenHandler {
             case MANAGE_MEMBERS -> "Agregar y remover miembros";
             case MANAGE_PERMS   -> "Cambiar permisos de miembros";
             case MANAGE_FLAGS   -> "Cambiar flags globales";
-            case MANAGE_GROUPS  -> "Crear y editar grupos";
+            case MANAGE_GROUPS        -> "Crear y editar grupos";
+            case MANAGE_SUBDIVISIONS  -> "Crear y editar subdivisiones";
             case TP             -> "Usar /sp tp para llegar aquí";
             case FLY            -> "Volar dentro de la parcela";
             case ENTER          -> "Entrar al área de la parcela";
