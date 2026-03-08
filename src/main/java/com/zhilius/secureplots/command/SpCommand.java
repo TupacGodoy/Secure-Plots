@@ -123,7 +123,17 @@ public class SpCommand {
                                                                 BoolArgumentType.getBool(ctx, "value"),
                                                                 StringArgumentType.getString(ctx, "plot"))))))))
 
-                // /sp group <create|delete|addmember|removemember|setperm> ...
+                // /sp fly <on|off> [plot]  — toggle ALLOW_FLY flag + FLY perm para todos los miembros
+                .then(CommandManager.literal("fly")
+                        .executes(ctx -> executeFlyToggle(ctx.getSource(), null))
+                        .then(CommandManager.argument("value", BoolArgumentType.bool())
+                                .executes(ctx -> executeFlyToggle(ctx.getSource(),
+                                        BoolArgumentType.getBool(ctx, "value")))
+                                .then(CommandManager.argument("plot", StringArgumentType.greedyString())
+                                        .executes(ctx -> executeFlySet(
+                                                ctx.getSource(),
+                                                BoolArgumentType.getBool(ctx, "value"),
+                                                StringArgumentType.getString(ctx, "plot"))))))
                 .then(CommandManager.literal("group")
                         .executes(ctx -> executeGroupList(ctx.getSource()))
                         .then(CommandManager.literal("create")
@@ -559,6 +569,55 @@ public class SpCommand {
         plot.setPermission(targetUuid, perm, value);
         manager.markDirty();
         player.sendMessage(Text.literal("§a✔ Permiso §f" + perm.name().toLowerCase() + " §a" + (value ? "activado" : "desactivado") + " para §e" + targetName), false);
+        return 1;
+    }
+
+    // ── /sp fly [true|false] [plot] ───────────────────────────────────────────
+    // Shortcut para toggle del flag ALLOW_FLY + permiso FLY para todos los miembros.
+    // Solo jugadores con el tag "plot_admin" o dueño/admin de la plot pueden usarlo.
+    private static int executeFlyToggle(ServerCommandSource source, Boolean value) {
+        ServerPlayerEntity player = source.getPlayer();
+        if (player == null) return 0;
+        PlotManager manager = PlotManager.getOrCreate(player.getServerWorld());
+        PlotData plot = manager.getPlotAt(player.getBlockPos());
+        if (plot == null) {
+            player.sendMessage(Text.literal("✗ No estás dentro de ninguna parcela.").formatted(Formatting.RED), false);
+            return 0;
+        }
+        if (!plot.hasPermission(player.getUuid(), PlotData.Permission.MANAGE_FLAGS)
+                && !player.getCommandTags().contains("plot_admin")) {
+            player.sendMessage(Text.literal("✗ No tenés permiso para cambiar el fly de esta parcela.").formatted(Formatting.RED), false);
+            return 0;
+        }
+        boolean newValue = value != null ? value : !plot.hasFlag(PlotData.Flag.ALLOW_FLY);
+        return applyFlyChange(player, manager, plot, newValue);
+    }
+
+    private static int executeFlySet(ServerCommandSource source, boolean value, String plotArg) {
+        ServerPlayerEntity player = source.getPlayer();
+        if (player == null) return 0;
+        PlotManager manager = PlotManager.getOrCreate(player.getServerWorld());
+        PlotData plot = resolveSinglePlot(player, manager, plotArg);
+        if (plot == null) return 0;
+        if (!plot.hasPermission(player.getUuid(), PlotData.Permission.MANAGE_FLAGS)
+                && !player.getCommandTags().contains("plot_admin")) {
+            player.sendMessage(Text.literal("✗ No tenés permiso para cambiar el fly de esta parcela.").formatted(Formatting.RED), false);
+            return 0;
+        }
+        return applyFlyChange(player, manager, plot, value);
+    }
+
+    private static int applyFlyChange(ServerPlayerEntity player, PlotManager manager, PlotData plot, boolean enable) {
+        // Toggle flag global ALLOW_FLY
+        plot.setFlag(PlotData.Flag.ALLOW_FLY, enable);
+        // También activar/desactivar el permiso FLY para todos los miembros existentes
+        for (java.util.UUID uuid : plot.getMembers().keySet()) {
+            plot.setPermission(uuid, PlotData.Permission.FLY, enable);
+        }
+        manager.markDirty();
+        String status = enable ? "§aactivado" : "§cdesactivado";
+        player.sendMessage(Text.literal("§a✔ Fly §f" + status + " §aen §e\"" + plot.getPlotName() + "\""), false);
+        player.sendMessage(Text.literal("§7El flag global y el permiso de todos los miembros fue actualizado."), false);
         return 1;
     }
 

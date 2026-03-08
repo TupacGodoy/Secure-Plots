@@ -30,7 +30,7 @@ import java.util.*;
 
 public class PlotMenuHandler extends GenericContainerScreenHandler {
 
-    public enum MenuPage { INFO, MEMBERS, PERMS, FLAGS, UPGRADE }
+    public enum MenuPage { INFO, MEMBERS, GLOBAL_PERMS, UPGRADE }
     public enum PendingAction { NONE, RENAME, ADD_MEMBER, CREATE_GROUP }
 
     private final BlockPos plotPos;
@@ -49,11 +49,10 @@ public class PlotMenuHandler extends GenericContainerScreenHandler {
     private static final int SIZE = ROWS * 9;
 
     // Tabs en fila superior
-    private static final int SLOT_TAB_INFO    = 0;
-    private static final int SLOT_TAB_MEMBERS = 1;
-    private static final int SLOT_TAB_PERMS   = 2;
-    private static final int SLOT_TAB_FLAGS   = 3;
-    private static final int SLOT_TAB_UPGRADE = 4;
+    private static final int SLOT_TAB_INFO         = 0;
+    private static final int SLOT_TAB_MEMBERS      = 1;
+    private static final int SLOT_TAB_GLOBAL_PERMS = 2;
+    private static final int SLOT_TAB_UPGRADE      = 3;
     private static final int SLOT_CLOSE       = 8;
     private static final int SLOT_UPGRADE_BTN = 49;
 
@@ -86,8 +85,7 @@ public class PlotMenuHandler extends GenericContainerScreenHandler {
                 else if (viewingGroupName != null) buildGroupPage(viewingGroupName);
                 else buildMembersPage();
             }
-            case PERMS   -> buildPermsPage();
-            case FLAGS   -> buildFlagsPage();
+            case GLOBAL_PERMS -> buildGlobalPermsPage();
             case UPGRADE -> buildUpgradePage();
         }
         menuInv.setStack(SLOT_CLOSE, named(Items.BARRIER, "§c✕ Cerrar"));
@@ -101,20 +99,15 @@ public class PlotMenuHandler extends GenericContainerScreenHandler {
     }
 
     private void buildTabs() {
-        boolean canManage = myRole == PlotData.Role.OWNER || myRole == PlotData.Role.ADMIN;
-
         menuInv.setStack(SLOT_TAB_INFO,
             namedLore(page == MenuPage.INFO ? Items.LIME_STAINED_GLASS_PANE : Items.WHITE_STAINED_GLASS_PANE,
                 "§e📋 Info", "§7Ver información de la parcela"));
         menuInv.setStack(SLOT_TAB_MEMBERS,
             namedLore(page == MenuPage.MEMBERS ? Items.LIME_STAINED_GLASS_PANE : Items.WHITE_STAINED_GLASS_PANE,
-                "§e👥 Miembros", "§7Gestionar acceso y grupos"));
-        menuInv.setStack(SLOT_TAB_PERMS,
-            namedLore(page == MenuPage.PERMS ? Items.LIME_STAINED_GLASS_PANE : Items.WHITE_STAINED_GLASS_PANE,
-                "§e🔑 Permisos", "§7Permisos por rol por defecto"));
-        menuInv.setStack(SLOT_TAB_FLAGS,
-            namedLore(page == MenuPage.FLAGS ? Items.LIME_STAINED_GLASS_PANE : Items.WHITE_STAINED_GLASS_PANE,
-                "§e🚩 Flags", "§7Flags globales de la parcela"));
+                "§e👥 Miembros", "§7Gestionar miembros y sus permisos"));
+        menuInv.setStack(SLOT_TAB_GLOBAL_PERMS,
+            namedLore(page == MenuPage.GLOBAL_PERMS ? Items.LIME_STAINED_GLASS_PANE : Items.WHITE_STAINED_GLASS_PANE,
+                "§e🌐 Permisos Globales", "§7Permisos globales y grupos"));
         menuInv.setStack(SLOT_TAB_UPGRADE,
             namedLore(page == MenuPage.UPGRADE ? Items.LIME_STAINED_GLASS_PANE : Items.WHITE_STAINED_GLASS_PANE,
                 "§e⬆ Mejorar", "§7Subir el nivel de protección"));
@@ -194,29 +187,12 @@ public class PlotMenuHandler extends GenericContainerScreenHandler {
                 "§a+ Agregar miembro",
                 "§7Clic para agregar un jugador",
                 "§8El jugador debe estar online"));
-
-            menuInv.setStack(11, namedLore(Items.BOOKSHELF,
-                "§d+ Crear grupo",
-                "§7Clic para crear un grupo de permisos",
-                "§8Permite asignar permisos en bloque"));
         }
 
-        // Grupos
+        // Miembros — sin grupos, usan todos los slots disponibles
         List<PlotData.PermissionGroup> groups = data.getGroups();
-        int[] groupSlots = {19, 20, 21};
-        for (int i = 0; i < groups.size() && i < groupSlots.length; i++) {
-            PlotData.PermissionGroup g = groups.get(i);
-            String memberCount = "§7" + g.members.size() + " miembro(s)";
-            String permCount = "§7" + g.permissions.size() + " permiso(s)";
-            menuInv.setStack(groupSlots[i], namedLore(Items.WRITABLE_BOOK,
-                "§d[G] " + g.name,
-                memberCount, permCount,
-                canManage ? "§eClic para editar" : "§8Solo lectura"));
-        }
-
-        // Miembros
         List<Map.Entry<UUID, PlotData.Role>> memberList = new ArrayList<>(data.getMembers().entrySet());
-        int[] slots = {28,29,30,31,32,33,34,37,38,39,40,41,42,43};
+        int[] slots = {19,20,21,22,23,24,25, 28,29,30,31,32,33,34, 37,38,39,40,41,42,43};
         int idx = 0;
         for (Map.Entry<UUID, PlotData.Role> entry : memberList) {
             if (idx >= slots.length) break;
@@ -224,7 +200,7 @@ public class PlotMenuHandler extends GenericContainerScreenHandler {
             PlotData.Role role = entry.getValue();
             List<String> lore = new ArrayList<>();
             lore.add(roleColor(role) + role.name());
-            // Grupo del miembro
+            // Mostrar grupos del miembro como info
             for (PlotData.PermissionGroup g : groups) {
                 if (g.members.contains(entry.getKey())) lore.add("§d[" + g.name + "]");
             }
@@ -237,13 +213,11 @@ public class PlotMenuHandler extends GenericContainerScreenHandler {
             idx++;
         }
 
-        if (memberList.isEmpty() && groups.isEmpty()) {
+        if (memberList.isEmpty()) {
             menuInv.setStack(22, namedLore(Items.BARRIER,
                 "§7Sin miembros todavía",
                 "§8Usá el botón verde para agregar"));
         }
-
-        // Botón volver si estamos en sub-vista (no aplica aquí pero útil)
     }
 
     // ── MEMBER PERMS PAGE (sub-página) ────────────────────────────────────────
@@ -284,7 +258,7 @@ public class PlotMenuHandler extends GenericContainerScreenHandler {
     // ── GROUP PAGE (sub-página) ───────────────────────────────────────────────
     private void buildGroupPage(String groupName) {
         PlotData.PermissionGroup group = data.getGroup(groupName);
-        if (group == null) { viewingGroupName = null; buildMembersPage(); return; }
+        if (group == null) { viewingGroupName = null; buildGlobalPermsPage(); return; }
 
         boolean canEdit = data.hasPermission(player.getUuid(), PlotData.Permission.MANAGE_GROUPS);
 
@@ -324,70 +298,20 @@ public class PlotMenuHandler extends GenericContainerScreenHandler {
         }
     }
 
-    // ── PERMS PAGE (permisos por defecto por rol) ─────────────────────────────
-    private void buildPermsPage() {
-        boolean canEdit = data.hasPermission(player.getUuid(), PlotData.Permission.MANAGE_PERMS);
+    // ── GLOBAL PERMS PAGE (permisos globales + grupos) ────────────────────────
+    private void buildGlobalPermsPage() {
+        boolean canEditFlags  = data.hasPermission(player.getUuid(), PlotData.Permission.MANAGE_FLAGS);
+        boolean canEditGroups = data.hasPermission(player.getUuid(), PlotData.Permission.MANAGE_GROUPS);
 
-        menuInv.setStack(10, namedLore(Items.BOOK,
-            "§ePermisos por Rol",
-            "§7Estos son los permisos que cada rol",
-            "§7tiene por defecto al ser agregado.",
-            canEdit ? "§ePueden modificarse individualmente" : "§8Solo lectura"));
-
-        // Mostrar tabla: columna = rol, fila = permiso
-        // Rol MEMBER (columna 19-25) y VISITOR (columna 28-34)
-        PlotData.Permission[] perms = PlotData.Permission.values();
-        int[] memberSlots = {19,20,21,22,23,24,25};
-        int[] visitorSlots = {28,29,30,31,32,33,34};
-
-        Set<PlotData.Permission> memberDefaults = PlotData.defaultPermsFor(PlotData.Role.MEMBER);
-        Set<PlotData.Permission> visitorDefaults = PlotData.defaultPermsFor(PlotData.Role.VISITOR);
-        Set<PlotData.Permission> adminDefaults = PlotData.defaultPermsFor(PlotData.Role.ADMIN);
-
-        menuInv.setStack(18, namedLore(Items.IRON_SWORD, "§7Rol: §aMEMBER", "§8Permisos por defecto"));
-        menuInv.setStack(27, namedLore(Items.WOODEN_SWORD, "§7Rol: §7VISITOR", "§8Permisos por defecto"));
-
-        for (int i = 0; i < perms.length && i < memberSlots.length; i++) {
-            PlotData.Permission perm = perms[i];
-            boolean has = memberDefaults.contains(perm);
-            menuInv.setStack(memberSlots[i], namedLore(
-                has ? Items.LIME_DYE : Items.GRAY_DYE,
-                (has ? "§a✔ " : "§c✗ ") + permLabel(perm),
-                "§7" + permDesc(perm)));
-        }
-        for (int i = 0; i < perms.length && i < visitorSlots.length; i++) {
-            PlotData.Permission perm = perms[i];
-            boolean has = visitorDefaults.contains(perm);
-            menuInv.setStack(visitorSlots[i], namedLore(
-                has ? Items.LIME_DYE : Items.GRAY_DYE,
-                (has ? "§a✔ " : "§c✗ ") + permLabel(perm),
-                "§7" + permDesc(perm)));
-        }
-
-        menuInv.setStack(36, namedLore(Items.DIAMOND_SWORD, "§7Rol: §cADMIN", "§8Permisos por defecto"));
-        int[] adminSlots = {37,38,39,40,41,42,43};
-        for (int i = 0; i < perms.length && i < adminSlots.length; i++) {
-            PlotData.Permission perm = perms[i];
-            boolean has = adminDefaults.contains(perm);
-            menuInv.setStack(adminSlots[i], namedLore(
-                has ? Items.LIME_DYE : Items.GRAY_DYE,
-                (has ? "§a✔ " : "§c✗ ") + permLabel(perm),
-                "§7" + permDesc(perm)));
-        }
-    }
-
-    // ── FLAGS PAGE ────────────────────────────────────────────────────────────
-    private void buildFlagsPage() {
-        boolean canEdit = data.hasPermission(player.getUuid(), PlotData.Permission.MANAGE_FLAGS);
-
+        // Header
         menuInv.setStack(10, namedLore(Items.ORANGE_BANNER,
-            "§eFlags Globales",
-            "§7Las flags afectan a TODOS los jugadores",
-            "§7dentro de la parcela.",
-            canEdit ? "§eClic para toggle" : "§8Solo el dueño/admin puede cambiar"));
+            "§e🌐 Permisos Globales",
+            "§7Afectan a TODOS los jugadores dentro de la parcela.",
+            canEditFlags ? "§eClic en cada uno para activar/desactivar" : "§8Solo el dueño/admin puede cambiar"));
 
+        // Flags — fila central
         PlotData.Flag[] flagValues = PlotData.Flag.values();
-        int[] flagSlots = {19,20,21,22,23,24,25, 28,29,30,31};
+        int[] flagSlots = {19,20,21,22,23,24,25};
         for (int i = 0; i < flagValues.length && i < flagSlots.length; i++) {
             PlotData.Flag flag = flagValues[i];
             boolean on = data.hasFlag(flag);
@@ -395,8 +319,39 @@ public class PlotMenuHandler extends GenericContainerScreenHandler {
                 on ? Items.LIME_CONCRETE : Items.RED_CONCRETE,
                 (on ? "§a[ON] " : "§c[OFF] ") + flagLabel(flag),
                 "§7" + flagDesc(flag),
-                canEdit ? (on ? "§cClic para desactivar" : "§aClic para activar") : "§8Sin permisos"
+                canEditFlags ? (on ? "§cClic para desactivar" : "§aClic para activar") : "§8Sin permisos"
             ));
+        }
+
+        // Separador
+        menuInv.setStack(27, namedLore(Items.PURPLE_STAINED_GLASS_PANE,
+            "§d━━━ Grupos de Permisos ━━━",
+            "§7Asignan permisos a varios miembros a la vez."));
+
+        // Botón crear grupo
+        if (canEditGroups) {
+            menuInv.setStack(28, namedLore(Items.BOOKSHELF,
+                "§d+ Crear grupo",
+                "§7Clic para crear un grupo de permisos",
+                "§8Los grupos aplican permisos en bloque"));
+        }
+
+        // Grupos existentes
+        List<PlotData.PermissionGroup> groups = data.getGroups();
+        int[] groupSlots = {29,30,31,32,33,34};
+        for (int i = 0; i < groups.size() && i < groupSlots.length; i++) {
+            PlotData.PermissionGroup g = groups.get(i);
+            menuInv.setStack(groupSlots[i], namedLore(Items.WRITABLE_BOOK,
+                "§d[G] " + g.name,
+                "§7" + g.members.size() + " miembro(s)",
+                "§7" + g.permissions.size() + " permiso(s)",
+                canEditGroups ? "§eClic para editar" : "§8Solo lectura"));
+        }
+
+        if (groups.isEmpty()) {
+            menuInv.setStack(31, namedLore(Items.BARRIER,
+                "§7Sin grupos todavía",
+                "§8Usá el botón morado para crear uno"));
         }
     }
 
@@ -461,11 +416,10 @@ public class PlotMenuHandler extends GenericContainerScreenHandler {
         if (clicked.isEmpty()) return;
 
         // Tabs
-        if (slotIndex == SLOT_TAB_INFO)    { page = MenuPage.INFO;    viewingMemberUuid = null; viewingGroupName = null; refreshMenu(); return; }
-        if (slotIndex == SLOT_TAB_MEMBERS) { page = MenuPage.MEMBERS; viewingMemberUuid = null; viewingGroupName = null; refreshMenu(); return; }
-        if (slotIndex == SLOT_TAB_PERMS)   { page = MenuPage.PERMS;   viewingMemberUuid = null; viewingGroupName = null; refreshMenu(); return; }
-        if (slotIndex == SLOT_TAB_FLAGS)   { page = MenuPage.FLAGS;   viewingMemberUuid = null; viewingGroupName = null; refreshMenu(); return; }
-        if (slotIndex == SLOT_TAB_UPGRADE) { page = MenuPage.UPGRADE; viewingMemberUuid = null; viewingGroupName = null; refreshMenu(); return; }
+        if (slotIndex == SLOT_TAB_INFO)         { page = MenuPage.INFO;         viewingMemberUuid = null; viewingGroupName = null; refreshMenu(); return; }
+        if (slotIndex == SLOT_TAB_MEMBERS)      { page = MenuPage.MEMBERS;      viewingMemberUuid = null; viewingGroupName = null; refreshMenu(); return; }
+        if (slotIndex == SLOT_TAB_GLOBAL_PERMS) { page = MenuPage.GLOBAL_PERMS; viewingMemberUuid = null; viewingGroupName = null; refreshMenu(); return; }
+        if (slotIndex == SLOT_TAB_UPGRADE)      { page = MenuPage.UPGRADE;      viewingMemberUuid = null; viewingGroupName = null; refreshMenu(); return; }
         if (slotIndex == SLOT_CLOSE) { player.closeHandledScreen(); return; }
 
         // Botón upgrade
@@ -539,25 +493,45 @@ public class PlotMenuHandler extends GenericContainerScreenHandler {
             }
         }
 
-        // ── FLAGS page ────────────────────────────────────────────────────────
-        if (page == MenuPage.FLAGS) {
-            boolean canEdit = data.hasPermission(player.getUuid(), PlotData.Permission.MANAGE_FLAGS);
-            if (!canEdit) return;
+        // ── GLOBAL PERMS page ─────────────────────────────────────────────────
+        if (page == MenuPage.GLOBAL_PERMS) {
+            if (viewingGroupName != null) {
+                handleGroupPageClick(slotIndex, button, clicked); return;
+            }
 
-            PlotData.Flag[] flagValues = PlotData.Flag.values();
-            int[] flagSlots = {19,20,21,22,23,24,25, 28,29,30,31};
-            for (int i = 0; i < flagValues.length && i < flagSlots.length; i++) {
-                if (slotIndex == flagSlots[i]) {
-                    if (!(player.getWorld() instanceof ServerWorld sw)) return;
-                    PlotManager manager = PlotManager.getOrCreate(sw);
-                    PlotData fresh = manager.getPlot(plotPos);
-                    if (fresh == null) return;
-                    fresh.setFlag(flagValues[i], !fresh.hasFlag(flagValues[i]));
-                    manager.markDirty();
-                    this.data = fresh;
-                    playSound(SoundEvents.UI_BUTTON_CLICK.value(), 0.4f, 1.2f);
-                    refreshMenu();
-                    return;
+            // Toggle flags
+            boolean canEditFlags = data.hasPermission(player.getUuid(), PlotData.Permission.MANAGE_FLAGS);
+            if (canEditFlags) {
+                PlotData.Flag[] flagValues = PlotData.Flag.values();
+                int[] flagSlots = {19,20,21,22,23,24,25};
+                for (int i = 0; i < flagValues.length && i < flagSlots.length; i++) {
+                    if (slotIndex == flagSlots[i]) {
+                        if (!(player.getWorld() instanceof ServerWorld sw)) return;
+                        PlotManager manager = PlotManager.getOrCreate(sw);
+                        PlotData fresh = manager.getPlot(plotPos);
+                        if (fresh == null) return;
+                        fresh.setFlag(flagValues[i], !fresh.hasFlag(flagValues[i]));
+                        manager.markDirty();
+                        this.data = fresh;
+                        playSound(SoundEvents.UI_BUTTON_CLICK.value(), 0.4f, 1.2f);
+                        refreshMenu();
+                        return;
+                    }
+                }
+            }
+
+            // Crear grupo
+            boolean canEditGroups = data.hasPermission(player.getUuid(), PlotData.Permission.MANAGE_GROUPS);
+            if (clicked.getItem() == Items.BOOKSHELF && canEditGroups) {
+                openSignForInput(PendingAction.CREATE_GROUP); return;
+            }
+
+            // Abrir grupo existente
+            if (clicked.getItem() == Items.WRITABLE_BOOK) {
+                Text nameText = clicked.get(DataComponentTypes.CUSTOM_NAME);
+                if (nameText != null) {
+                    String gn = nameText.getString().replaceAll("§.", "").replace("[G] ", "").trim();
+                    if (data.getGroup(gn) != null) { viewingGroupName = gn; refreshMenu(); return; }
                 }
             }
         }

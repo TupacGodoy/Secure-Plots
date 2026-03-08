@@ -77,6 +77,8 @@ public class SecurePlots implements ModInitializer {
             long tick = world.getTime();
             com.zhilius.secureplots.plot.PlotManager.getOrCreate(world)
                 .updateOwnerSeen(player.getUuid(), tick);
+            // Revoke any fly granted by SecurePlots
+            com.zhilius.secureplots.plot.PlotAreaTracker.onPlayerLeave(player);
         });
     }
 

@@ -220,7 +220,7 @@ public class SignInputManager {
         data.getOrCreateGroup(groupName);
         manager.markDirty();
         player.sendMessage(Text.literal("§a✔ Grupo §d\"" + groupName + "\" §acreado."), false);
-        reopenMenu(player, plotPos, PlotMenuHandler.MenuPage.MEMBERS);
+        reopenMenu(player, plotPos, PlotMenuHandler.MenuPage.GLOBAL_PERMS);
     }
 
     private static void reopenMenu(ServerPlayerEntity player, BlockPos plotPos, PlotMenuHandler.MenuPage targetPage) {
