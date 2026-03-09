@@ -1,253 +1,290 @@
 # 🛡 SecurePlots
 
-Mod de Fabric para Minecraft 1.21.1 que permite a los jugadores proteger zonas del mundo usando bloques especiales. Incluye sistema de permisos por miembro, grupos, flags globales, teleporte, vuelo y menú visual completo.
+A Fabric mod for Minecraft 1.21.1 that lets players protect areas of the world using special blocks. Includes a member permission system, groups, global flags, teleport, flight, and a full visual menu.
 
 ---
 
-## 📋 Requisitos
+## 📋 Requirements
 
-| Requisito | Versión |
+| Requirement | Version |
 |---|---|
 | Minecraft | 1.21.1 |
-| Fabric Loader | 0.18.4 o superior |
-| Fabric API | 0.116.9+1.21.1 o superior |
+| Fabric Loader | 0.18.4 or higher |
+| Fabric API | 0.116.9+1.21.1 or higher |
 | Java | 21 |
 
 ---
 
-## 📦 Instalación
+## 📦 Installation
 
-1. Instalá [Fabric Loader](https://fabricmc.net/use/) para Minecraft 1.21.1.
-2. Descargá [Fabric API](https://modrinth.com/mod/fabric-api) y colocalo en la carpeta `mods/`.
-3. Colocá el archivo `.jar` de SecurePlots también en la carpeta `mods/`.
-4. Iniciá el servidor o cliente. El archivo de configuración se genera automáticamente en `config/secure_plots.json`.
-
----
-
-## 🚀 Cómo empezar
-
-1. Obtené un **Bloque de Parcela** (aparece en el grupo funcional del inventario creativo).
-2. Colocalo en el mundo. Ese bloque se convierte en el centro de tu protección.
-3. Usá el **Plot Blueprint** (ítem especial) o hacé clic derecho sobre el bloque para abrir el menú de gestión.
+1. Install [Fabric Loader](https://fabricmc.net/use/) for Minecraft 1.21.1.
+2. Download [Fabric API](https://modrinth.com/mod/fabric-api) and place it in the `mods/` folder.
+3. Place the SecurePlots `.jar` file in the `mods/` folder as well.
+4. Start the server or client. The config file is automatically generated at `config/secure_plots.json`.
 
 ---
 
-## 🧱 Bloques de Parcela
+## 🚀 Getting Started
 
-Hay 5 niveles de protección. Cada bloque define el radio de la zona protegida:
-
-| Bloque | Nivel | Radio | Luminosidad |
-|---|---|---|---|
-| Bronze Plot Block | Bronce | 15×15 bloques | 4 |
-| Gold Plot Block | Oro | 30×30 bloques | 5 |
-| Emerald Plot Block | Esmeralda | 50×50 bloques | 6 |
-| Diamond Plot Block | Diamante | 75×75 bloques | 7 |
-| Netherite Plot Block | Netherita | 100×100 bloques | 8 |
-
-Todos tienen dureza 50 y resistencia a explosiones 1200.
+1. Obtain a **Plot Block** (found in the functional block group of the creative inventory).
+2. Place it in the world. That block becomes the center of your protection.
+3. Use the **Plot Blueprint** (special item) or right-click the block to open the management menu.
 
 ---
 
-## ⬆️ Mejoras de nivel
+## 🧱 Plot Blocks
 
-Para subir de nivel, abrí el menú de la parcela y andá a la pestaña **Mejorar**. Los costos por defecto son:
+There are 5 protection tiers. Each block defines the radius of the protected area (default values — all configurable in `secure_plots.json`):
 
-| De → A | Materiales |
+| Block | Tier | Radius | Luminance | Hardness | Blast Resistance |
+|---|---|---|---|---|---|
+| Bronze Plot Block | Bronze | 15×15 blocks | 4 | 50 | 1200 |
+| Gold Plot Block | Gold | 30×30 blocks | 5 | 50 | 1200 |
+| Emerald Plot Block | Emerald | 50×50 blocks | 6 | 50 | 1200 |
+| Diamond Plot Block | Diamond | 75×75 blocks | 7 | 50 | 1200 |
+| Netherite Plot Block | Netherite | 100×100 blocks | 8 | 50 | 1200 |
+
+---
+
+## ⬆️ Tier Upgrades
+
+To upgrade, open the plot menu and go to the **Upgrade** tab. Default costs:
+
+| From → To | Materials |
 |---|---|
-| Bronce → Oro | 15 bloques de oro |
-| Oro → Esmeralda | 10 bloques de esmeralda |
-| Esmeralda → Diamante | 64 diamantes |
-| Diamante → Netherita | 1 bloque de netherita |
+| Bronze → Gold | 15 gold blocks |
+| Gold → Emerald | 10 emerald blocks |
+| Emerald → Diamond | 64 diamonds |
+| Diamond → Netherite | 1 netherite block |
 
-Los costos son configurables en `secure_plots.json`.
+All upgrade costs are fully configurable in `secure_plots.json`.
 
 ---
 
-## 🗂️ Menú de gestión
+## 🗂️ Management Menu
 
-Se abre usando el **Plot Blueprint** dentro de tu parcela o haciendo clic derecho en el bloque. Tiene 4 pestañas:
+Opened with the **Plot Blueprint** inside your plot, or by right-clicking the block. It has 4 tabs:
 
 ### 📋 Info
-- Nombre de la parcela, dueño, nivel, tamaño y coordenadas.
-- Tu rol actual.
-- Botón de teleporte (si el TP público está activo, o si sos owner/admin).
-- Botón para renombrar (solo owner).
-- Indicador de inactividad (si está habilitado en config).
+- Plot name, owner, tier, size, and coordinates.
+- Your current role.
+- Teleport button (if public TP is enabled, or if you are owner/admin).
+- Rename button (owner only).
+- Inactivity indicator (if enabled in config).
 
-### 👥 Miembros
-- Lista de todos los miembros con su rol y grupos asignados.
-- Clic en un miembro para editar sus permisos individuales.
-- Shift+clic para remover un miembro.
-- Botón para agregar nuevos miembros (requiere permiso `MANAGE_MEMBERS`).
+### 👥 Members
+- List of all members with their role and assigned groups.
+- Click a member to edit their individual permissions.
+- Shift+click to remove a member.
+- Button to add new members (requires `MANAGE_MEMBERS` permission).
 
-### 🌐 Permisos Globales
-- Toggles de todos los permisos globales (flags) que afectan a todos los jugadores en la parcela.
-- Sección de grupos: crear, editar y eliminar grupos de permisos.
+### 🌐 Global Permissions
+- Toggles for all global permissions (flags) affecting every player in the plot.
+- Groups section: create, edit, and delete permission groups.
 
-### ⬆️ Mejorar
-- Muestra el nivel actual y el siguiente.
-- Lista los materiales requeridos con indicador de si los tenés o no.
-- Botón para mejorar (consume los materiales automáticamente).
+### ⬆️ Upgrade
+- Shows the current and next tier.
+- Lists required materials with an indicator showing whether you have them.
+- Upgrade button (automatically consumes the materials).
 
 ---
 
 ## 👤 Roles
 
-| Rol | Descripción |
+| Role | Description |
 |---|---|
-| **OWNER** | Dueño de la parcela. Todos los permisos. |
-| **ADMIN** | Puede gestionar miembros, permisos, construir, interactuar y usar TP. |
-| **MEMBER** | Puede construir, interactuar, abrir contenedores y usar TP. |
-| **VISITOR** | Solo puede interactuar y entrar (por defecto para cualquier jugador sin acceso). |
+| **OWNER** | Plot owner. All permissions. |
+| **ADMIN** | Can manage members, permissions, build, interact, and use TP. |
+| **MEMBER** | Can build, interact, open containers, and use TP. |
+| **VISITOR** | Can only interact and enter (default for any player without access). |
+
+Default permissions for each role are configurable in `secure_plots.json` under `roleDefaults`.
 
 ---
 
-## 🔑 Permisos individuales
+## 🔑 Individual Permissions
 
-Estos permisos se pueden asignar por miembro o por grupo:
+These permissions can be assigned per member or per group:
 
-| Permiso | Descripción |
+| Permission | Description |
 |---|---|
-| `BUILD` | Colocar y romper bloques |
-| `INTERACT` | Palancas, puertas, botones |
-| `CONTAINERS` | Abrir cofres e inventarios |
-| `PVP` | Atacar a otros jugadores |
-| `MANAGE_MEMBERS` | Agregar y remover miembros |
-| `MANAGE_PERMS` | Cambiar permisos de miembros |
-| `MANAGE_FLAGS` | Cambiar permisos globales |
-| `MANAGE_GROUPS` | Crear y editar grupos |
-| `TP` | Usar `/sp tp` para llegar a la parcela |
-| `FLY` | Volar dentro de la parcela |
-| `ENTER` | Entrar al área de la parcela |
+| `BUILD` | Place and break blocks |
+| `INTERACT` | Levers, doors, buttons |
+| `CONTAINERS` | Open chests and inventories |
+| `PVP` | Attack other players |
+| `MANAGE_MEMBERS` | Add and remove members |
+| `MANAGE_PERMS` | Change member permissions |
+| `MANAGE_FLAGS` | Change global flags |
+| `MANAGE_GROUPS` | Create and edit groups |
+| `TP` | Use `/sp tp` to reach the plot |
+| `FLY` | Fly inside the plot |
+| `ENTER` | Enter the plot area |
 
 ---
 
-## 🌐 Permisos Globales (Flags)
+## 🌐 Global Permissions (Flags)
 
-Afectan a **todos** los jugadores que estén en la parcela, incluidos visitantes:
+Affect **all** players inside the plot, including visitors:
 
-| Flag | Descripción |
+| Flag | Description |
 |---|---|
-| `ALLOW_VISITOR_BUILD` | Cualquiera puede construir |
-| `ALLOW_VISITOR_INTERACT` | Cualquiera puede interactuar |
-| `ALLOW_VISITOR_CONTAINERS` | Cualquiera puede abrir cofres |
-| `ALLOW_PVP` | PvP habilitado para todos |
-| `ALLOW_FLY` | Todos pueden volar en la parcela |
-| `ALLOW_TP` | Todos pueden hacer `/sp tp` a esta parcela |
-| `GREETINGS` | Mostrar mensaje en el HUD al entrar/salir |
+| `ALLOW_VISITOR_BUILD` | Anyone can build |
+| `ALLOW_VISITOR_INTERACT` | Anyone can interact |
+| `ALLOW_VISITOR_CONTAINERS` | Anyone can open chests |
+| `ALLOW_PVP` | PvP enabled for everyone |
+| `ALLOW_FLY` | Everyone can fly in the plot |
+| `ALLOW_TP` | Everyone can use `/sp tp` to this plot |
+| `GREETINGS` | Show HUD message when entering/leaving |
 
-Por defecto, las nuevas parcelas tienen `ALLOW_TP` y `GREETINGS` activados.
-
----
-
-## 👥 Grupos de permisos
-
-Los grupos permiten asignar un conjunto de permisos a varios miembros a la vez. Se crean desde la pestaña **Permisos Globales** del menú o con el comando `/sp group create <nombre>`. Cada grupo tiene sus propios permisos y lista de miembros.
+The flags enabled by default on new plots are configurable in `secure_plots.json` under `defaultFlags`. Defaults: `ALLOW_TP` and `GREETINGS`.
 
 ---
 
-## ✈️ Sistema de vuelo
+## 👥 Permission Groups
 
-Si el flag `ALLOW_FLY` está activo en una parcela, todos los jugadores dentro podrán volar. Si solo se quiere dar vuelo a miembros específicos, se puede activar el permiso `FLY` individualmente desde el menú de permisos del miembro. El vuelo se activa automáticamente al entrar y se revoca al salir (sin afectar a jugadores en creativo o con vuelo propio).
+Groups let you assign a set of permissions to multiple members at once. Created from the **Global Permissions** tab in the menu or with `/sp group create <name>`. Each group has its own permissions and member list.
+
+---
+
+## ✈️ Flight System
+
+If the `ALLOW_FLY` flag is active on a plot, all players inside can fly. To give flight only to specific members, enable the `FLY` permission individually from the member permissions menu. Flight is automatically enabled on entry and revoked on exit (without affecting creative or already-flying players).
 
 ---
 
 ## 🗺️ Plot Blueprint
 
-Ítem especial para gestionar tus parcelas:
+Special item for managing your plots:
 
-- **Clic normal** dentro de una parcela: abre el menú de gestión.
-- **Clic normal** fuera de una parcela: abre la lista de todas tus parcelas con opciones de TP.
-- **Shift+clic**: muestra el borde visual de la protección más cercana.
-
----
-
-## 💬 Comandos
-
-Todos los comandos funcionan con `/sp` o `/secureplots`.
-
-### Generales
-
-| Comando | Descripción |
-|---|---|
-| `/sp list` | Lista todas tus protecciones con coordenadas y nivel. |
-| `/sp info [parcela]` | Muestra información detallada de la parcela donde estás o la indicada. |
-| `/sp view` | Muestra el borde visual de tu protección más cercana. |
-| `/sp rename <nombre>` | Renombra la parcela donde estás parado. |
-| `/sp tp [parcela]` | Te teleporta a una de tus parcelas o a una pública. |
-
-### Miembros
-
-| Comando | Descripción |
-|---|---|
-| `/sp add <jugador> <parcela\|all>` | Agrega un jugador como miembro. |
-| `/sp remove <jugador> <parcela\|all>` | Remueve a un miembro. |
-
-### Permisos y Flags
-
-| Comando | Descripción |
-|---|---|
-| `/sp flag` | Lista todas las flags disponibles. |
-| `/sp flag <flag>` | Muestra el estado de una flag en la parcela actual. |
-| `/sp flag <flag> <true\|false> [parcela]` | Activa o desactiva una flag. |
-| `/sp perm` | Lista todos los permisos disponibles. |
-| `/sp perm <jugador> <permiso>` | Muestra si un miembro tiene un permiso. |
-| `/sp perm <jugador> <permiso> <true\|false> [parcela]` | Cambia un permiso individual. |
-| `/sp fly [true\|false] [parcela]` | Activa/desactiva el vuelo global + permiso FLY para todos los miembros. |
-
-### Grupos
-
-| Comando | Descripción |
-|---|---|
-| `/sp group` | Lista los grupos de la parcela actual. |
-| `/sp group create <nombre>` | Crea un grupo de permisos. |
-| `/sp group delete <nombre>` | Elimina un grupo. |
-| `/sp group addmember <grupo> <jugador>` | Agrega un miembro al grupo. |
-| `/sp group removemember <grupo> <jugador>` | Quita un miembro del grupo. |
-| `/sp group setperm <grupo> <permiso> <true\|false>` | Activa o desactiva un permiso en el grupo. |
-
-### Argumento `<parcela>`
-Se puede pasar el **nombre** de la parcela, su **número** según `/sp list`, o `all` para aplicar a todas.
+- **Normal click** inside a plot: opens the management menu.
+- **Normal click** outside a plot: opens a list of all your plots with TP options.
+- **Shift+click**: shows the visual border of the nearest protection.
 
 ---
 
-## ⚙️ Configuración
+## 💬 Commands
 
-El archivo `config/secure_plots.json` se genera automáticamente. Opciones disponibles:
+All commands work with `/sp` or `/secureplots`.
+
+### General
+
+| Command | Description |
+|---|---|
+| `/sp list` | Lists all your protections with coordinates and tier. |
+| `/sp info [plot]` | Shows detailed info about the plot you're standing in or the specified one. |
+| `/sp view` | Shows the visual border of your nearest protection. |
+| `/sp rename <name>` | Renames the plot you're standing in. |
+| `/sp tp [plot]` | Teleports you to one of your plots or a public one. |
+
+### Members
+
+| Command | Description |
+|---|---|
+| `/sp add <player> <plot\|all>` | Adds a player as a member. |
+| `/sp remove <player> <plot\|all>` | Removes a member. |
+
+### Permissions & Flags
+
+| Command | Description |
+|---|---|
+| `/sp flag` | Lists all available flags. |
+| `/sp flag <flag>` | Shows the status of a flag in the current plot. |
+| `/sp flag <flag> <true\|false> [plot]` | Enables or disables a flag. |
+| `/sp perm` | Lists all available permissions. |
+| `/sp perm <player> <perm>` | Shows whether a member has a permission. |
+| `/sp perm <player> <perm> <true\|false> [plot]` | Changes an individual permission. |
+| `/sp fly [true\|false] [plot]` | Enables/disables global flight + FLY permission for all members. |
+
+### Groups
+
+| Command | Description |
+|---|---|
+| `/sp group` | Lists groups in the current plot. |
+| `/sp group create <name>` | Creates a permission group. |
+| `/sp group delete <name>` | Deletes a group. |
+| `/sp group addmember <group> <player>` | Adds a member to the group. |
+| `/sp group removemember <group> <player>` | Removes a member from the group. |
+| `/sp group setperm <group> <perm> <true\|false>` | Enables or disables a permission in the group. |
+
+### The `<plot>` argument
+You can pass the plot's **name**, its **number** from `/sp list`, or `all` to apply to all plots.
+
+---
+
+## ⚙️ Configuration
+
+The file `config/secure_plots.json` is automatically generated with all default values. Below is the full config with every available option:
 
 ```json
 {
   "maxPlotsPerPlayer": 3,
+  "plotBuffer": 15,
+  "adminTag": "plot_admin",
+  "cobblescoinsItemId": "cobbleverse:cobblecoin",
+  "blockedStructurePrefixes": [
+    "cobbleverse:",
+    "legendarymonuments:"
+  ],
   "inactivityExpiry": {
     "enabled": false,
     "baseDays": 45,
     "daysPerTier": 5
   },
+  "tiers": [
+    { "tier": 0, "displayName": "Bronze",    "radius": 15,  "luminance": 4, "hardness": 50.0, "blastResistance": 1200.0 },
+    { "tier": 1, "displayName": "Gold",      "radius": 30,  "luminance": 5, "hardness": 50.0, "blastResistance": 1200.0 },
+    { "tier": 2, "displayName": "Emerald",   "radius": 50,  "luminance": 6, "hardness": 50.0, "blastResistance": 1200.0 },
+    { "tier": 3, "displayName": "Diamond",   "radius": 75,  "luminance": 7, "hardness": 50.0, "blastResistance": 1200.0 },
+    { "tier": 4, "displayName": "Netherite", "radius": 100, "luminance": 8, "hardness": 50.0, "blastResistance": 1200.0 }
+  ],
   "upgradeCosts": [
-    { "fromTier": 0, "toTier": 1, "items": [{ "itemId": "minecraft:gold_block", "amount": 15 }] },
-    { "fromTier": 1, "toTier": 2, "items": [{ "itemId": "minecraft:emerald_block", "amount": 10 }] },
-    { "fromTier": 2, "toTier": 3, "items": [{ "itemId": "minecraft:diamond", "amount": 64 }] },
-    { "fromTier": 3, "toTier": 4, "items": [{ "itemId": "minecraft:netherite_block", "amount": 1 }] }
-  ]
+    { "fromTier": 0, "toTier": 1, "cobblecoins": 0, "items": [{ "itemId": "minecraft:gold_block", "amount": 15 }] },
+    { "fromTier": 1, "toTier": 2, "cobblecoins": 0, "items": [{ "itemId": "minecraft:emerald_block", "amount": 10 }] },
+    { "fromTier": 2, "toTier": 3, "cobblecoins": 0, "items": [{ "itemId": "minecraft:diamond", "amount": 64 }] },
+    { "fromTier": 3, "toTier": 4, "cobblecoins": 0, "items": [{ "itemId": "minecraft:netherite_block", "amount": 1 }] }
+  ],
+  "roleDefaults": {
+    "admin":   ["BUILD", "INTERACT", "CONTAINERS", "PVP", "MANAGE_MEMBERS", "MANAGE_PERMS", "TP", "ENTER"],
+    "member":  ["BUILD", "INTERACT", "CONTAINERS", "TP", "ENTER"],
+    "visitor": ["INTERACT", "ENTER"]
+  },
+  "defaultFlags": ["ALLOW_TP", "GREETINGS"]
 }
 ```
 
-| Opción | Descripción |
+### Option Reference
+
+| Option | Description |
 |---|---|
-| `maxPlotsPerPlayer` | Máximo de parcelas por jugador. `0` = ilimitado. |
-| `inactivityExpiry.enabled` | Si está en `true`, las protecciones expiran si el dueño no entra al servidor. |
-| `inactivityExpiry.baseDays` | Días base antes de que expire una protección. |
-| `inactivityExpiry.daysPerTier` | Días extra de gracia por cada nivel de mejora. |
-| `upgradeCosts` | Lista de costos de mejora. Se pueden usar cualquier ítem de Minecraft. |
+| `maxPlotsPerPlayer` | Maximum plots per player. `0` = unlimited. |
+| `plotBuffer` | Minimum block gap between plots to prevent overlap. |
+| `adminTag` | Command tag that grants admin access to all plots. Assign with `/tag <player> add <value>`. |
+| `cobblescoinsItemId` | Cobblecoins item ID for integration with the cobbleverse mod. |
+| `blockedStructurePrefixes` | List of structure ID prefixes over which plots cannot be placed. |
+| `inactivityExpiry.enabled` | If `true`, protections expire when the owner is inactive. |
+| `inactivityExpiry.baseDays` | Base days of inactivity before a protection expires. |
+| `inactivityExpiry.daysPerTier` | Extra grace days per upgrade tier. |
+| `tiers[].displayName` | Tier name shown in menus and commands. |
+| `tiers[].radius` | Plot radius in blocks (total area is radius×radius). |
+| `tiers[].luminance` | Luminance of the plot block (0–15). |
+| `tiers[].hardness` | Block hardness (mining time). |
+| `tiers[].blastResistance` | Block blast resistance. |
+| `upgradeCosts` | Upgrade costs per tier. Supports multiple items from any mod and cobblecoins. |
+| `roleDefaults.admin` | Permissions automatically assigned when adding an ADMIN. |
+| `roleDefaults.member` | Permissions automatically assigned when adding a MEMBER. |
+| `roleDefaults.visitor` | Base permissions for any player with no assigned role. |
+| `defaultFlags` | Global flags automatically enabled on every new plot. |
 
 ---
 
-## 🔧 Permisos de administrador
+## 🔧 Admin Permissions
 
-Los operadores del servidor con el tag `plot_admin` (asignable con `/tag <jugador> add plot_admin`) tienen acceso completo a todas las parcelas como si fueran dueños. Pueden gestionar miembros, permisos, flags y grupos de cualquier parcela.
+Server operators with the tag set in `adminTag` (default `plot_admin`, assignable with `/tag <player> add plot_admin`) have full access to all plots as if they were owners. They can manage members, permissions, flags, and groups of any plot.
+
+The tag can be freely changed in `secure_plots.json` without recompiling the mod.
 
 ---
 
-## 💾 Datos
+## 💾 Data
 
-Los datos de las parcelas se guardan como `PersistentState` del mundo (en `world/data/`). No requieren base de datos externa. Son retrocompatibles: parcelas guardadas sin flags o grupos se cargan con valores por defecto.
+Plot data is saved as a `PersistentState` in the world (under `world/data/`). No external database required. Fully backwards compatible: plots saved with an older version of the mod load correctly, and any new config fields are automatically populated with default values.
