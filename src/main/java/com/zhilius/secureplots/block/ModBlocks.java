@@ -1,6 +1,7 @@
 package com.zhilius.secureplots.block;
 
 import com.zhilius.secureplots.SecurePlots;
+import com.zhilius.secureplots.config.SecurePlotsConfig;
 import net.minecraft.block.AbstractBlock;
 import net.minecraft.block.Block;
 import net.minecraft.block.MapColor;
@@ -12,45 +13,52 @@ import net.minecraft.util.Identifier;
 
 public class ModBlocks {
 
+    // Los valores de luminance/hardness/blastResistance se leen del config.
+    // El config ya estará cargado cuando se llame a initialize() desde SecurePlots.onInitialize().
+
     // Tier 0 - Bronze
     public static final Block BRONZE_PLOT_BLOCK = register("bronze_plot_block",
-            new PlotBlock(AbstractBlock.Settings.create()
-                    .mapColor(MapColor.ORANGE)
-                    .strength(50f, 1200f)
-                    .luminance(state -> 4)
-                    .requiresTool(), 0));
+            new PlotBlock(buildSettings(MapColor.ORANGE, 0), 0));
 
     // Tier 1 - Gold
     public static final Block GOLD_PLOT_BLOCK = register("gold_plot_block",
-            new PlotBlock(AbstractBlock.Settings.create()
-                    .mapColor(MapColor.GOLD)
-                    .strength(50f, 1200f)
-                    .luminance(state -> 5)
-                    .requiresTool(), 1));
+            new PlotBlock(buildSettings(MapColor.GOLD, 1), 1));
 
     // Tier 2 - Emerald
     public static final Block emerald_PLOT_BLOCK = register("emerald_plot_block",
-            new PlotBlock(AbstractBlock.Settings.create()
-                    .mapColor(MapColor.GREEN)
-                    .strength(50f, 1200f)
-                    .luminance(state -> 6)
-                    .requiresTool(), 2));
+            new PlotBlock(buildSettings(MapColor.GREEN, 2), 2));
 
     // Tier 3 - Diamond
     public static final Block DIAMOND_PLOT_BLOCK = register("diamond_plot_block",
-            new PlotBlock(AbstractBlock.Settings.create()
-                    .mapColor(MapColor.DIAMOND_BLUE)
-                    .strength(50f, 1200f)
-                    .luminance(state -> 7)
-                    .requiresTool(), 3));
+            new PlotBlock(buildSettings(MapColor.DIAMOND_BLUE, 3), 3));
 
     // Tier 4 - Netherite
     public static final Block NETHERITE_PLOT_BLOCK = register("netherite_plot_block",
-            new PlotBlock(AbstractBlock.Settings.create()
-                    .mapColor(MapColor.BLACK)
-                    .strength(50f, 1200f)
-                    .luminance(state -> 8)
-                    .requiresTool(), 4));
+            new PlotBlock(buildSettings(MapColor.BLACK, 4), 4));
+
+    /**
+     * Construye los settings del bloque leyendo luminance, hardness y blastResistance del config.
+     * Si el config no está disponible (arranque muy temprano), usa los valores por defecto.
+     */
+    private static AbstractBlock.Settings buildSettings(MapColor color, int tier) {
+        int luminance = 4 + tier;       // fallback
+        float hardness = 50f;
+        float blastResistance = 1200f;
+
+        if (SecurePlotsConfig.INSTANCE != null) {
+            SecurePlotsConfig.TierConfig tc = SecurePlotsConfig.INSTANCE.getTierConfig(tier);
+            luminance        = tc.luminance;
+            hardness         = tc.hardness;
+            blastResistance  = tc.blastResistance;
+        }
+
+        final int lum = luminance;
+        return AbstractBlock.Settings.create()
+                .mapColor(color)
+                .strength(hardness, blastResistance)
+                .luminance(state -> lum)
+                .requiresTool();
+    }
 
     public static Block fromTier(int tier) {
         return switch (tier) {

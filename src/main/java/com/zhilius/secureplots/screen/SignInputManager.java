@@ -1,4 +1,5 @@
 package com.zhilius.secureplots.screen;
+import com.zhilius.secureplots.config.SecurePlotsConfig;
 
 import com.zhilius.secureplots.plot.PlotData;
 import com.zhilius.secureplots.plot.PlotManager;
@@ -117,7 +118,7 @@ public class SignInputManager {
             player.sendMessage(Text.literal("✗ Protección no encontrada.").formatted(Formatting.RED), false);
             return;
         }
-        boolean isAdmin = player.getCommandTags().contains("plot_admin");
+        boolean isAdmin = player.getCommandTags().contains(SecurePlotsConfig.INSTANCE != null ? SecurePlotsConfig.INSTANCE.adminTag : "plot_admin");
         if (!data.getOwnerId().equals(player.getUuid()) && !isAdmin) {
             player.sendMessage(Text.literal("✗ Solo el dueño puede renombrar.").formatted(Formatting.RED), false);
             reopenMenu(player, plotPos, PlotMenuHandler.MenuPage.INFO);
@@ -160,7 +161,7 @@ public class SignInputManager {
             player.sendMessage(Text.literal("✗ Protección no encontrada.").formatted(Formatting.RED), false);
             return;
         }
-        boolean isAdmin = player.getCommandTags().contains("plot_admin");
+        boolean isAdmin = player.getCommandTags().contains(SecurePlotsConfig.INSTANCE != null ? SecurePlotsConfig.INSTANCE.adminTag : "plot_admin");
         if (!data.hasPermission(player.getUuid(), PlotData.Permission.MANAGE_MEMBERS) && !isAdmin) {
             reopenMenu(player, plotPos, PlotMenuHandler.MenuPage.MEMBERS);
             return;
@@ -200,7 +201,7 @@ public class SignInputManager {
             player.sendMessage(Text.literal("✗ Protección no encontrada.").formatted(Formatting.RED), false);
             return;
         }
-        boolean isAdmin = player.getCommandTags().contains("plot_admin");
+        boolean isAdmin = player.getCommandTags().contains(SecurePlotsConfig.INSTANCE != null ? SecurePlotsConfig.INSTANCE.adminTag : "plot_admin");
         if (!data.hasPermission(player.getUuid(), PlotData.Permission.MANAGE_GROUPS) && !isAdmin) {
             player.sendMessage(Text.literal("✗ No tenés permiso para crear grupos.").formatted(Formatting.RED), false);
             reopenMenu(player, plotPos, PlotMenuHandler.MenuPage.MEMBERS);

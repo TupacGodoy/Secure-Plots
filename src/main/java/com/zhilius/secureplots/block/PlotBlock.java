@@ -101,9 +101,9 @@ public class PlotBlock extends BlockWithEntity {
             player.sendMessage(Text.literal("  🛡 ¡Parcela creada!").formatted(Formatting.YELLOW, Formatting.BOLD), false);
             player.sendMessage(Text.literal("═══════════════════════════").formatted(Formatting.GOLD), false);
             player.sendMessage(Text.literal("  Tamaño: ").formatted(Formatting.GRAY)
-                    .append(Text.literal(plotSize.radius + "x" + plotSize.radius + " bloques").formatted(Formatting.AQUA)), false);
+                    .append(Text.literal(plotSize.getRadius() + "x" + plotSize.getRadius() + " bloques").formatted(Formatting.AQUA)), false);
             player.sendMessage(Text.literal("  Nivel: ").formatted(Formatting.GRAY)
-                    .append(Text.literal(plotSize.displayName).formatted(Formatting.AQUA)), false);
+                    .append(Text.literal(plotSize.getDisplayName()).formatted(Formatting.AQUA)), false);
             player.sendMessage(Text.literal("  Usá el §6Plano de Protección §7para gestionarla.").formatted(Formatting.GRAY), false);
             player.sendMessage(Text.literal("═══════════════════════════").formatted(Formatting.GOLD), false);
 
@@ -115,7 +115,7 @@ public class PlotBlock extends BlockWithEntity {
     private void sendInfoToChat(ServerPlayerEntity player, com.zhilius.secureplots.plot.PlotData data) {
         String name = (data.getPlotName() != null && !data.getPlotName().isBlank())
                 ? data.getPlotName() : "Parcela Protegida";
-        int size = data.getSize().radius;
+        int size = data.getSize().getRadius();
         String membersStr = data.getMembers().isEmpty() ? "Ninguno" : String.valueOf(data.getMembers().size());
 
         player.sendMessage(Text.literal("═══════════════════════════").formatted(Formatting.GOLD), false);
@@ -124,7 +124,7 @@ public class PlotBlock extends BlockWithEntity {
         player.sendMessage(Text.literal("  Dueño: ").formatted(Formatting.GRAY)
                 .append(Text.literal(data.getOwnerName()).formatted(Formatting.WHITE)), false);
         player.sendMessage(Text.literal("  Nivel: ").formatted(Formatting.GRAY)
-                .append(Text.literal(data.getSize().displayName).formatted(Formatting.AQUA)), false);
+                .append(Text.literal(data.getSize().getDisplayName()).formatted(Formatting.AQUA)), false);
         player.sendMessage(Text.literal("  Tamaño: ").formatted(Formatting.GRAY)
                 .append(Text.literal(size + "x" + size + " bloques").formatted(Formatting.AQUA)), false);
         player.sendMessage(Text.literal("  Miembros: ").formatted(Formatting.GRAY)
@@ -158,9 +158,9 @@ public class PlotBlock extends BlockWithEntity {
     @Override
     public void appendTooltip(ItemStack stack, TooltipContext context, List<Text> tooltip, TooltipType options) {
         PlotSize plotSize = PlotSize.fromTier(this.tier);
-        int size = plotSize.radius;
+        int size = plotSize.getRadius();
         tooltip.add(Text.literal("Protege: " + size + "x" + size + " bloques").formatted(Formatting.AQUA));
-        tooltip.add(Text.literal("Tier " + (this.tier + 1) + " — " + plotSize.displayName).formatted(Formatting.GRAY));
+        tooltip.add(Text.literal("Tier " + (this.tier + 1) + " — " + plotSize.getDisplayName()).formatted(Formatting.GRAY));
         tooltip.add(Text.literal("Coloca para reclamar tu parcela.").formatted(Formatting.DARK_GRAY));
     }
 

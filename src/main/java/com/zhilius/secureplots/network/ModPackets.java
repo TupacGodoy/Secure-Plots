@@ -1,4 +1,5 @@
 package com.zhilius.secureplots.network;
+import com.zhilius.secureplots.config.SecurePlotsConfig;
 
 import com.zhilius.secureplots.SecurePlots;
 import com.zhilius.secureplots.network.ModPackets.OpenPlotScreenPayload;
@@ -196,8 +197,8 @@ public class ModPackets {
 
                     player.sendMessage(
                             net.minecraft.text.Text
-                                    .literal("Proteccion mejorada a " + nextSize.displayName + " (" + nextSize.radius
-                                            + "x" + nextSize.radius + ")!")
+                                    .literal("Proteccion mejorada a " + nextSize.getDisplayName() + " (" + nextSize.getRadius()
+                                            + "x" + nextSize.getRadius() + ")!")
                                     .formatted(net.minecraft.util.Formatting.GREEN),
                             false);
                     sendOpenPlotScreen(player, pos, data);
@@ -287,7 +288,7 @@ public class ModPackets {
                 var manager = com.zhilius.secureplots.plot.PlotManager.getOrCreate(serverWorld);
                 PlotData data = manager.getPlot(pos);
                 if (data == null) return;
-                boolean isAdmin = player.getCommandTags().contains("plot_admin");
+                boolean isAdmin = player.getCommandTags().contains(SecurePlotsConfig.INSTANCE != null ? SecurePlotsConfig.INSTANCE.adminTag : "plot_admin");
                 if (!data.getOwnerId().equals(player.getUuid()) && !isAdmin) return;
                 try {
                     java.util.UUID memberUuid = java.util.UUID.fromString(payload.memberUuid());

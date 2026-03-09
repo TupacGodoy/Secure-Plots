@@ -40,7 +40,7 @@ public class SecurePlotsClient implements ClientModInitializer {
         }
 
         public void upgrade(PlotData newData) {
-            this.prevRadius      = this.data.getSize().radius;
+            this.prevRadius      = this.data.getSize().getRadius();
             this.prevTier        = this.data.getSize().tier;
             this.transitionStart = System.currentTimeMillis();
             this.expandPulseStart = System.currentTimeMillis();
@@ -75,10 +75,10 @@ public class SecurePlotsClient implements ClientModInitializer {
         public float effectiveRadiusF() {
             float base;
             if (prevRadius < 0) {
-                base = data.getSize().radius;
+                base = data.getSize().getRadius();
             } else {
                 float p = transitionProgress();
-                base = prevRadius + p * (data.getSize().radius - prevRadius);
+                base = prevRadius + p * (data.getSize().getRadius() - prevRadius);
             }
             return base + expandPulseRadius();
         }

@@ -78,8 +78,8 @@ public class PlotInfoScreen extends Screen {
         long time = this.client.world != null ? this.client.world.getTime() : 0;
 
         drawRow(ctx, x, y, "Dueño",   data.getOwnerName(),                Formatting.WHITE);  y += gap;
-        drawRow(ctx, x, y, "Nivel",   data.getSize().displayName,          Formatting.AQUA);   y += gap;
-        int sz = data.getSize().radius;
+        drawRow(ctx, x, y, "Nivel",   data.getSize().getDisplayName(),          Formatting.AQUA);   y += gap;
+        int sz = data.getSize().getRadius();
         drawRow(ctx, x, y, "Tamaño",  sz + "x" + sz + " bloques",         Formatting.AQUA);   y += gap;
         drawRow(ctx, x, y, "Miembros", String.valueOf(data.getMembers().size()), Formatting.GREEN); y += gap;
 

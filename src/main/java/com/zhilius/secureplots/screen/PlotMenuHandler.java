@@ -64,7 +64,7 @@ public class PlotMenuHandler extends GenericContainerScreenHandler {
         super(ScreenHandlerType.GENERIC_9X6, syncId, playerInv, inv, ROWS);
         this.plotPos = plotPos;
         this.data    = data;
-        boolean isPlotAdmin = ((ServerPlayerEntity) playerInv.player).getCommandTags().contains("plot_admin");
+        boolean isPlotAdmin = ((ServerPlayerEntity) playerInv.player).getCommandTags().contains(SecurePlotsConfig.INSTANCE != null ? SecurePlotsConfig.INSTANCE.adminTag : "plot_admin");
         this.myRole  = isPlotAdmin ? PlotData.Role.OWNER : data.getRoleOf(playerInv.player.getUuid());
         this.player  = (ServerPlayerEntity) playerInv.player;
         this.page    = page;
@@ -125,8 +125,8 @@ public class PlotMenuHandler extends GenericContainerScreenHandler {
             "§eDueño", "§f" + data.getOwnerName()));
 
         menuInv.setStack(21, namedLore(itemForSize(data.getSize()),
-            tierColor(data.getSize()) + "Nivel: " + data.getSize().displayName,
-            "§7Tamaño: §b" + data.getSize().radius + "x" + data.getSize().radius + " bloques"));
+            tierColor(data.getSize()) + "Nivel: " + data.getSize().getDisplayName(),
+            "§7Tamaño: §b" + data.getSize().getRadius() + "x" + data.getSize().getRadius() + " bloques"));
 
         menuInv.setStack(22, namedLore(Items.PAPER,
             "§eIntegrantes",
@@ -361,8 +361,8 @@ public class PlotMenuHandler extends GenericContainerScreenHandler {
         PlotSize next = cur.next();
 
         menuInv.setStack(19, namedLore(itemForSize(cur),
-            tierColor(cur) + "Nivel actual: " + cur.displayName,
-            "§7Tamaño: §b" + cur.radius + "x" + cur.radius + " bloques"));
+            tierColor(cur) + "Nivel actual: " + cur.getDisplayName(),
+            "§7Tamaño: §b" + cur.getRadius() + "x" + cur.getRadius() + " bloques"));
 
         if (next == null) {
             menuInv.setStack(22, namedLore(Items.NETHER_STAR,
@@ -372,8 +372,8 @@ public class PlotMenuHandler extends GenericContainerScreenHandler {
         }
 
         menuInv.setStack(21, namedLore(itemForSize(next),
-            tierColor(next) + "Siguiente: " + next.displayName,
-            "§7Tamaño: §b" + next.radius + "x" + next.radius + " bloques"));
+            tierColor(next) + "Siguiente: " + next.getDisplayName(),
+            "§7Tamaño: §b" + next.getRadius() + "x" + next.getRadius() + " bloques"));
 
         SecurePlotsConfig cfg = SecurePlotsConfig.INSTANCE;
         SecurePlotsConfig.UpgradeCost cost = cfg != null ? cfg.getUpgradeCost(cur.tier) : null;
@@ -397,7 +397,7 @@ public class PlotMenuHandler extends GenericContainerScreenHandler {
 
         if (myRole == PlotData.Role.OWNER) {
             if (canAfford) {
-                ItemStack btn = namedLore(Items.ANVIL, "§a⬆ Mejorar a " + next.displayName, "§7Tenés todos los materiales");
+                ItemStack btn = namedLore(Items.ANVIL, "§a⬆ Mejorar a " + next.getDisplayName(), "§7Tenés todos los materiales");
                 btn.set(DataComponentTypes.ENCHANTMENT_GLINT_OVERRIDE, true);
                 menuInv.setStack(SLOT_UPGRADE_BTN, btn);
             } else {
@@ -693,7 +693,7 @@ public class PlotMenuHandler extends GenericContainerScreenHandler {
 
         player.closeHandledScreen();
         com.zhilius.secureplots.network.ModPackets.sendShowPlotBorder(player, fresh);
-        player.sendMessage(Text.literal("§a✔ ¡Protección mejorada a §e" + next.displayName + "§a!"), false);
+        player.sendMessage(Text.literal("§a✔ ¡Protección mejorada a §e" + next.getDisplayName() + "§a!"), false);
     }
 
     private void spawnUpgradeParticles(ServerWorld sw, BlockPos pos) {

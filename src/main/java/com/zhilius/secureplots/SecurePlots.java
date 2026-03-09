@@ -116,7 +116,7 @@ public class SecurePlots implements ModInitializer {
             if (!isPlacing && plot.canBuild(player.getUuid())) {
                 // Player has permission but isn't inside the plot — check distance to border
                 net.minecraft.util.math.BlockPos center = plot.getCenter();
-                int r = plot.getSize().radius;
+                int r = plot.getSize().getRadius();
                 net.minecraft.util.math.BlockPos pp = player.getBlockPos();
                 int dx = Math.max(0, Math.abs(pp.getX() - center.getX()) - r);
                 int dz = Math.max(0, Math.abs(pp.getZ() - center.getZ()) - r);

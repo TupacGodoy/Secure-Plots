@@ -4,6 +4,7 @@ import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.BoolArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.zhilius.secureplots.network.ModPackets;
+import com.zhilius.secureplots.config.SecurePlotsConfig;
 import com.zhilius.secureplots.plot.PlotData;
 import com.zhilius.secureplots.plot.PlotManager;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
@@ -192,7 +193,7 @@ public class SpCommand {
         player.sendMessage(
             Text.literal("Mostrando borde de: ").formatted(Formatting.GRAY)
                 .append(Text.literal(nearest.getPlotName()).formatted(Formatting.YELLOW))
-                .append(Text.literal(" (" + nearest.getSize().radius + "x" + nearest.getSize().radius + ")").formatted(Formatting.AQUA)),
+                .append(Text.literal(" (" + nearest.getSize().getRadius() + "x" + nearest.getSize().getRadius() + ")").formatted(Formatting.AQUA)),
             false);
         return 1;
     }
@@ -216,7 +217,7 @@ public class SpCommand {
             player.sendMessage(
                 Text.literal("  " + (i + 1) + ". ").formatted(Formatting.GRAY)
                     .append(Text.literal(p.getPlotName()).formatted(Formatting.WHITE))
-                    .append(Text.literal(" [" + p.getSize().displayName + "]").formatted(getTierFormatting(p.getSize().tier)))
+                    .append(Text.literal(" [" + p.getSize().getDisplayName() + "]").formatted(getTierFormatting(p.getSize().tier)))
                     .append(Text.literal("  " + c.getX() + ", " + c.getY() + ", " + c.getZ()).formatted(Formatting.DARK_GRAY))
                     .append(Text.literal(tpFlag)),
                 false);
@@ -246,12 +247,12 @@ public class SpCommand {
         }
 
         BlockPos c = plot.getCenter();
-        int sz = plot.getSize().radius;
+        int sz = plot.getSize().getRadius();
         player.sendMessage(Text.literal("═══════════════════════════").formatted(Formatting.GOLD), false);
         player.sendMessage(Text.literal("  🛡 " + plot.getPlotName()).formatted(Formatting.YELLOW, Formatting.BOLD), false);
         player.sendMessage(Text.literal("═══════════════════════════").formatted(Formatting.GOLD), false);
         player.sendMessage(Text.literal("  Dueño: ").formatted(Formatting.GRAY).append(Text.literal(plot.getOwnerName()).formatted(Formatting.WHITE)), false);
-        player.sendMessage(Text.literal("  Nivel: ").formatted(Formatting.GRAY).append(Text.literal(plot.getSize().displayName).formatted(Formatting.AQUA)), false);
+        player.sendMessage(Text.literal("  Nivel: ").formatted(Formatting.GRAY).append(Text.literal(plot.getSize().getDisplayName()).formatted(Formatting.AQUA)), false);
         player.sendMessage(Text.literal("  Tamaño: ").formatted(Formatting.GRAY).append(Text.literal(sz + "x" + sz + " bloques").formatted(Formatting.AQUA)), false);
         player.sendMessage(Text.literal("  Coords: ").formatted(Formatting.GRAY).append(Text.literal(c.getX() + ", " + c.getY() + ", " + c.getZ()).formatted(Formatting.WHITE)), false);
 
@@ -444,7 +445,7 @@ public class SpCommand {
         boolean isOwner = plot.getOwnerId().equals(player.getUuid());
         boolean isMember = plot.getRoleOf(player.getUuid()) != PlotData.Role.VISITOR;
         boolean tpPublic = plot.hasFlag(PlotData.Flag.ALLOW_TP);
-        boolean isAdmin = player.getCommandTags().contains("plot_admin");
+        boolean isAdmin = player.getCommandTags().contains(SecurePlotsConfig.INSTANCE != null ? SecurePlotsConfig.INSTANCE.adminTag : "plot_admin");
 
         if (!isOwner && !isMember && !tpPublic && !isAdmin) {
             player.sendMessage(Text.literal("✗ El TP no está habilitado en \"" + plot.getPlotName() + "\".").formatted(Formatting.RED), false);
@@ -498,7 +499,7 @@ public class SpCommand {
         if (plot == null) return 0;
 
         if (!plot.hasPermission(player.getUuid(), PlotData.Permission.MANAGE_FLAGS)
-                && !player.getCommandTags().contains("plot_admin")) {
+                && !player.getCommandTags().contains(SecurePlotsConfig.INSTANCE != null ? SecurePlotsConfig.INSTANCE.adminTag : "plot_admin")) {
             player.sendMessage(Text.literal("✗ No tenés permiso para cambiar flags.").formatted(Formatting.RED), false);
             return 0;
         }
@@ -555,7 +556,7 @@ public class SpCommand {
         if (plot == null) return 0;
 
         if (!plot.hasPermission(player.getUuid(), PlotData.Permission.MANAGE_PERMS)
-                && !player.getCommandTags().contains("plot_admin")) {
+                && !player.getCommandTags().contains(SecurePlotsConfig.INSTANCE != null ? SecurePlotsConfig.INSTANCE.adminTag : "plot_admin")) {
             player.sendMessage(Text.literal("✗ No tenés permiso para cambiar permisos.").formatted(Formatting.RED), false);
             return 0;
         }
@@ -585,7 +586,7 @@ public class SpCommand {
             return 0;
         }
         if (!plot.hasPermission(player.getUuid(), PlotData.Permission.MANAGE_FLAGS)
-                && !player.getCommandTags().contains("plot_admin")) {
+                && !player.getCommandTags().contains(SecurePlotsConfig.INSTANCE != null ? SecurePlotsConfig.INSTANCE.adminTag : "plot_admin")) {
             player.sendMessage(Text.literal("✗ No tenés permiso para cambiar el fly de esta parcela.").formatted(Formatting.RED), false);
             return 0;
         }
@@ -600,7 +601,7 @@ public class SpCommand {
         PlotData plot = resolveSinglePlot(player, manager, plotArg);
         if (plot == null) return 0;
         if (!plot.hasPermission(player.getUuid(), PlotData.Permission.MANAGE_FLAGS)
-                && !player.getCommandTags().contains("plot_admin")) {
+                && !player.getCommandTags().contains(SecurePlotsConfig.INSTANCE != null ? SecurePlotsConfig.INSTANCE.adminTag : "plot_admin")) {
             player.sendMessage(Text.literal("✗ No tenés permiso para cambiar el fly de esta parcela.").formatted(Formatting.RED), false);
             return 0;
         }
@@ -653,7 +654,7 @@ public class SpCommand {
             return 0;
         }
         if (!plot.hasPermission(player.getUuid(), PlotData.Permission.MANAGE_GROUPS)
-                && !player.getCommandTags().contains("plot_admin")) {
+                && !player.getCommandTags().contains(SecurePlotsConfig.INSTANCE != null ? SecurePlotsConfig.INSTANCE.adminTag : "plot_admin")) {
             player.sendMessage(Text.literal("✗ No tenés permiso para gestionar grupos.").formatted(Formatting.RED), false);
             return 0;
         }
@@ -677,7 +678,7 @@ public class SpCommand {
             return 0;
         }
         if (!plot.hasPermission(player.getUuid(), PlotData.Permission.MANAGE_GROUPS)
-                && !player.getCommandTags().contains("plot_admin")) {
+                && !player.getCommandTags().contains(SecurePlotsConfig.INSTANCE != null ? SecurePlotsConfig.INSTANCE.adminTag : "plot_admin")) {
             player.sendMessage(Text.literal("✗ No tenés permiso para gestionar grupos.").formatted(Formatting.RED), false);
             return 0;
         }
@@ -756,7 +757,7 @@ public class SpCommand {
             return 0;
         }
         if (!plot.hasPermission(player.getUuid(), PlotData.Permission.MANAGE_GROUPS)
-                && !player.getCommandTags().contains("plot_admin")) {
+                && !player.getCommandTags().contains(SecurePlotsConfig.INSTANCE != null ? SecurePlotsConfig.INSTANCE.adminTag : "plot_admin")) {
             player.sendMessage(Text.literal("✗ No tenés permiso para gestionar grupos.").formatted(Formatting.RED), false);
             return 0;
         }
@@ -790,7 +791,7 @@ public class SpCommand {
             // Debe ser owner o admin
             if (!plot.getOwnerId().equals(player.getUuid())
                     && plot.getRoleOf(player.getUuid()) != PlotData.Role.ADMIN
-                    && !player.getCommandTags().contains("plot_admin")) {
+                    && !player.getCommandTags().contains(SecurePlotsConfig.INSTANCE != null ? SecurePlotsConfig.INSTANCE.adminTag : "plot_admin")) {
                 player.sendMessage(Text.literal("✗ Solo el dueño o admin puede hacer esto.").formatted(Formatting.RED), false);
                 return null;
             }

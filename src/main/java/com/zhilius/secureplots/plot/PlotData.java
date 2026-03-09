@@ -117,9 +117,8 @@ public class PlotData {
         this.lastOwnerSeenTick = currentTick;
         this.plotName = ownerName + "'s Plot";
         this.hasRank = false;
-        // Flags por defecto
-        this.flags.add(Flag.ALLOW_TP);
-        this.flags.add(Flag.GREETINGS);
+        // Flags por defecto (leídas del config)
+        loadDefaultFlags();
     }
 
     public PlotData() {}
@@ -140,6 +139,22 @@ public class PlotData {
     public Map<UUID, Role> getMembers()         { return members; }
     public List<PermissionGroup> getGroups()    { return groups; }
     public Set<Flag> getFlags()                 { return flags; }
+
+    // ── Helpers de config ──────────────────────────────────────────────────────
+
+    /** Carga las flags por defecto definidas en el config. */
+    private void loadDefaultFlags() {
+        SecurePlotsConfig cfg = SecurePlotsConfig.INSTANCE;
+        if (cfg != null && cfg.defaultFlags != null) {
+            for (String flagName : cfg.defaultFlags) {
+                try { this.flags.add(Flag.valueOf(flagName)); } catch (Exception ignored) {}
+            }
+        } else {
+            // Fallback si el config no está disponible
+            this.flags.add(Flag.ALLOW_TP);
+            this.flags.add(Flag.GREETINGS);
+        }
+    }
 
     // ── Flags globales ────────────────────────────────────────────────────────
     public boolean hasFlag(Flag flag) { return flags.contains(flag); }
@@ -170,11 +185,25 @@ public class PlotData {
 
     // ── Permisos por defecto según rol ────────────────────────────────────────
     public static Set<Permission> defaultPermsFor(Role role) {
+        SecurePlotsConfig cfg = SecurePlotsConfig.INSTANCE;
+        if (cfg != null && cfg.roleDefaults != null) {
+            List<String> names = switch (role) {
+                case OWNER -> null; // siempre todos los permisos
+                case ADMIN   -> cfg.roleDefaults.admin;
+                case MEMBER  -> cfg.roleDefaults.member;
+                case VISITOR -> cfg.roleDefaults.visitor;
+            };
+            if (names == null) return EnumSet.allOf(Permission.class);
+            Set<Permission> perms = new HashSet<>();
+            for (String name : names) {
+                try { perms.add(Permission.valueOf(name)); } catch (Exception ignored) {}
+            }
+            return perms;
+        }
+        // Fallback hardcoded si el config no está disponible
         Set<Permission> perms = new HashSet<>();
         switch (role) {
-            case OWNER -> {
-                perms.addAll(Arrays.asList(Permission.values()));
-            }
+            case OWNER -> perms.addAll(Arrays.asList(Permission.values()));
             case ADMIN -> {
                 perms.add(Permission.BUILD);
                 perms.add(Permission.INTERACT);
@@ -369,9 +398,10 @@ public class PlotData {
                 try { data.flags.add(Flag.valueOf(flagsList.getString(i))); } catch (Exception ignored) {}
             }
         } else {
-            // Retrocompatibilidad: flags por defecto
-            data.flags.add(Flag.ALLOW_TP);
-            data.flags.add(Flag.GREETINGS);
+            // Retrocompatibilidad: usar flags por defecto del config
+            PlotData tmp = new PlotData();
+            tmp.loadDefaultFlags();
+            data.flags.addAll(tmp.flags);
         }
 
         // Grupos

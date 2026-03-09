@@ -173,7 +173,7 @@ public class PlotScreen extends Screen {
         PlotSize next = data.getSize().next();
         if (next == null) return;
         addDrawableChild(ButtonWidget.builder(
-                Text.literal("Mejorar a " + next.displayName + "  ▶"),
+                Text.literal("Mejorar a " + next.getDisplayName() + "  ▶"),
                 b -> ClientPlayNetworking.send(new ModPackets.UpgradePlotPayload(plotPos)))
                 .dimensions(px + 14, py() + PH - 32, PW - 28, 20).build());
     }
@@ -253,8 +253,8 @@ public class PlotScreen extends Screen {
         int row = y + 26; int gap = 16;
 
         row(ctx, x, row, "Dueño",    data.getOwnerName(),               0x333333, 0x000000); row += gap;
-        row(ctx, x, row, "Nivel",    data.getSize().displayName,        0x333333, 0x006688); row += gap;
-        int sz = data.getSize().radius;
+        row(ctx, x, row, "Nivel",    data.getSize().getDisplayName(),        0x333333, 0x006688); row += gap;
+        int sz = data.getSize().getRadius();
         row(ctx, x, row, "Tamaño",   sz + "x" + sz + " bloques",       0x333333, 0x006688); row += gap;
         row(ctx, x, row, "Tu rol",   myRole.name(),                     0x333333, roleRgb(myRole)); row += gap;
 
@@ -302,7 +302,7 @@ public class PlotScreen extends Screen {
 
         int row = y; int gap = 16;
 
-        row(ctx, x, row, "Nivel actual", cur.displayName + " (" + cur.radius + "x" + cur.radius + ")",
+        row(ctx, x, row, "Nivel actual", cur.getDisplayName() + " (" + cur.getRadius() + "x" + cur.getRadius() + ")",
                 0x333333, 0x006688); row += gap;
 
         if (next == null) {
@@ -311,7 +311,7 @@ public class PlotScreen extends Screen {
             return;
         }
 
-        row(ctx, x, row, "Siguiente", next.displayName + " (" + next.radius + "x" + next.radius + ")",
+        row(ctx, x, row, "Siguiente", next.getDisplayName() + " (" + next.getRadius() + "x" + next.getRadius() + ")",
                 0x333333, 0x005500); row += gap + 4;
 
         ctx.fill(x - 2, row, x + PW - 14, row + 1, 0xFF8B8B8B);

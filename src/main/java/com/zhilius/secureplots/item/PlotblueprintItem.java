@@ -1,4 +1,5 @@
 package com.zhilius.secureplots.item;
+import com.zhilius.secureplots.config.SecurePlotsConfig;
 
 import com.zhilius.secureplots.network.ModPackets;
 import com.zhilius.secureplots.plot.PlotData;
@@ -45,7 +46,7 @@ public class PlotblueprintItem extends Item {
         if (!world.isClient && user instanceof ServerPlayerEntity player) {
             PlotManager manager = PlotManager.getOrCreate((ServerWorld) world);
             PlotData atPos = manager.getPlotAt(player.getBlockPos());
-            boolean isAdmin = player.getCommandTags().contains("plot_admin");
+            boolean isAdmin = player.getCommandTags().contains(SecurePlotsConfig.INSTANCE != null ? SecurePlotsConfig.INSTANCE.adminTag : "plot_admin");
 
             if (player.isSneaking()) {
                 // Shift+click: mostrar rayos del borde
@@ -103,7 +104,7 @@ public class PlotblueprintItem extends Item {
 
             List<Text> lore = new ArrayList<>();
             lore.add(Text.literal("§7X: §f" + c.getX() + "  §7Z: §f" + c.getZ()).styled(s -> s.withItalic(false)));
-            lore.add(Text.literal("§7Nivel: §b" + p.getSize().displayName).styled(s -> s.withItalic(false)));
+            lore.add(Text.literal("§7Nivel: §b" + p.getSize().getDisplayName()).styled(s -> s.withItalic(false)));
             lore.add(Text.literal(tpStatus).styled(s -> s.withItalic(false)));
             lore.add(Text.literal("§eClic: Teleportarte aquí").styled(s -> s.withItalic(false)));
             lore.add(Text.literal("§7Shift+Clic: Abrir menú").styled(s -> s.withItalic(false)));

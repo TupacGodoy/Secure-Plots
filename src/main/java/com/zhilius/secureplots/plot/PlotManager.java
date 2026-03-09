@@ -1,5 +1,6 @@
 package com.zhilius.secureplots.plot;
 
+import com.zhilius.secureplots.config.SecurePlotsConfig;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.nbt.NbtList;
 import net.minecraft.registry.RegistryWrapper;
@@ -13,10 +14,19 @@ import java.util.*;
 public class PlotManager extends PersistentState {
 
     private static final String KEY = "secure_plots_data";
-    private static final int BUFFER = 15;
 
-    private static final List<String> BLOCKED_STRUCTURE_PREFIXES = Arrays.asList(
-            "cobbleverse:", "legendarymonuments:");
+    // Buffer y prefijos bloqueados se leen del config en tiempo de ejecución
+
+    private int getBuffer() {
+        return SecurePlotsConfig.INSTANCE != null ? SecurePlotsConfig.INSTANCE.plotBuffer : 15;
+    }
+
+    private List<String> getBlockedPrefixes() {
+        if (SecurePlotsConfig.INSTANCE != null && SecurePlotsConfig.INSTANCE.blockedStructurePrefixes != null) {
+            return SecurePlotsConfig.INSTANCE.blockedStructurePrefixes;
+        }
+        return Arrays.asList("cobbleverse:", "legendarymonuments:");
+    }
 
     private final Map<BlockPos, PlotData> plots = new HashMap<>();
 
@@ -33,14 +43,15 @@ public class PlotManager extends PersistentState {
     }
 
     public boolean canPlace(BlockPos center, PlotSize size) {
-        int halfSize = size.radius / 2;
-        int minX = center.getX() - halfSize - BUFFER;
-        int maxX = center.getX() + halfSize + BUFFER;
-        int minZ = center.getZ() - halfSize - BUFFER;
-        int maxZ = center.getZ() + halfSize + BUFFER;
+        int buffer = getBuffer();
+        int halfSize = size.getRadius() / 2;
+        int minX = center.getX() - halfSize - buffer;
+        int maxX = center.getX() + halfSize + buffer;
+        int minZ = center.getZ() - halfSize - buffer;
+        int maxZ = center.getZ() + halfSize + buffer;
 
         for (PlotData other : plots.values()) {
-            int otherHalf = other.getSize().radius / 2;
+            int otherHalf = other.getSize().getRadius() / 2;
             int oMinX = other.getCenter().getX() - otherHalf;
             int oMaxX = other.getCenter().getX() + otherHalf;
             int oMinZ = other.getCenter().getZ() - otherHalf;
@@ -93,7 +104,7 @@ public class PlotManager extends PersistentState {
     }
 
     public boolean isInsidePlot(BlockPos pos, PlotData data) {
-        int half = data.getSize().radius / 2;
+        int half = data.getSize().getRadius() / 2;
         BlockPos c = data.getCenter();
         return pos.getX() >= c.getX() - half && pos.getX() <= c.getX() + half
                 && pos.getZ() >= c.getZ() - half && pos.getZ() <= c.getZ() + half;

@@ -153,7 +153,7 @@ public class PlotHologram {
                 ? data.getPlotName() : "Parcela Protegida";
         PlotSize next = data.getSize().next();
         String nextLine = (next != null)
-                ? "\u00a77Siguiente: " + tierColorCode(next.tier) + "\u00a7l" + next.displayName
+                ? "\u00a77Siguiente: " + tierColorCode(next.tier) + "\u00a7l" + next.getDisplayName()
                 : "\u00a76\u00a7lNivel M\u00e1ximo";
 
         player.sendMessage(net.minecraft.text.Text.literal(
@@ -163,9 +163,9 @@ public class PlotHologram {
         player.sendMessage(net.minecraft.text.Text.literal(
             "\u00a77Due\u00f1o:    \u00a7f" + data.getOwnerName()), false);
         player.sendMessage(net.minecraft.text.Text.literal(
-            "\u00a77Nivel:    " + tc + "\u00a7l" + data.getSize().displayName), false);
+            "\u00a77Nivel:    " + tc + "\u00a7l" + data.getSize().getDisplayName()), false);
         player.sendMessage(net.minecraft.text.Text.literal(
-            "\u00a77Tama\u00f1o:   \u00a7b" + data.getSize().radius + "x" + data.getSize().radius), false);
+            "\u00a77Tama\u00f1o:   \u00a7b" + data.getSize().getRadius() + "x" + data.getSize().getRadius()), false);
         player.sendMessage(net.minecraft.text.Text.literal(
             "\u00a77Miembros: \u00a7a" + data.getMembers().size()), false);
         player.sendMessage(net.minecraft.text.Text.literal(
@@ -207,18 +207,18 @@ public class PlotHologram {
         // Arrow: thin vertical bar body + triangle tip (unicode)
         String ntc = next != null ? tierColorCode(next.tier) : "";
         String nextLine = (next != null)
-                ? "\u00a7e\u2b06 \u00a77Siguiente: " + ntc + "\u00a7l" + next.displayName
+                ? "\u00a7e\u2b06 \u00a77Siguiente: " + ntc + "\u00a7l" + next.getDisplayName()
                 : "\u00a76\u00a7l\u2605 Nivel Maximo \u2605";
 
         // Measure each visible line in Minecraft font pixels
         // § codes are stripped inside mcWidth()
         String raw_name    = " " + name;
         String raw_dueno   = " Dueño:    " + data.getOwnerName();
-        String raw_nivel   = " Nivel:    " + data.getSize().displayName;
-        String raw_tamano  = " Tamaño:   " + data.getSize().radius + "x" + data.getSize().radius;
+        String raw_nivel   = " Nivel:    " + data.getSize().getDisplayName();
+        String raw_tamano  = " Tamaño:   " + data.getSize().getRadius() + "x" + data.getSize().getRadius();
         String raw_members = " Miembros: " + data.getMembers().size();
         String raw_next    = next != null
-                ? " ⬡ Siguiente: " + next.displayName
+                ? " ⬡ Siguiente: " + next.getDisplayName()
                 : " ★ Nivel Maximo ★";
 
         int maxPx = 0;
@@ -240,8 +240,8 @@ public class PlotHologram {
             tc + "\u00a7l " + name + NL +
             divider + NL +
             "\u00a77 Due\u00f1o:    \u00a7f" + data.getOwnerName() + NL +
-            "\u00a77 Nivel:    " + tc + "\u00a7l" + data.getSize().displayName + NL +
-            "\u00a77 Tama\u00f1o:   \u00a7b" + data.getSize().radius + "x" + data.getSize().radius + NL +
+            "\u00a77 Nivel:    " + tc + "\u00a7l" + data.getSize().getDisplayName() + NL +
+            "\u00a77 Tama\u00f1o:   \u00a7b" + data.getSize().getRadius() + "x" + data.getSize().getRadius() + NL +
             "\u00a77 Miembros: \u00a7a" + data.getMembers().size() + NL +
             divider + NL +
             " " + nextLine + NL +
