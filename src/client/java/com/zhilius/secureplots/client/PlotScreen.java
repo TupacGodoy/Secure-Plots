@@ -24,6 +24,7 @@ public class PlotScreen extends Screen {
     private static final int TAB_INFO    = 0;
     private static final int TAB_MEMBERS = 1;
     private static final int TAB_UPGRADE = 2;
+    private static final int TAB_CREATIVE = 3;
     private int activeTab = TAB_INFO;
 
     private TextFieldWidget nameField;
@@ -56,19 +57,22 @@ public class PlotScreen extends Screen {
             return;
         }
 
-        int tw = PW / 3;
+        int tw = PW / 4;
         addDrawableChild(ButtonWidget.builder(Text.literal("Info"), b -> { activeTab = TAB_INFO; selectedMember = null; clearAndInit(); })
-                .dimensions(px,        py - 20, tw - 1, 20).build());
+                .dimensions(px,          py - 20, tw - 1, 20).build());
         addDrawableChild(ButtonWidget.builder(Text.literal("Miembros"), b -> { activeTab = TAB_MEMBERS; selectedMember = null; clearAndInit(); })
-                .dimensions(px + tw,   py - 20, tw - 1, 20).build());
+                .dimensions(px + tw,     py - 20, tw - 1, 20).build());
         addDrawableChild(ButtonWidget.builder(Text.literal("Mejorar"), b -> { activeTab = TAB_UPGRADE; selectedMember = null; clearAndInit(); })
-                .dimensions(px + tw*2, py - 20, tw,     20).build());
+                .dimensions(px + tw * 2, py - 20, tw - 1, 20).build());
+        addDrawableChild(ButtonWidget.builder(Text.literal("Creativo"), b -> { activeTab = TAB_CREATIVE; selectedMember = null; clearAndInit(); })
+                .dimensions(px + tw * 3, py - 20, tw,     20).build());
 
         int cy = py + 28;
 
-        if (activeTab == TAB_INFO)    initInfoTab(px, cy);
-        if (activeTab == TAB_MEMBERS) initMembersTab(px, cy);
-        if (activeTab == TAB_UPGRADE) initUpgradeTab(px, cy);
+        if (activeTab == TAB_INFO)     initInfoTab(px, cy);
+        if (activeTab == TAB_MEMBERS)  initMembersTab(px, cy);
+        if (activeTab == TAB_UPGRADE)  initUpgradeTab(px, cy);
+        if (activeTab == TAB_CREATIVE) initCreativeTab(px, cy);
     }
 
     // ── PERMISSIONS SUB-SCREEN ───────────────────────────────────────────────
@@ -167,6 +171,21 @@ public class PlotScreen extends Screen {
         }
     }
 
+    // ── CREATIVO ─────────────────────────────────────────────────────────────
+    private void initCreativeTab(int px, int cy) {
+        // Tiers: 0=Bronze, 1=Gold, 2=Emerald, 3=Diamond, 4=Netherite
+        String[] tierNames  = { "Bronce", "Oro", "Esmeralda", "Diamante", "Netherita" };
+        String[] tierColors = { "§6", "§e", "§a", "§b", "§7" };
+        int btnW = PW - 28;
+        for (int i = 0; i < tierNames.length; i++) {
+            final int tier = i;
+            String label = tierColors[i] + "⬛ Bloque de Parcela — " + tierNames[i];
+            addDrawableChild(ButtonWidget.builder(Text.literal(label), b ->
+                ClientPlayNetworking.send(new ModPackets.GiveBlockPayload(tier))
+            ).dimensions(px + 12, cy + i * 24, btnW, 20).build());
+        }
+    }
+
     // ── MEJORAR ──────────────────────────────────────────────────────────────
     private void initUpgradeTab(int px, int cy) {
         if (myRole != PlotData.Role.OWNER) return;
@@ -207,9 +226,9 @@ public class PlotScreen extends Screen {
 
         // Tab highlight (only when not in sub-screen)
         if (selectedMember == null) {
-            int tw = PW / 3;
+            int tw = PW / 4;
             int tabX = px + activeTab * tw;
-            ctx.fill(tabX, py - 20, tabX + tw - (activeTab == 2 ? 0 : 1), py, 0x55FFFFFF);
+            ctx.fill(tabX, py - 20, tabX + tw - (activeTab == 3 ? 0 : 1), py, 0x55FFFFFF);
         }
 
         int cy = py + 28;
@@ -218,9 +237,10 @@ public class PlotScreen extends Screen {
         if (selectedMember != null) {
             renderPermissions(ctx, x, cy);
         } else {
-            if (activeTab == TAB_INFO)    renderInfo(ctx, x, cy);
-            if (activeTab == TAB_MEMBERS) renderMembers(ctx, x, cy);
-            if (activeTab == TAB_UPGRADE) renderUpgrade(ctx, x, cy);
+            if (activeTab == TAB_INFO)     renderInfo(ctx, x, cy);
+            if (activeTab == TAB_MEMBERS)  renderMembers(ctx, x, cy);
+            if (activeTab == TAB_UPGRADE)  renderUpgrade(ctx, x, cy);
+            if (activeTab == TAB_CREATIVE) renderCreative(ctx, x, cy);
         }
 
         super.render(ctx, mouseX, mouseY, delta);
@@ -342,6 +362,16 @@ public class PlotScreen extends Screen {
             ctx.drawTextWithShadow(textRenderer,
                     Text.literal("Solo el dueño puede mejorar."), x, py() + PH - 40, 0xAA0000);
         }
+    }
+
+    // ── Render Creativo ──────────────────────────────────────────────────────
+    private void renderCreative(DrawContext ctx, int x, int y) {
+        ctx.drawTextWithShadow(textRenderer,
+            Text.literal("Obtener bloques de parcela:").formatted(Formatting.DARK_GRAY),
+            x, y - 14, 0x555555);
+        ctx.drawTextWithShadow(textRenderer,
+            Text.literal("(Solo OPs / modo creativo)").formatted(Formatting.DARK_GRAY),
+            x, y - 4, 0x888888);
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────

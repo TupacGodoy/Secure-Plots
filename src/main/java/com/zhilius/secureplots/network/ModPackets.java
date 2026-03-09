@@ -121,6 +121,15 @@ public class ModPackets {
         @Override public Id<? extends CustomPayload> getId() { return ID; }
     }
 
+    /** C→S: el owner pide que el server le dé un plot block por tier (modo creativo). */
+    public record GiveBlockPayload(int tier) implements CustomPayload {
+        public static final Id<GiveBlockPayload> ID = new Id<>(Identifier.of(SecurePlots.MOD_ID, "give_block"));
+        public static final PacketCodec<PacketByteBuf, GiveBlockPayload> CODEC = PacketCodec.of(
+                (value, buf) -> buf.writeInt(value.tier()),
+                buf -> new GiveBlockPayload(buf.readInt()));
+        @Override public Id<? extends CustomPayload> getId() { return ID; }
+    }
+
     public static void registerPayloads() {
         PayloadTypeRegistry.playS2C().register(OpenPlotScreenPayload.ID, OpenPlotScreenPayload.CODEC);
         PayloadTypeRegistry.playS2C().register(ShowPlotBorderPayload.ID, ShowPlotBorderPayload.CODEC);
@@ -131,6 +140,7 @@ public class ModPackets {
         PayloadTypeRegistry.playC2S().register(AddMemberPayload.ID, AddMemberPayload.CODEC);
         PayloadTypeRegistry.playC2S().register(SetPermissionPayload.ID, SetPermissionPayload.CODEC);
         PayloadTypeRegistry.playC2S().register(RemoveMemberPayload.ID, RemoveMemberPayload.CODEC);
+        PayloadTypeRegistry.playC2S().register(GiveBlockPayload.ID, GiveBlockPayload.CODEC);
     }
 
     public static void sendShowPlotInfo(ServerPlayerEntity player, BlockPos pos, PlotData data) {
@@ -297,6 +307,29 @@ public class ModPackets {
                     manager.markDirty();
                     sendOpenPlotScreen(player, pos, data);
                 } catch (Exception ignored) {}
+            });
+        });
+
+        // Give plot block (creative tab) — only ops or players with creative mode
+        ServerPlayNetworking.registerGlobalReceiver(GiveBlockPayload.ID, (payload, context) -> {
+            ServerPlayerEntity player = context.player();
+            int tier = payload.tier();
+            context.server().execute(() -> {
+                // Only allow if the player is an operator (permission level 2+) or in creative
+                boolean isOp = player.hasPermissionLevel(2);
+                boolean isCreative = player.isCreative();
+                if (!isOp && !isCreative) {
+                    player.sendMessage(net.minecraft.text.Text.literal("✗ Solo OPs o jugadores en creativo pueden usar esto.")
+                            .formatted(net.minecraft.util.Formatting.RED), false);
+                    return;
+                }
+                net.minecraft.block.Block block = com.zhilius.secureplots.block.ModBlocks.fromTier(tier);
+                net.minecraft.item.ItemStack stack = new net.minecraft.item.ItemStack(block.asItem(), 1);
+                if (!player.giveItemStack(stack)) {
+                    player.dropItem(stack, false);
+                }
+                player.sendMessage(net.minecraft.text.Text.literal("✔ Bloque de parcela obtenido.")
+                        .formatted(net.minecraft.util.Formatting.GREEN), true);
             });
         });
     }
