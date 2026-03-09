@@ -237,6 +237,7 @@ public class PlotHologram {
 
         String text =
             border + NL +
+            divider + NL +
             tc + "\u00a7l " + name + NL +
             divider + NL +
             "\u00a77 Due\u00f1o:    \u00a7f" + data.getOwnerName() + NL +

@@ -31,7 +31,7 @@ import java.util.*;
 public class PlotMenuHandler extends GenericContainerScreenHandler {
 
     public enum MenuPage { INFO, MEMBERS, GLOBAL_PERMS, UPGRADE }
-    public enum PendingAction { NONE, RENAME, ADD_MEMBER, CREATE_GROUP }
+    public enum PendingAction { NONE, RENAME, ADD_MEMBER, CREATE_GROUP, SET_ENTER_MESSAGE, SET_EXIT_MESSAGE }
 
     private final BlockPos plotPos;
     private PlotData data;
@@ -44,6 +44,9 @@ public class PlotMenuHandler extends GenericContainerScreenHandler {
     private UUID viewingMemberUuid = null;
     // Para sub-página de grupos
     private String viewingGroupName = null;
+    // Paginación de permisos de miembro
+    private int permPage = 0;
+    private static final int PERMS_PER_PAGE = 14;
 
     private static final int ROWS = 6;
     private static final int SIZE = ROWS * 9;
@@ -145,6 +148,17 @@ public class PlotMenuHandler extends GenericContainerScreenHandler {
         if (myRole == PlotData.Role.OWNER) {
             menuInv.setStack(29, namedLore(Items.ANVIL,
                 "§6✏ Renombrar parcela", "§7Clic para cambiar el nombre"));
+
+            String em = data.getEnterMessage();
+            String xm = data.getExitMessage();
+            menuInv.setStack(37, namedLore(Items.GREEN_DYE,
+                "§a💬 Mensaje al entrar",
+                em.isEmpty() ? "§8Sin mensaje" : "§f" + em,
+                "§7Clic para editar"));
+            menuInv.setStack(38, namedLore(Items.RED_DYE,
+                "§c💬 Mensaje al salir",
+                xm.isEmpty() ? "§8Sin mensaje" : "§f" + xm,
+                "§7Clic para editar"));
         }
 
         // TP a la plot (si el flag está activo o es owner/admin)
@@ -231,14 +245,29 @@ public class PlotMenuHandler extends GenericContainerScreenHandler {
 
         menuInv.setStack(12, namedLore(Items.ARROW, "§7← Volver", "§8Clic para regresar"));
 
-        // Mostrar toggle por cada permiso (excepto OWNER-only)
-        PlotData.Permission[] perms = PlotData.Permission.values();
+        // Paginación
+        PlotData.Permission[] allPerms = PlotData.Permission.values();
+        int totalPages = (int) Math.ceil((double) allPerms.length / PERMS_PER_PAGE);
+        permPage = Math.max(0, Math.min(permPage, totalPages - 1));
+        int start = permPage * PERMS_PER_PAGE;
+        int end   = Math.min(start + PERMS_PER_PAGE, allPerms.length);
+
+        // Botones de navegación de página
+        if (permPage > 0)
+            menuInv.setStack(14, namedLore(Items.SPECTRAL_ARROW, "§e← Página anterior", "§7Página " + permPage + "/" + totalPages));
+        if (permPage < totalPages - 1)
+            menuInv.setStack(16, namedLore(Items.SPECTRAL_ARROW, "§ePágina siguiente →", "§7Página " + (permPage + 2) + "/" + totalPages));
+
+        menuInv.setStack(13, namedLore(Items.PAPER, "§7Página §e" + (permPage + 1) + "§7/§e" + totalPages,
+            "§8" + allPerms.length + " permisos en total"));
+
         int[] slots = {19,20,21,22,23,24,25, 28,29,30,31,32,33,34};
         Set<PlotData.Permission> current = data.getPermsOf(uuid);
-        for (int i = 0; i < perms.length && i < slots.length; i++) {
-            PlotData.Permission perm = perms[i];
+        int si = 0;
+        for (int i = start; i < end && si < slots.length; i++, si++) {
+            PlotData.Permission perm = allPerms[i];
             boolean has = current.contains(perm);
-            menuInv.setStack(slots[i], namedLore(
+            menuInv.setStack(slots[si], namedLore(
                 has ? Items.LIME_DYE : Items.GRAY_DYE,
                 (has ? "§a✔ " : "§c✗ ") + permLabel(perm),
                 "§7" + permDesc(perm),
@@ -252,6 +281,25 @@ public class PlotMenuHandler extends GenericContainerScreenHandler {
                 "§eRol: " + roleColor(role) + role.name(),
                 "§7Clic para cambiar el rol",
                 "§8Cicla: MEMBER → ADMIN → MEMBER"));
+        }
+
+        // Grupos — mostrar grupos a los que pertenece y permitir agregar/quitar
+        boolean canManageGroups = data.hasPermission(player.getUuid(), PlotData.Permission.MANAGE_GROUPS);
+        List<PlotData.PermissionGroup> allGroups = data.getGroups();
+        if (!allGroups.isEmpty()) {
+            int[] groupSlots = {37, 38, 39, 40, 41, 42, 43};
+            int gi = 0;
+            for (PlotData.PermissionGroup g : allGroups) {
+                if (gi >= groupSlots.length) break;
+                boolean inGroup = g.members.contains(uuid);
+                menuInv.setStack(groupSlots[gi], namedLore(
+                    inGroup ? Items.PURPLE_STAINED_GLASS_PANE : Items.GRAY_STAINED_GLASS_PANE,
+                    (inGroup ? "§d✔ " : "§8✗ ") + "Grupo: §d" + g.name,
+                    inGroup ? "§7Miembro de este grupo" : "§8No pertenece a este grupo",
+                    canManageGroups ? (inGroup ? "§cClic para quitar del grupo" : "§aClic para agregar al grupo") : "§8Sin permisos de grupos"
+                ));
+                gi++;
+            }
         }
     }
 
@@ -431,6 +479,14 @@ public class PlotMenuHandler extends GenericContainerScreenHandler {
             if (clicked.getItem() == Items.ANVIL && myRole == PlotData.Role.OWNER) {
                 openSignForInput(PendingAction.RENAME); return;
             }
+            // Mensaje al entrar
+            if (clicked.getItem() == Items.GREEN_DYE && myRole == PlotData.Role.OWNER) {
+                openSignForInput(PendingAction.SET_ENTER_MESSAGE); return;
+            }
+            // Mensaje al salir
+            if (clicked.getItem() == Items.RED_DYE && myRole == PlotData.Role.OWNER) {
+                openSignForInput(PendingAction.SET_EXIT_MESSAGE); return;
+            }
             // TP
             if (clicked.getItem() == Items.ENDER_PEARL) {
                 handleTp(); return;
@@ -484,7 +540,7 @@ public class PlotMenuHandler extends GenericContainerScreenHandler {
                         // Buscar UUID y abrir sub-página
                         for (UUID uuid : data.getMembers().keySet()) {
                             if (data.getMemberName(uuid).equalsIgnoreCase(memberName)) {
-                                viewingMemberUuid = uuid; refreshMenu(); return;
+                                viewingMemberUuid = uuid; permPage = 0; refreshMenu(); return;
                             }
                         }
                     }
@@ -539,32 +595,67 @@ public class PlotMenuHandler extends GenericContainerScreenHandler {
 
     private void handleMemberPermsClick(int slotIndex, int button, ItemStack clicked) {
         if (clicked.getItem() == Items.ARROW) {
-            viewingMemberUuid = null; refreshMenu(); return;
+            viewingMemberUuid = null; permPage = 0; refreshMenu(); return;
         }
+        // Navegación de páginas
+        if (clicked.getItem() == Items.SPECTRAL_ARROW) {
+            Text nameText = clicked.get(DataComponentTypes.CUSTOM_NAME);
+            String label = nameText != null ? nameText.getString() : "";
+            if (label.contains("anterior")) permPage = Math.max(0, permPage - 1);
+            else permPage++;
+            refreshMenu(); return;
+        }
+
         boolean canEdit = data.hasPermission(player.getUuid(), PlotData.Permission.MANAGE_PERMS);
-        if (!canEdit) return;
+        boolean canManageGroups = data.hasPermission(player.getUuid(), PlotData.Permission.MANAGE_GROUPS);
 
         // Cambiar rol
-        if (clicked.getItem() == Items.EXPERIENCE_BOTTLE) {
+        if (clicked.getItem() == Items.EXPERIENCE_BOTTLE && canEdit) {
             cycleRole(viewingMemberUuid); return;
         }
 
-        // Toggle permiso
-        PlotData.Permission[] perms = PlotData.Permission.values();
+        // Toggle grupo (fila inferior: slots 37-43)
+        if (canManageGroups) {
+            int[] groupSlots = {37, 38, 39, 40, 41, 42, 43};
+            List<PlotData.PermissionGroup> allGroups = data.getGroups();
+            for (int i = 0; i < allGroups.size() && i < groupSlots.length; i++) {
+                if (slotIndex == groupSlots[i]) {
+                    if (!(player.getWorld() instanceof ServerWorld sw)) return;
+                    PlotManager manager = PlotManager.getOrCreate(sw);
+                    PlotData fresh = manager.getPlot(plotPos);
+                    if (fresh == null) return;
+                    PlotData.PermissionGroup g = fresh.getGroup(allGroups.get(i).name);
+                    if (g == null) return;
+                    if (g.members.contains(viewingMemberUuid)) g.members.remove(viewingMemberUuid);
+                    else g.members.add(viewingMemberUuid);
+                    manager.markDirty();
+                    this.data = fresh;
+                    playSound(SoundEvents.UI_BUTTON_CLICK.value(), 0.4f, 1.2f);
+                    refreshMenu(); return;
+                }
+            }
+        }
+
+        if (!canEdit) return;
+
+        // Toggle permiso — con paginación
+        PlotData.Permission[] allPerms = PlotData.Permission.values();
+        int start = permPage * PERMS_PER_PAGE;
+        int end   = Math.min(start + PERMS_PER_PAGE, allPerms.length);
         int[] slots = {19,20,21,22,23,24,25, 28,29,30,31,32,33,34};
-        for (int i = 0; i < perms.length && i < slots.length; i++) {
-            if (slotIndex == slots[i]) {
+        int si = 0;
+        for (int i = start; i < end && si < slots.length; i++, si++) {
+            if (slotIndex == slots[si]) {
                 if (!(player.getWorld() instanceof ServerWorld sw)) return;
                 PlotManager manager = PlotManager.getOrCreate(sw);
                 PlotData fresh = manager.getPlot(plotPos);
                 if (fresh == null) return;
-                boolean current = fresh.hasPermission(viewingMemberUuid, perms[i]);
-                fresh.setPermission(viewingMemberUuid, perms[i], !current);
+                boolean current = fresh.hasPermission(viewingMemberUuid, allPerms[i]);
+                fresh.setPermission(viewingMemberUuid, allPerms[i], !current);
                 manager.markDirty();
                 this.data = fresh;
                 playSound(SoundEvents.UI_BUTTON_CLICK.value(), 0.4f, 1.2f);
-                refreshMenu();
-                return;
+                refreshMenu(); return;
             }
         }
     }
@@ -645,10 +736,12 @@ public class PlotMenuHandler extends GenericContainerScreenHandler {
         if (!(player.getWorld() instanceof ServerWorld sw)) return;
         sw.getServer().execute(() -> {
             switch (action) {
-                case RENAME       -> SignInputManager.openForRename(player, plotPos);
-                case ADD_MEMBER   -> SignInputManager.openForAddMember(player, plotPos);
-                case CREATE_GROUP -> SignInputManager.openForCreateGroup(player, plotPos);
-                default           -> {}
+                case RENAME             -> SignInputManager.openForRename(player, plotPos);
+                case ADD_MEMBER         -> SignInputManager.openForAddMember(player, plotPos);
+                case CREATE_GROUP       -> SignInputManager.openForCreateGroup(player, plotPos);
+                case SET_ENTER_MESSAGE  -> SignInputManager.openForEnterMessage(player, plotPos);
+                case SET_EXIT_MESSAGE   -> SignInputManager.openForExitMessage(player, plotPos);
+                default                 -> {}
             }
         });
     }
@@ -761,32 +854,84 @@ public class PlotMenuHandler extends GenericContainerScreenHandler {
     private static String permLabel(PlotData.Permission perm) {
         return switch (perm) {
             case BUILD          -> "Construir";
+            case BREAK          -> "Romper";
+            case PLACE          -> "Colocar";
             case INTERACT       -> "Interactuar";
             case CONTAINERS     -> "Contenedores";
+            case USE_BEDS       -> "Usar Camas";
+            case USE_CRAFTING   -> "Mesa de Crafteo";
+            case USE_ENCHANTING -> "Mesa de Encantamiento";
+            case USE_ANVIL      -> "Yunque";
+            case USE_FURNACE    -> "Hornos";
+            case USE_BREWING    -> "Pociones";
+            case ATTACK_MOBS    -> "Atacar Mobs";
+            case ATTACK_ANIMALS -> "Atacar Animales";
             case PVP            -> "PvP";
+            case RIDE_ENTITIES  -> "Montar Entidades";
+            case INTERACT_MOBS  -> "Interactuar Mobs";
+            case LEASH_MOBS     -> "Atar Mobs";
+            case SHEAR_MOBS     -> "Esquilar";
+            case MILK_MOBS      -> "Ordeñar";
+            case CROP_TRAMPLING -> "Pisotear Cultivos";
+            case PICKUP_ITEMS   -> "Recoger Ítems";
+            case DROP_ITEMS     -> "Tirar Ítems";
+            case BREAK_CROPS    -> "Romper Cultivos";
+            case PLANT_SEEDS    -> "Plantar Semillas";
+            case USE_BONEMEAL   -> "Hueso de Polvo";
+            case BREAK_DECOR    -> "Romper Decoración";
+            case DETONATE_TNT   -> "Detonar TNT";
+            case GRIEFING       -> "Griefing";
+            case TP             -> "Teleportar";
+            case FLY            -> "Volar";
+            case ENTER          -> "Entrar";
+            case CHAT           -> "Chat";
+            case COMMAND_USE    -> "Comandos";
             case MANAGE_MEMBERS -> "Gestionar Miembros";
             case MANAGE_PERMS   -> "Gestionar Permisos";
             case MANAGE_FLAGS   -> "Gestionar Flags";
             case MANAGE_GROUPS  -> "Gestionar Grupos";
-            case TP             -> "Teleportar";
-            case FLY            -> "Volar";
-            case ENTER          -> "Entrar";
         };
     }
 
     private static String permDesc(PlotData.Permission perm) {
         return switch (perm) {
             case BUILD          -> "Colocar y romper bloques";
+            case BREAK          -> "Solo romper bloques";
+            case PLACE          -> "Solo colocar bloques";
             case INTERACT       -> "Palancas, puertas, botones";
             case CONTAINERS     -> "Abrir cofres e inventarios";
+            case USE_BEDS       -> "Usar camas para dormir";
+            case USE_CRAFTING   -> "Usar mesas de crafteo";
+            case USE_ENCHANTING -> "Usar mesas de encantamiento";
+            case USE_ANVIL      -> "Usar yunques";
+            case USE_FURNACE    -> "Usar hornos y ahumadores";
+            case USE_BREWING    -> "Usar soportes de pociones";
+            case ATTACK_MOBS    -> "Atacar mobs hostiles";
+            case ATTACK_ANIMALS -> "Atacar animales pasivos";
             case PVP            -> "Atacar a otros jugadores";
+            case RIDE_ENTITIES  -> "Montar caballos, botes, etc.";
+            case INTERACT_MOBS  -> "Comerciar, nombrar mobs";
+            case LEASH_MOBS     -> "Atar y soltar mobs con correa";
+            case SHEAR_MOBS     -> "Esquilar ovejas";
+            case MILK_MOBS      -> "Ordeñar vacas y cabras";
+            case CROP_TRAMPLING -> "Pisar y destruir cultivos";
+            case PICKUP_ITEMS   -> "Recoger ítems del suelo";
+            case DROP_ITEMS     -> "Tirar ítems al suelo";
+            case BREAK_CROPS    -> "Romper plantas y cultivos";
+            case PLANT_SEEDS    -> "Plantar semillas y saplings";
+            case USE_BONEMEAL   -> "Usar hueso de polvo en plantas";
+            case BREAK_DECOR    -> "Romper flores y decoraciones";
+            case DETONATE_TNT   -> "Encender y detonar TNT";
+            case GRIEFING       -> "Daño por creepers/wither/etc.";
+            case TP             -> "Usar /sp tp para llegar aquí";
+            case FLY            -> "Volar dentro de la parcela";
+            case ENTER          -> "Entrar al área de la parcela";
+            case CHAT           -> "Chatear dentro de la parcela";
+            case COMMAND_USE    -> "Usar comandos en la parcela";
             case MANAGE_MEMBERS -> "Agregar y remover miembros";
             case MANAGE_PERMS   -> "Cambiar permisos de miembros";
             case MANAGE_FLAGS   -> "Cambiar flags globales";
             case MANAGE_GROUPS  -> "Crear y editar grupos";
-            case TP             -> "Usar /sp tp para llegar aquí";
-            case FLY            -> "Volar dentro de la parcela";
-            case ENTER          -> "Entrar al área de la parcela";
         };
     }
 

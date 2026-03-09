@@ -20,22 +20,49 @@ public class PlotData {
      */
     public enum Permission {
         // Construcción
-        BUILD,          // colocar/romper bloques
+        BUILD,              // colocar/romper bloques
+        BREAK,              // solo romper bloques
+        PLACE,              // solo colocar bloques
         // Interacción
-        INTERACT,       // palancas, puertas, botones
-        CONTAINERS,     // cofres, baúles, etc.
-        // PvP
-        PVP,            // atacar jugadores dentro de la plot
-        // Admin / gestión
-        MANAGE_MEMBERS, // agregar/remover miembros (equiv. ADMIN)
-        MANAGE_PERMS,   // cambiar permisos de miembros
-        MANAGE_FLAGS,   // cambiar flags globales
-        MANAGE_GROUPS,  // crear/editar grupos de la plot
-        // Teleport
-        TP,             // teletransportarse a la plot (si está habilitado)
+        INTERACT,           // palancas, puertas, botones
+        CONTAINERS,         // cofres, baúles, etc.
+        USE_BEDS,           // usar camas
+        USE_CRAFTING,       // usar mesas de crafteo
+        USE_ENCHANTING,     // usar mesas de encantamiento
+        USE_ANVIL,          // usar yunques
+        USE_FURNACE,        // usar hornos
+        USE_BREWING,        // usar soportes para pociones
+        // Entidades
+        ATTACK_MOBS,        // atacar mobs
+        ATTACK_ANIMALS,     // atacar animales pasivos
+        PVP,                // atacar jugadores dentro de la plot
+        RIDE_ENTITIES,      // montar entidades (caballos, botes)
+        INTERACT_MOBS,      // interactuar con mobs (comerciantes, etc.)
+        LEASH_MOBS,         // atar/soltar mobs con correa
+        SHEAR_MOBS,         // esquilar ovejas
+        MILK_MOBS,          // ordeñar vacas
+        // Naturaleza
+        CROP_TRAMPLING,     // pisotear cultivos
+        PICKUP_ITEMS,       // recoger ítems del suelo
+        DROP_ITEMS,         // tirar ítems al suelo
+        BREAK_CROPS,        // romper plantas/cultivos
+        PLANT_SEEDS,        // plantar semillas
+        USE_BONEMEAL,       // usar hueso de polvo
+        BREAK_DECOR,        // romper decoraciones (flores, etc.)
+        // Explosivos
+        DETONATE_TNT,       // detonar TNT
+        GRIEFING,           // creepers/wither/etc. hacen daño
         // Misc
-        FLY,            // volar dentro de la plot (si el servidor lo soporta)
-        ENTER           // entrar al área de la plot
+        TP,                 // teletransportarse a la plot
+        FLY,                // volar dentro de la plot
+        ENTER,              // entrar al área de la plot
+        CHAT,               // enviar mensajes en el chat mientras está en la plot
+        COMMAND_USE,        // usar comandos dentro de la plot
+        // Admin / gestión
+        MANAGE_MEMBERS,     // agregar/remover miembros
+        MANAGE_PERMS,       // cambiar permisos de miembros
+        MANAGE_FLAGS,       // cambiar flags globales
+        MANAGE_GROUPS,      // crear/editar grupos de la plot
     }
 
     // ── Flags globales ────────────────────────────────────────────────────────
@@ -106,6 +133,8 @@ public class PlotData {
     private List<PermissionGroup> groups = new ArrayList<>();
 
     private String plotName;
+    private String enterMessage = "";   // mensaje al entrar a la parcela (vacío = sin mensaje)
+    private String exitMessage  = "";   // mensaje al salir de la parcela (vacío = sin mensaje)
 
     // ── Constructores ─────────────────────────────────────────────────────────
     public PlotData(UUID ownerId, String ownerName, BlockPos center, PlotSize size, long currentTick) {
@@ -133,6 +162,10 @@ public class PlotData {
     public void setHasRank(boolean hasRank)     { this.hasRank = hasRank; }
     public String getPlotName()                 { return plotName; }
     public void setPlotName(String plotName)    { this.plotName = plotName; }
+    public String getEnterMessage()             { return enterMessage != null ? enterMessage : ""; }
+    public void setEnterMessage(String msg)     { this.enterMessage = msg != null ? msg : ""; }
+    public String getExitMessage()              { return exitMessage != null ? exitMessage : ""; }
+    public void setExitMessage(String msg)      { this.exitMessage = msg != null ? msg : ""; }
     public long getPlacedAtTick()               { return placedAtTick; }
     public long getLastOwnerSeenTick()          { return lastOwnerSeenTick; }
     public void setLastOwnerSeenTick(long tick) { this.lastOwnerSeenTick = tick; }
@@ -330,6 +363,8 @@ public class PlotData {
         nbt.putLong("placedAt", placedAtTick);
         nbt.putLong("lastOwnerSeen", lastOwnerSeenTick);
         nbt.putString("plotName", plotName);
+        nbt.putString("enterMessage", enterMessage != null ? enterMessage : "");
+        nbt.putString("exitMessage",  exitMessage  != null ? exitMessage  : "");
 
         // Miembros
         NbtList membersList = new NbtList();
@@ -369,6 +404,8 @@ public class PlotData {
         data.placedAtTick = nbt.getLong("placedAt");
         data.lastOwnerSeenTick = nbt.contains("lastOwnerSeen") ? nbt.getLong("lastOwnerSeen") : data.placedAtTick;
         data.plotName = nbt.getString("plotName");
+        data.enterMessage = nbt.contains("enterMessage") ? nbt.getString("enterMessage") : "";
+        data.exitMessage  = nbt.contains("exitMessage")  ? nbt.getString("exitMessage")  : "";
 
         // Miembros
         NbtList membersList = nbt.getList("members", 10);

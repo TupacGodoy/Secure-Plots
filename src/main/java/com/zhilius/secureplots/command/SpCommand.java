@@ -35,6 +35,10 @@ public class SpCommand {
         for (String name : new String[]{"sp", "secureplots"}) {
             dispatcher.register(CommandManager.literal(name)
 
+                // /sp help
+                .then(CommandManager.literal("help")
+                        .executes(ctx -> executeHelp(ctx.getSource())))
+
                 // /sp view
                 .then(CommandManager.literal("view")
                         .executes(ctx -> executeView(ctx.getSource())))
@@ -168,16 +172,36 @@ public class SpCommand {
                                                                 StringArgumentType.getString(ctx, "group"),
                                                                 StringArgumentType.getString(ctx, "perm"),
                                                                 BoolArgumentType.getBool(ctx, "value"))))))))
-
-                // /sp clearholos
-                .then(CommandManager.literal("clearholos")
-                        .executes(ctx -> executeClearHolos(ctx.getSource())))
-
-                // /sp testholo
-                .then(CommandManager.literal("testholo")
-                        .executes(ctx -> executeTestHolo(ctx.getSource())))
             );
         }
+    }
+
+    // ── /sp help ──────────────────────────────────────────────────────────────
+    private static int executeHelp(ServerCommandSource source) {
+        ServerPlayerEntity player = source.getPlayer();
+        if (player == null) return 0;
+        player.sendMessage(Text.literal("§e═══════════════════════════════"), false);
+        player.sendMessage(Text.literal("  §6§l🛡 Secure Plots — Comandos").formatted(Formatting.BOLD), false);
+        player.sendMessage(Text.literal("§e═══════════════════════════════"), false);
+        player.sendMessage(Text.literal("§e/sp view §7— Muestra el borde de tu parcela más cercana"), false);
+        player.sendMessage(Text.literal("§e/sp list §7— Lista todas tus parcelas"), false);
+        player.sendMessage(Text.literal("§e/sp info [parcela] §7— Info de una parcela"), false);
+        player.sendMessage(Text.literal("§e/sp rename <nombre> §7— Renombra la parcela donde estás"), false);
+        player.sendMessage(Text.literal("§e/sp tp [parcela] §7— Teleportate a una parcela"), false);
+        player.sendMessage(Text.literal("§e/sp add <jugador> <parcela|all> §7— Agrega un miembro"), false);
+        player.sendMessage(Text.literal("§e/sp remove <jugador> <parcela|all> §7— Quita un miembro"), false);
+        player.sendMessage(Text.literal("§e/sp flag §7— Lista los flags disponibles"), false);
+        player.sendMessage(Text.literal("§e/sp flag <flag> <true|false> [parcela] §7— Cambia un flag"), false);
+        player.sendMessage(Text.literal("§e/sp perm §7— Lista los permisos disponibles"), false);
+        player.sendMessage(Text.literal("§e/sp perm <jugador> <perm> <true|false> [parcela] §7— Cambia un permiso"), false);
+        player.sendMessage(Text.literal("§e/sp group §7— Lista los grupos de la parcela"), false);
+        player.sendMessage(Text.literal("§e/sp group create <nombre> §7— Crea un grupo"), false);
+        player.sendMessage(Text.literal("§e/sp group delete <nombre> §7— Elimina un grupo"), false);
+        player.sendMessage(Text.literal("§e/sp group addmember <grupo> <jugador> §7— Agrega al grupo"), false);
+        player.sendMessage(Text.literal("§e/sp group removemember <grupo> <jugador> §7— Quita del grupo"), false);
+        player.sendMessage(Text.literal("§e/sp group setperm <grupo> <perm> <true|false> §7— Perm. de grupo"), false);
+        player.sendMessage(Text.literal("§e═══════════════════════════════"), false);
+        return 1;
     }
 
     // ── /sp view ──────────────────────────────────────────────────────────────
@@ -772,14 +796,6 @@ public class SpCommand {
         return 1;
     }
 
-    // ── /sp clearholos ────────────────────────────────────────────────────────
-    private static int executeClearHolos(ServerCommandSource source) {
-        com.zhilius.secureplots.hologram.PlotHologram.clearAll(source.getServer());
-        if (source.getPlayer() != null)
-            source.getPlayer().sendMessage(Text.literal("✔ Todos los holograms eliminados.").formatted(Formatting.GREEN), false);
-        return 1;
-    }
-
     // ── Helpers ───────────────────────────────────────────────────────────────
     private static PlotData resolveSinglePlot(ServerPlayerEntity player, PlotManager manager, String plotArg) {
         if (plotArg == null) {
@@ -869,40 +885,4 @@ public class SpCommand {
         };
     }
 
-    private static int executeTestHolo(ServerCommandSource source) {
-        net.minecraft.server.network.ServerPlayerEntity player = source.getPlayer();
-        if (player == null) return 0;
-        if (!(source.getWorld() instanceof net.minecraft.server.world.ServerWorld sw)) return 0;
-
-        net.minecraft.entity.decoration.DisplayEntity.TextDisplayEntity disp =
-                net.minecraft.entity.EntityType.TEXT_DISPLAY.create(sw);
-        if (disp == null) {
-            player.sendMessage(net.minecraft.text.Text.literal("§cERROR: create() null"), false);
-            return 0;
-        }
-
-        net.minecraft.nbt.NbtCompound nbt = new net.minecraft.nbt.NbtCompound();
-        net.minecraft.nbt.NbtList rotation = new net.minecraft.nbt.NbtList();
-        rotation.add(net.minecraft.nbt.NbtFloat.of(player.getYaw() + 180f));
-        rotation.add(net.minecraft.nbt.NbtFloat.of(0f));
-        nbt.put("Rotation", rotation);
-        nbt.putByte("billboard", (byte) 0);
-        nbt.putString("text", "{\"text\":\"§6§lTEST FIJO\\n§7Si ves esto fijo, funciona.\"}");
-        nbt.putInt("background", 0x60000000);
-        nbt.putInt("line_width", 200);
-        disp.readNbt(nbt);
-        disp.setPos(player.getX(), player.getY() + 2.0, player.getZ());
-
-        boolean ok = sw.spawnEntity(disp);
-        player.sendMessage(net.minecraft.text.Text.literal(ok ? "§aOK spawned" : "§cFAIL"), false);
-        com.zhilius.secureplots.SecurePlots.LOGGER.info("[testholo] ok={}", ok);
-
-        final java.util.UUID id = disp.getUuid();
-        new java.util.Timer().schedule(new java.util.TimerTask() {
-            @Override public void run() {
-                sw.getServer().execute(() -> { net.minecraft.entity.Entity e = sw.getEntity(id); if (e != null) e.discard(); });
-            }
-        }, 10000);
-        return 1;
-    }
 }

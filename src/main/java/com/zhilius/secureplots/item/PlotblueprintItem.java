@@ -56,15 +56,16 @@ public class PlotblueprintItem extends Item {
                     player.sendMessage(Text.literal("✗ No estás dentro de una protección tuya.").formatted(Formatting.RED), false);
                 }
             } else {
+                // Click normal: si está dentro de una plot propia → abrir menú de la plot
+                // Si está fuera → abrir lista de parcelas
                 if (atPos != null && (atPos.getRoleOf(player.getUuid()) != PlotData.Role.VISITOR || isAdmin)) {
-                    // Dentro de una plot propia → abrir menú
                     BlockPos plotPos = atPos.getCenter();
                     player.openHandledScreen(new SimpleNamedScreenHandlerFactory(
                             (syncId, inv, p) -> new PlotMenuHandler(syncId, inv, plotPos, atPos, PlotMenuHandler.MenuPage.INFO),
                             Text.literal("🛡 " + atPos.getPlotName())
                     ));
                 } else {
-                    // Fuera de protección → abrir menú de selección con lista de plots + TP
+                    // Fuera de protección → siempre abrir lista (sin shift requerido)
                     List<PlotData> playerPlots = manager.getPlayerPlots(player.getUuid());
                     if (playerPlots.isEmpty()) {
                         player.sendMessage(Text.literal("✗ No tenés protecciones colocadas.").formatted(Formatting.RED), false);
@@ -92,7 +93,7 @@ public class PlotblueprintItem extends Item {
             inv.setStack(i, named(Items.BLACK_STAINED_GLASS_PANE, " "));
         inv.setStack(4, namedLore(Items.MAP, "§e🗺 Tus Parcelas",
             "§7Clic: Teleportarte",
-            "§7Shift+Clic: Abrir menú de la parcela"));
+            "§7Clic derecho: Abrir menú de la parcela"));
         inv.setStack(8, named(Items.BARRIER, "§c✕ Cerrar"));
 
         // Plot entries
@@ -107,7 +108,7 @@ public class PlotblueprintItem extends Item {
             lore.add(Text.literal("§7Nivel: §b" + p.getSize().getDisplayName()).styled(s -> s.withItalic(false)));
             lore.add(Text.literal(tpStatus).styled(s -> s.withItalic(false)));
             lore.add(Text.literal("§eClic: Teleportarte aquí").styled(s -> s.withItalic(false)));
-            lore.add(Text.literal("§7Shift+Clic: Abrir menú").styled(s -> s.withItalic(false)));
+            lore.add(Text.literal("§7Clic derecho: Abrir menú").styled(s -> s.withItalic(false)));
 
             ItemStack plotItem = new ItemStack(itemForTier(p.getSize().tier));
             plotItem.set(DataComponentTypes.CUSTOM_NAME,

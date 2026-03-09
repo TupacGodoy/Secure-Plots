@@ -23,7 +23,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class SignInputManager {
 
-    public enum InputType { RENAME, ADD_MEMBER, CREATE_GROUP }
+    public enum InputType { RENAME, ADD_MEMBER, CREATE_GROUP, SET_ENTER_MESSAGE, SET_EXIT_MESSAGE }
 
     public record PendingInput(BlockPos fakePos, BlockPos plotPos, InputType type) {}
 
@@ -39,6 +39,14 @@ public class SignInputManager {
 
     public static void openForCreateGroup(ServerPlayerEntity player, BlockPos plotPos) {
         open(player, plotPos, InputType.CREATE_GROUP);
+    }
+
+    public static void openForEnterMessage(ServerPlayerEntity player, BlockPos plotPos) {
+        open(player, plotPos, InputType.SET_ENTER_MESSAGE);
+    }
+
+    public static void openForExitMessage(ServerPlayerEntity player, BlockPos plotPos) {
+        open(player, plotPos, InputType.SET_EXIT_MESSAGE);
     }
 
     private static void open(ServerPlayerEntity player, BlockPos plotPos, InputType type) {
@@ -103,9 +111,11 @@ public class SignInputManager {
         if (text.isEmpty()) return;
 
         switch (input.type()) {
-            case RENAME       -> handleRename(player, input.plotPos(), text);
-            case ADD_MEMBER   -> handleAddMember(player, input.plotPos(), text);
-            case CREATE_GROUP -> handleCreateGroup(player, input.plotPos(), text);
+            case RENAME             -> handleRename(player, input.plotPos(), text);
+            case ADD_MEMBER         -> handleAddMember(player, input.plotPos(), text);
+            case CREATE_GROUP       -> handleCreateGroup(player, input.plotPos(), text);
+            case SET_ENTER_MESSAGE  -> handleSetMessage(player, input.plotPos(), text, true);
+            case SET_EXIT_MESSAGE   -> handleSetMessage(player, input.plotPos(), text, false);
         }
     }
 
@@ -222,6 +232,29 @@ public class SignInputManager {
         manager.markDirty();
         player.sendMessage(Text.literal("§a✔ Grupo §d\"" + groupName + "\" §acreado."), false);
         reopenMenu(player, plotPos, PlotMenuHandler.MenuPage.GLOBAL_PERMS);
+    }
+
+    // ── Set Enter/Exit Message ────────────────────────────────────────────────
+    private static void handleSetMessage(ServerPlayerEntity player, BlockPos plotPos, String msg, boolean isEnter) {
+        if (!(player.getWorld() instanceof ServerWorld sw)) return;
+        PlotManager manager = PlotManager.getOrCreate(sw);
+        PlotData data = manager.getPlot(plotPos);
+        if (data == null) {
+            player.sendMessage(Text.literal("✗ Protección no encontrada.").formatted(Formatting.RED), false);
+            return;
+        }
+        if (!data.getOwnerId().equals(player.getUuid())) {
+            player.sendMessage(Text.literal("✗ Solo el dueño puede cambiar los mensajes.").formatted(Formatting.RED), false);
+            reopenMenu(player, plotPos, PlotMenuHandler.MenuPage.INFO);
+            return;
+        }
+        msg = msg.trim();
+        if (isEnter) data.setEnterMessage(msg);
+        else         data.setExitMessage(msg);
+        manager.markDirty();
+        String tipo = isEnter ? "entrada" : "salida";
+        player.sendMessage(Text.literal("§a✔ Mensaje de " + tipo + " actualizado: §f" + msg), false);
+        reopenMenu(player, plotPos, PlotMenuHandler.MenuPage.INFO);
     }
 
     private static void reopenMenu(ServerPlayerEntity player, BlockPos plotPos, PlotMenuHandler.MenuPage targetPage) {

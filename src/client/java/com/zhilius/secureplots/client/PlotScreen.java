@@ -64,7 +64,7 @@ public class PlotScreen extends Screen {
                 .dimensions(px + tw,     py - 20, tw - 1, 20).build());
         addDrawableChild(ButtonWidget.builder(Text.literal("Mejorar"), b -> { activeTab = TAB_UPGRADE; selectedMember = null; clearAndInit(); })
                 .dimensions(px + tw * 2, py - 20, tw - 1, 20).build());
-        addDrawableChild(ButtonWidget.builder(Text.literal("Creativo"), b -> { activeTab = TAB_CREATIVE; selectedMember = null; clearAndInit(); })
+        addDrawableChild(ButtonWidget.builder(Text.literal("Creative"), b -> { activeTab = TAB_CREATIVE; selectedMember = null; clearAndInit(); })
                 .dimensions(px + tw * 3, py - 20, tw,     20).build());
 
         int cy = py + 28;
@@ -393,32 +393,84 @@ public class PlotScreen extends Screen {
     private static String permLabel(PlotData.Permission perm) {
         return switch (perm) {
             case BUILD          -> "Construir";
+            case BREAK          -> "Romper";
+            case PLACE          -> "Colocar";
             case INTERACT       -> "Interactuar";
-            case CONTAINERS     -> "Abrir cofres";
+            case CONTAINERS     -> "Contenedores";
+            case USE_BEDS       -> "Camas";
+            case USE_CRAFTING   -> "Crafteo";
+            case USE_ENCHANTING -> "Encantamiento";
+            case USE_ANVIL      -> "Yunque";
+            case USE_FURNACE    -> "Hornos";
+            case USE_BREWING    -> "Pociones";
+            case ATTACK_MOBS    -> "Atacar Mobs";
+            case ATTACK_ANIMALS -> "Atacar Animales";
             case PVP            -> "PvP";
+            case RIDE_ENTITIES  -> "Montar Entidades";
+            case INTERACT_MOBS  -> "Interactuar Mobs";
+            case LEASH_MOBS     -> "Atar Mobs";
+            case SHEAR_MOBS     -> "Esquilar";
+            case MILK_MOBS      -> "Ordeñar";
+            case CROP_TRAMPLING -> "Pisotear Cultivos";
+            case PICKUP_ITEMS   -> "Recoger Ítems";
+            case DROP_ITEMS     -> "Tirar Ítems";
+            case BREAK_CROPS    -> "Romper Cultivos";
+            case PLANT_SEEDS    -> "Plantar";
+            case USE_BONEMEAL   -> "Hueso de Polvo";
+            case BREAK_DECOR    -> "Romper Decoración";
+            case DETONATE_TNT   -> "Detonar TNT";
+            case GRIEFING       -> "Griefing";
+            case TP             -> "Teleportar";
+            case FLY            -> "Volar";
+            case ENTER          -> "Entrar";
+            case CHAT           -> "Chat";
+            case COMMAND_USE    -> "Comandos";
             case MANAGE_MEMBERS -> "Gestionar Miembros";
             case MANAGE_PERMS   -> "Gestionar Permisos";
             case MANAGE_FLAGS   -> "Gestionar Flags";
             case MANAGE_GROUPS  -> "Gestionar Grupos";
-            case TP             -> "Teleportar";
-            case FLY            -> "Volar";
-            case ENTER          -> "Entrar";
         };
     }
 
     private static String permDesc(PlotData.Permission perm) {
         return switch (perm) {
             case BUILD          -> "Colocar y romper bloques";
-            case INTERACT       -> "Usar palancas, puertas, etc.";
+            case BREAK          -> "Solo romper bloques";
+            case PLACE          -> "Solo colocar bloques";
+            case INTERACT       -> "Palancas, puertas, botones";
             case CONTAINERS     -> "Abrir cofres e inventarios";
-            case PVP            -> "Atacar jugadores en la plot";
+            case USE_BEDS       -> "Usar camas para dormir";
+            case USE_CRAFTING   -> "Usar mesas de crafteo";
+            case USE_ENCHANTING -> "Mesas de encantamiento";
+            case USE_ANVIL      -> "Usar yunques";
+            case USE_FURNACE    -> "Hornos y ahumadores";
+            case USE_BREWING    -> "Soportes de pociones";
+            case ATTACK_MOBS    -> "Atacar mobs hostiles";
+            case ATTACK_ANIMALS -> "Atacar animales pasivos";
+            case PVP            -> "Atacar a otros jugadores";
+            case RIDE_ENTITIES  -> "Montar caballos, botes, etc.";
+            case INTERACT_MOBS  -> "Comerciar, nombrar mobs";
+            case LEASH_MOBS     -> "Atar y soltar mobs";
+            case SHEAR_MOBS     -> "Esquilar ovejas";
+            case MILK_MOBS      -> "Ordeñar vacas y cabras";
+            case CROP_TRAMPLING -> "Pisar y destruir cultivos";
+            case PICKUP_ITEMS   -> "Recoger ítems del suelo";
+            case DROP_ITEMS     -> "Tirar ítems al suelo";
+            case BREAK_CROPS    -> "Romper plantas y cultivos";
+            case PLANT_SEEDS    -> "Plantar semillas y saplings";
+            case USE_BONEMEAL   -> "Hueso de polvo en plantas";
+            case BREAK_DECOR    -> "Romper flores y decoraciones";
+            case DETONATE_TNT   -> "Encender y detonar TNT";
+            case GRIEFING       -> "Daño por creepers/wither/etc.";
+            case TP             -> "Usar /sp tp para llegar aquí";
+            case FLY            -> "Volar dentro de la parcela";
+            case ENTER          -> "Entrar al área de la parcela";
+            case CHAT           -> "Chatear en la parcela";
+            case COMMAND_USE    -> "Usar comandos en la parcela";
             case MANAGE_MEMBERS -> "Agregar y remover miembros";
             case MANAGE_PERMS   -> "Cambiar permisos de miembros";
             case MANAGE_FLAGS   -> "Cambiar flags globales";
             case MANAGE_GROUPS  -> "Crear y editar grupos";
-            case TP             -> "Usar /sp tp para llegar aquí";
-            case FLY            -> "Volar dentro de la parcela";
-            case ENTER          -> "Entrar al área de la parcela";
         };
     }
 
