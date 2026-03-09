@@ -1,6 +1,7 @@
 package com.zhilius.secureplots;
 
 import com.zhilius.secureplots.block.ModBlocks;
+import com.zhilius.secureplots.block.PlotStakeBlock;
 import com.zhilius.secureplots.blockentity.ModBlockEntities;
 import com.zhilius.secureplots.command.SpCommand;
 import com.zhilius.secureplots.config.SecurePlotsConfig;
@@ -100,7 +101,7 @@ public class SecurePlots implements ModInitializer {
             boolean isPlacing = player.getStackInHand(hand).getItem() instanceof net.minecraft.item.BlockItem;
             BlockPos effectiveTarget = isPlacing ? target.offset(hitResult.getSide()) : target;
 
-            // ── Subdivision tool: intercept before protection check ────────────
+            // ── Subdivision tool (PlotStakeItem) ─────────────────────────────────
             if (player.getStackInHand(hand).getItem() instanceof PlotStakeItem
                     && player instanceof ServerPlayerEntity sp) {
                 return PlotStakeItem.onUseBlock(sp, sw, hand, hitResult);

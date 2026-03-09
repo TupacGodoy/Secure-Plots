@@ -21,7 +21,10 @@ import net.minecraft.util.ActionResult;
 import net.minecraft.util.Formatting;
 import net.minecraft.util.hit.BlockHitResult;
 import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.shape.VoxelShape;
+import net.minecraft.world.BlockView;
 import net.minecraft.world.World;
+import net.minecraft.world.WorldView;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -43,6 +46,25 @@ public class PlotStakeBlock extends BlockWithEntity {
 
     public PlotStakeBlock(Settings settings) {
         super(settings);
+    }
+
+    private static final VoxelShape SHAPE = Block.createCuboidShape(6, 0, 6, 10, 16, 10);
+
+    @Override
+    public VoxelShape getOutlineShape(BlockState state, BlockView world, BlockPos pos,
+                                      net.minecraft.block.ShapeContext context) {
+        return SHAPE;
+    }
+
+    @Override
+    public VoxelShape getCollisionShape(BlockState state, BlockView world, BlockPos pos,
+                                        net.minecraft.block.ShapeContext context) {
+        return SHAPE;
+    }
+
+    @Override
+    public boolean canPlaceAt(BlockState state, net.minecraft.world.WorldView world, BlockPos pos) {
+        return true;
     }
 
     @Override
@@ -301,7 +323,7 @@ public class PlotStakeBlock extends BlockWithEntity {
                     if (world.getBlockState(candidate).getBlock() instanceof PlotStakeBlock) {
                         PlotStakeBlockEntity be = getBlockEntity(world, candidate);
                         if (be != null && ownerId.equals(be.getOwnerId())
-                                && (be.getSubdivisionName() == null || be.getSubdivisionName().isEmpty())
+                                && be.getSubdivisionName() == null || (be != null && be.getSubdivisionName() != null && be.getSubdivisionName().isEmpty())
                                 && plot.getCenter().equals(be.getPlotCenter())) {
                             result.add(candidate);
                         }

@@ -53,12 +53,12 @@ public class ModBlocks {
                     .requiresTool(), 4));
 
     /** Estaca de Parcela — delimita subdivisiones */
-    public static final Block PLOT_STAKE_BLOCK = register("plot_stake_block",
-            new com.zhilius.secureplots.block.PlotStakeBlock(
+    public static final Block PLOT_STAKE_BLOCK = registerStake("plot_stake_block",
+            new PlotStakeBlock(
                     AbstractBlock.Settings.create()
                             .mapColor(MapColor.BROWN)
                             .strength(2f, 6f)
-                            ));
+                            .nonOpaque()));
 
     public static Block fromTier(int tier) {
         return switch (tier) {
@@ -74,6 +74,13 @@ public class ModBlocks {
     private static Block register(String name, Block block) {
         Identifier id = Identifier.of(SecurePlots.MOD_ID, name);
         Registry.register(Registries.ITEM, id, new BlockItem(block, new Item.Settings()));
+        return Registry.register(Registries.BLOCK, id, block);
+    }
+
+    /** Registra el bloque con un PlotStakeBlockItem personalizado */
+    private static Block registerStake(String name, Block block) {
+        Identifier id = Identifier.of(SecurePlots.MOD_ID, name);
+        Registry.register(Registries.ITEM, id, new PlotStakeBlockItem(block, new Item.Settings()));
         return Registry.register(Registries.BLOCK, id, block);
     }
 
