@@ -26,11 +26,7 @@ import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.util.math.BlockPos;
 import org.joml.Matrix4f;
 
-import java.util.Random;
-
 public class PlotBorderRenderer {
-
-    private static final Random RAND = new Random();
 
     // { r_core, g_core, b_core,  r_glow, g_glow, b_glow,  r_white, g_white, b_white }
     // tier 0=bronze  1=gold  2=emerald  3=diamond  4=netherite
@@ -47,6 +43,17 @@ public class PlotBorderRenderer {
     private static final float WG = 0.13f;  // glow halo thickness
     private static final float SW = 0.025f; // scanline thickness
     private static final float SCANLINE_SPACING = 1.5f;
+
+    /**
+     * Fast deterministic pseudo-random in [-1, 1] — no Random instance needed.
+     * Replaces RAND.setSeed(seed) + nextDouble() calls in the bolt loop.
+     */
+    private static double fastRand(long seed, int index) {
+        long n = seed + index * 12345L;
+        n = (n << 13) ^ n;
+        n = n * (n * n * 15731L + 789221L) + 1376312589L;
+        return (double)(n & 0x7fffffffL) / 1073741824.0 - 1.0;
+    }
 
     public static void render(WorldRenderContext context, SecurePlotsClient.BorderDisplay display) {
         PlotData data = display.data;
@@ -106,7 +113,10 @@ public class PlotBorderRenderer {
         RenderSystem.enableBlend();
         RenderSystem.defaultBlendFunc();
         RenderSystem.disableCull();
-        RenderSystem.disableDepthTest();
+        // Use depthMask(false) instead of disableDepthTest() so the border
+        // doesn't interfere with other transparent renders (water, etc.)
+        RenderSystem.enableDepthTest();
+        RenderSystem.depthMask(false);
         RenderSystem.setShader(GameRenderer::getPositionColorProgram);
 
         Matrix4f mx = matrices.peek().getPositionMatrix();
@@ -179,8 +189,9 @@ public class PlotBorderRenderer {
             BufferRenderer.drawWithGlobalProgram(buf.end());
         }
 
-        // ── PASS 2: CORNER LIGHTNING BOLTS (separate due to seeded RNG per segment) ──
+        // ── PASS 2: CORNER LIGHTNING BOLTS (uses fastRand — no Random instance) ──
         {
+            // Change slot every 120ms so bolts visually flicker
             long boltSlot = time / 120;
             BufferBuilder buf = tess.begin(VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_COLOR);
             for (int i = 0; i < 4; i++) {
@@ -226,7 +237,7 @@ public class PlotBorderRenderer {
             BufferRenderer.drawWithGlobalProgram(buf.end());
         }
 
-        RenderSystem.enableDepthTest();
+        RenderSystem.depthMask(true);
         RenderSystem.enableCull();
         RenderSystem.disableBlend();
         matrices.pop();
@@ -272,19 +283,22 @@ public class PlotBorderRenderer {
         buf.vertex(m, (float)x, (float)(y+w), (float)z1).color(r,g,b,a);
     }
 
-    /** Zigzag lightning bolt rendered as a series of quads with a fixed random seed */
+    /**
+     * Zigzag lightning bolt rendered as a series of quads.
+     * Uses fastRand() instead of java.util.Random — no object state, no setSeed().
+     * Reduced to 8 segments (was 14) for lower geometry overhead with minimal visual difference.
+     */
     private static void boltQuad(BufferBuilder buf, Matrix4f m,
                                   double cx, double cz, double baseY, double topY,
                                   float r, float g, float b, float a,
                                   long seed, double spread, float w) {
-        RAND.setSeed(seed);
-        int    segs = 14;
+        int    segs = 8;
         double segH = (topY - baseY) / segs;
         double px = cx, py = baseY, pz = cz;
         for (int i = 0; i < segs; i++) {
-            double nx = cx + (RAND.nextDouble() * 2 - 1) * spread;
+            double nx = cx + fastRand(seed, i * 2)     * spread;
             double ny = py + segH;
-            double nz = cz + (RAND.nextDouble() * 2 - 1) * spread;
+            double nz = cz + fastRand(seed, i * 2 + 1) * spread;
             if (i == segs - 1) { nx = cx; nz = cz; ny = topY; }
             buf.vertex(m, (float)(px-w), (float)py, (float)pz).color(r,g,b,a);
             buf.vertex(m, (float)(px+w), (float)py, (float)pz).color(r,g,b,a);
