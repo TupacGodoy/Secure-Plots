@@ -1,3 +1,20 @@
+/*
+ * SecurePlots - A Fabric mod for Minecraft 1.21.1
+ * Copyright (C) 2025 TupacGodoy
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <https://www.gnu.org/licenses/>.
+ */
 package com.zhilius.secureplots.hologram;
 
 import com.zhilius.secureplots.SecurePlots;
@@ -233,7 +250,7 @@ public class PlotHologram {
         for (int i = 0; i < dashCount; i++) { borderSB.append("-"); dividerSB.append("-"); }
         String border  = tc  + "\u00a7l" + borderSB;
         String divider = "\u00a78" + dividerSB;
-        String NL = "\\n";
+        String NL = "\n";
 
         String text =
             border + NL +
@@ -248,7 +265,7 @@ public class PlotHologram {
             " " + nextLine + NL +
             border;
 
-        text = text.replace("\"", "\\\"");
+        text = text.replace("\"", "\\"");
         return "{\"text\":\"" + text + "\"}";
     }
 }
