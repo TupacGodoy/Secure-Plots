@@ -98,12 +98,15 @@ public class PlotAreaTracker {
             // Si no es un cambio de plot, no procesar entrada/salida
             if (!doCheck) continue;
 
+            // Hoist config lookup once per player-event — used in both branches below
+            com.zhilius.secureplots.config.SecurePlotsConfig cfgEvent =
+                com.zhilius.secureplots.config.SecurePlotsConfig.INSTANCE;
+
             if (curCenter != null) {
                 // ── Entered a plot ──────────────────────────────────────────
 
                 // Action bar: plot name + owner
-                com.zhilius.secureplots.config.SecurePlotsConfig cfg0 = com.zhilius.secureplots.config.SecurePlotsConfig.INSTANCE;
-                if (cfg0 == null || cfg0.enableEnterHud) {
+                if (cfgEvent == null || cfgEvent.enableEnterHud) {
                     player.sendMessage(
                         Text.translatable("sp.hud.entering",
                             Text.literal(current.getPlotName()).formatted(Formatting.YELLOW, Formatting.BOLD),
@@ -111,8 +114,8 @@ public class PlotAreaTracker {
                         true);
                 }
 
-                // Custom enter message as title overlay (center screen, distinct from action bar)
-                if (current.hasFlag(PlotData.Flag.GREETINGS)) {
+                // Custom enter message as title overlay
+                if ((cfgEvent == null || cfgEvent.enableGreetingMessages) && current.hasFlag(PlotData.Flag.GREETINGS)) {
                     String msg = current.getEnterMessage();
                     if (msg != null && !msg.isBlank()) {
                         sendTitleMessage(player, msg);
@@ -125,7 +128,7 @@ public class PlotAreaTracker {
             } else {
                 // ── Left a plot ─────────────────────────────────────────────
                 PlotData prev = prevCenter != null ? manager.getPlotAt(prevCenter) : null;
-                if (prev != null && prev.hasFlag(PlotData.Flag.GREETINGS)) {
+                if ((cfgEvent == null || cfgEvent.enableGreetingMessages) && prev != null && prev.hasFlag(PlotData.Flag.GREETINGS)) {
                     String msg = prev.getExitMessage();
                     if (msg != null && !msg.isBlank()) {
                         sendTitleMessage(player, msg);

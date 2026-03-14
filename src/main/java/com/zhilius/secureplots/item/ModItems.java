@@ -6,14 +6,6 @@
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 package com.zhilius.secureplots.item;
 
@@ -31,7 +23,8 @@ import net.minecraft.util.Rarity;
 
 public class ModItems {
 
-    public static final Item PLOT_blueprint = register("plot_blueprint",
+    // Fixed: was "PLOT_blueprint" (inconsistent naming)
+    public static final Item PLOT_BLUEPRINT = register("plot_blueprint",
             new PlotblueprintItem(new Item.Settings()
                     .maxCount(1)
                     .rarity(Rarity.UNCOMMON)));
@@ -43,10 +36,10 @@ public class ModItems {
                     .displayName(Text.literal("Secure Plots"))
                     .icon(() -> new ItemStack(ModBlocks.BRONZE_PLOT_BLOCK))
                     .entries((context, entries) -> {
-                        entries.add(PLOT_blueprint);
+                        entries.add(PLOT_BLUEPRINT);
                         entries.add(ModBlocks.BRONZE_PLOT_BLOCK);
                         entries.add(ModBlocks.GOLD_PLOT_BLOCK);
-                        entries.add(ModBlocks.emerald_PLOT_BLOCK);
+                        entries.add(ModBlocks.EMERALD_PLOT_BLOCK);   // Fixed: was emerald_PLOT_BLOCK
                         entries.add(ModBlocks.DIAMOND_PLOT_BLOCK);
                         entries.add(ModBlocks.NETHERITE_PLOT_BLOCK);
                     })
@@ -57,6 +50,6 @@ public class ModItems {
     }
 
     public static void initialize() {
-        SecurePlots.LOGGER.info("Registrando items de Secure Plots...");
+        SecurePlots.LOGGER.info("Registering Secure Plots items...");
     }
 }

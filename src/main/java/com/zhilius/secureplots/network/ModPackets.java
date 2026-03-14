@@ -22,7 +22,6 @@ import com.google.gson.Gson;
 import com.zhilius.secureplots.SecurePlots;
 import com.zhilius.secureplots.config.BorderConfig;
 import com.zhilius.secureplots.network.ModPackets.OpenPlotScreenPayload;
-import com.zhilius.secureplots.network.ModPackets.ShowPlotBorderPayload;
 import com.zhilius.secureplots.network.ModPackets.UpdatePlotPayload;
 import com.zhilius.secureplots.network.ModPackets.UpgradePlotPayload;
 import com.zhilius.secureplots.plot.PlotData;
@@ -131,15 +130,6 @@ public class ModPackets {
         }
     }
 
-    public record ShowPlotInfoPayload(BlockPos pos, NbtCompound nbt) implements CustomPayload {
-        public static final Id<ShowPlotInfoPayload> ID = new Id<>(
-                Identifier.of(SecurePlots.MOD_ID, "show_plot_info"));
-        public static final PacketCodec<PacketByteBuf, ShowPlotInfoPayload> CODEC = PacketCodec.of(
-                (value, buf) -> { buf.writeBlockPos(value.pos()); buf.writeNbt(value.nbt()); },
-                buf -> new ShowPlotInfoPayload(buf.readBlockPos(), buf.readNbt()));
-        @Override public Id<? extends CustomPayload> getId() { return ID; }
-    }
-
     /** C→S: el owner pide que el server le dé un plot block por tier (modo creativo). */
     public record GiveBlockPayload(int tier) implements CustomPayload {
         public static final Id<GiveBlockPayload> ID = new Id<>(Identifier.of(SecurePlots.MOD_ID, "give_block"));
@@ -180,7 +170,6 @@ public class ModPackets {
         PayloadTypeRegistry.playS2C().register(OpenPlotScreenPayload.ID, OpenPlotScreenPayload.CODEC);
         PayloadTypeRegistry.playS2C().register(ShowPlotBorderPayload.ID, ShowPlotBorderPayload.CODEC);
         PayloadTypeRegistry.playS2C().register(HidePlotBorderPayload.ID, HidePlotBorderPayload.CODEC);
-        PayloadTypeRegistry.playS2C().register(ShowPlotInfoPayload.ID, ShowPlotInfoPayload.CODEC);
         PayloadTypeRegistry.playS2C().register(OpenChatPayload.ID, OpenChatPayload.CODEC);
         PayloadTypeRegistry.playS2C().register(SyncBorderConfigPayload.ID, SyncBorderConfigPayload.CODEC);
         PayloadTypeRegistry.playC2S().register(UpdatePlotPayload.ID, UpdatePlotPayload.CODEC);
@@ -193,12 +182,14 @@ public class ModPackets {
 
     public static void sendSyncBorderConfig(ServerPlayerEntity player) {
         if (com.zhilius.secureplots.config.BorderConfig.INSTANCE == null) return;
-        String json = new Gson().toJson(com.zhilius.secureplots.config.BorderConfig.INSTANCE);
+        // Stamp runtime toggles from SecurePlotsConfig into the visual config before syncing
+        com.zhilius.secureplots.config.BorderConfig bc =
+            com.zhilius.secureplots.config.BorderConfig.INSTANCE;
+        if (SecurePlotsConfig.INSTANCE != null) {
+            bc.hologramEnabled = SecurePlotsConfig.INSTANCE.enableHologram;
+        }
+        String json = new Gson().toJson(bc);
         ServerPlayNetworking.send(player, new SyncBorderConfigPayload(json));
-    }
-
-    public static void sendShowPlotInfo(ServerPlayerEntity player, BlockPos pos, PlotData data) {
-        ServerPlayNetworking.send(player, new ShowPlotInfoPayload(pos, data.toNbt()));
     }
 
     public static void sendOpenPlotScreen(ServerPlayerEntity player, BlockPos pos, PlotData data) {
@@ -241,13 +232,17 @@ public class ModPackets {
             ServerPlayerEntity player = context.player();
             context.server().execute(() -> {
                 if (player.getWorld() instanceof net.minecraft.server.world.ServerWorld serverWorld) {
+                    // enableUpgrades toggle
+                    SecurePlotsConfig cfgU = SecurePlotsConfig.INSTANCE;
+                    if (cfgU != null && !cfgU.enableUpgrades) return;
+
                     var manager = com.zhilius.secureplots.plot.PlotManager.getOrCreate(serverWorld);
                     PlotData data = manager.getPlot(pos);
                     if (data == null || !data.getOwnerId().equals(player.getUuid()))
                         return;
                     var nextSize = data.getSize().next();
                     if (nextSize == null) {
-                        player.sendMessage(net.minecraft.text.Text.literal("Esta proteccion ya esta al maximo nivel.")
+                        player.sendMessage(net.minecraft.text.Text.translatable("sp.upgrade.max_level")
                                 .formatted(net.minecraft.util.Formatting.RED), false);
                         return;
                     }
@@ -260,9 +255,8 @@ public class ModPackets {
                     serverWorld.setBlockState(pos, newBlock.getDefaultState());
 
                     player.sendMessage(
-                            net.minecraft.text.Text
-                                    .literal("Proteccion mejorada a " + nextSize.getDisplayName() + " (" + nextSize.getRadius()
-                                            + "x" + nextSize.getRadius() + ")!")
+                            net.minecraft.text.Text.translatable("sp.upgrade.success",
+                                    nextSize.getDisplayName(), nextSize.getRadius(), nextSize.getRadius())
                                     .formatted(net.minecraft.util.Formatting.GREEN),
                             false);
                     sendOpenPlotScreen(player, pos, data);
@@ -283,25 +277,26 @@ public class ModPackets {
 
                 ServerPlayerEntity target = context.server().getPlayerManager().getPlayer(targetName);
                 if (target == null) {
-                    player.sendMessage(net.minecraft.text.Text.literal("✗ Player \"" + targetName + "\" is not online.")
+                    player.sendMessage(net.minecraft.text.Text.translatable("sp.add.player_not_found", targetName)
                             .formatted(net.minecraft.util.Formatting.RED), false);
                     return;
                 }
                 if (target.getUuid().equals(player.getUuid())) {
-                    player.sendMessage(net.minecraft.text.Text.literal("✗ You cannot add yourself.")
+                    player.sendMessage(net.minecraft.text.Text.translatable("sp.add.self")
                             .formatted(net.minecraft.util.Formatting.RED), false);
                     return;
                 }
                 if (data.getRoleOf(target.getUuid()) != PlotData.Role.VISITOR) {
-                    player.sendMessage(net.minecraft.text.Text.literal("✗ " + targetName + " ya tiene acceso.")
+                    player.sendMessage(net.minecraft.text.Text.translatable("sp.member.already_has_access", targetName)
                             .formatted(net.minecraft.util.Formatting.YELLOW), false);
                     return;
                 }
                 data.addMember(target.getUuid(), target.getName().getString(), PlotData.Role.MEMBER);
                 manager.markDirty();
-                player.sendMessage(net.minecraft.text.Text.literal("✔ " + targetName + " agregado.")
+                player.sendMessage(net.minecraft.text.Text.translatable("sp.member.added_sender", targetName)
                         .formatted(net.minecraft.util.Formatting.GREEN), false);
-                target.sendMessage(net.minecraft.text.Text.literal("✔ Fuiste agregado a " + data.getPlotName() + " de " + player.getName().getString())
+                target.sendMessage(net.minecraft.text.Text.translatable("sp.member.added_target",
+                        data.getPlotName(), player.getName().getString())
                         .formatted(net.minecraft.util.Formatting.GREEN), false);
                 // Refresh screen
                 sendOpenPlotScreen(player, pos, data);
@@ -327,17 +322,17 @@ public class ModPackets {
                     }
                 }
                 if (targetUuid == null) {
-                    player.sendMessage(net.minecraft.text.Text.literal("✗ " + targetName + " no es miembro.")
+                    player.sendMessage(net.minecraft.text.Text.translatable("sp.member.not_member_simple", targetName)
                             .formatted(net.minecraft.util.Formatting.RED), false);
                     return;
                 }
                 data.removeMember(targetUuid);
                 manager.markDirty();
-                player.sendMessage(net.minecraft.text.Text.literal("✔ " + targetName + " eliminado.")
+                player.sendMessage(net.minecraft.text.Text.translatable("sp.member.removed_sender", targetName)
                         .formatted(net.minecraft.util.Formatting.GREEN), false);
                 ServerPlayerEntity target = context.server().getPlayerManager().getPlayer(targetUuid);
                 if (target != null) {
-                    target.sendMessage(net.minecraft.text.Text.literal("✗ Te quitaron el acceso a " + data.getPlotName())
+                    target.sendMessage(net.minecraft.text.Text.translatable("sp.member.removed_target", data.getPlotName())
                             .formatted(net.minecraft.util.Formatting.RED), false);
                 }
                 sendOpenPlotScreen(player, pos, data);
@@ -369,11 +364,12 @@ public class ModPackets {
             ServerPlayerEntity player = context.player();
             int tier = payload.tier();
             context.server().execute(() -> {
-                // Only allow if the player is an operator (permission level 2+) or in creative
-                boolean isOp = player.hasPermissionLevel(2);
+                // Only allow if the player is an operator (adminOpLevel+) or in creative
+                int opLevel = SecurePlotsConfig.INSTANCE != null ? SecurePlotsConfig.INSTANCE.adminOpLevel : 2;
+                boolean isOp = player.hasPermissionLevel(opLevel);
                 boolean isCreative = player.isCreative();
                 if (!isOp && !isCreative) {
-                    player.sendMessage(net.minecraft.text.Text.literal("✗ Solo OPs o jugadores en creativo pueden usar esto.")
+                    player.sendMessage(net.minecraft.text.Text.translatable("sp.give_block.no_permission")
                             .formatted(net.minecraft.util.Formatting.RED), false);
                     return;
                 }
@@ -382,7 +378,7 @@ public class ModPackets {
                 if (!player.giveItemStack(stack)) {
                     player.dropItem(stack, false);
                 }
-                player.sendMessage(net.minecraft.text.Text.literal("✔ Bloque de parcela obtenido.")
+                player.sendMessage(net.minecraft.text.Text.translatable("sp.give_block.success")
                         .formatted(net.minecraft.util.Formatting.GREEN), true);
             });
         });

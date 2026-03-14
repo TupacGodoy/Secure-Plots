@@ -616,6 +616,13 @@ public class SpCommand {
     private static int executeTp(ServerCommandSource source, String plotArg) {
         ServerPlayerEntity player = source.getPlayer();
         if (player == null) return 0;
+
+        // enablePlotTeleport global toggle
+        if (SecurePlotsConfig.INSTANCE != null && !SecurePlotsConfig.INSTANCE.enablePlotTeleport) {
+            player.sendMessage(Text.translatable("sp.tp.not_found").formatted(Formatting.RED), false);
+            return 0;
+        }
+
         PlotManager manager = PlotManager.getOrCreate(player.getServerWorld());
 
         PlotData plot = null;
@@ -807,6 +814,10 @@ public class SpCommand {
     private static int executeGroupList(ServerCommandSource source) {
         ServerPlayerEntity player = source.getPlayer();
         if (player == null) return 0;
+        if (SecurePlotsConfig.INSTANCE != null && !SecurePlotsConfig.INSTANCE.enablePermissionGroups) {
+            player.sendMessage(Text.translatable("sp.error.no_group_perm").formatted(Formatting.RED), false);
+            return 0;
+        }
         PlotManager manager = PlotManager.getOrCreate(player.getServerWorld());
         PlotData plot = manager.getPlotAt(player.getBlockPos());
         if (plot == null) {
@@ -827,6 +838,10 @@ public class SpCommand {
     private static int executeGroupCreate(ServerCommandSource source, String groupName) {
         ServerPlayerEntity player = source.getPlayer();
         if (player == null) return 0;
+        if (SecurePlotsConfig.INSTANCE != null && !SecurePlotsConfig.INSTANCE.enablePermissionGroups) {
+            player.sendMessage(Text.translatable("sp.error.no_group_perm").formatted(Formatting.RED), false);
+            return 0;
+        }
         PlotManager manager = PlotManager.getOrCreate(player.getServerWorld());
         PlotData plot = manager.getPlotAt(player.getBlockPos());
         if (plot == null) {

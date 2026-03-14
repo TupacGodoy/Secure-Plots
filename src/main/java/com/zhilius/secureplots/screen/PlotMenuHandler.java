@@ -433,6 +433,14 @@ public class PlotMenuHandler extends GenericContainerScreenHandler {
 
     // ── UPGRADE PAGE ──────────────────────────────────────────────────────────
     private void buildUpgradePage() {
+        // enableUpgrades global toggle
+        if (SecurePlotsConfig.INSTANCE != null && !SecurePlotsConfig.INSTANCE.enableUpgrades) {
+            menuInv.setStack(22, namedLore(Items.BARRIER,
+                "§c✗ Upgrades are disabled",
+                "§8This feature has been disabled by the server."));
+            return;
+        }
+
         PlotSize cur  = data.getSize();
         PlotSize next = cur.next();
 
@@ -458,6 +466,20 @@ public class PlotMenuHandler extends GenericContainerScreenHandler {
         if (cost != null) {
             List<String> costLore = new ArrayList<>();
             costLore.add("§eYou need:");
+            // Cobblecoins requirement
+            if (cost.cobblecoins > 0 && cfg != null && !cfg.cobblescoinsItemId.isBlank()) {
+                net.minecraft.util.Identifier coinId = net.minecraft.util.Identifier.of(cfg.cobblescoinsItemId);
+                net.minecraft.item.Item coinItem = net.minecraft.registry.Registries.ITEM.get(coinId);
+                int hasCoins = countItem(player, coinItem);
+                boolean okCoins = hasCoins >= cost.cobblecoins;
+                if (!okCoins) canAfford = false;
+                String coinName = cfg.cobblescoinsItemId.contains(":")
+                    ? cfg.cobblescoinsItemId.split(":")[1] : cfg.cobblescoinsItemId;
+                coinName = Character.toUpperCase(coinName.charAt(0)) + coinName.substring(1).replace("_", " ");
+                costLore.add((okCoins ? "§a✔" : "§c✗") + " §7" + coinName + ": "
+                    + (okCoins ? "§a" : "§c") + hasCoins + "§7/" + cost.cobblecoins);
+            }
+            // Regular items
             for (SecurePlotsConfig.UpgradeCost.ItemCost itemCost : cost.items) {
                 net.minecraft.util.Identifier id = net.minecraft.util.Identifier.of(itemCost.itemId);
                 net.minecraft.item.Item mc = net.minecraft.registry.Registries.ITEM.get(id);
@@ -938,7 +960,7 @@ public class PlotMenuHandler extends GenericContainerScreenHandler {
         boolean tpEnabled = data.hasFlag(PlotData.Flag.ALLOW_TP);
         boolean canTp = tpEnabled || myRole == PlotData.Role.OWNER || myRole == PlotData.Role.ADMIN;
         if (!canTp) {
-            player.sendMessage(Text.literal("§c✗ TP is not enabled in this plot."), false);
+            player.sendMessage(Text.translatable("sp.tp.not_allowed", data.getPlotName()), false);
             return;
         }
         if (!(player.getWorld() instanceof ServerWorld sw)) return;
@@ -949,7 +971,7 @@ public class PlotMenuHandler extends GenericContainerScreenHandler {
         player.closeHandledScreen();
         player.teleport(sw, c.getX() + 0.5, tpY, c.getZ() + 0.5,
             java.util.Set.of(), player.getYaw(), player.getPitch());
-        player.sendMessage(Text.literal("§a✔ Teleportado a §e" + data.getPlotName()), false);
+        player.sendMessage(Text.translatable("sp.tp.success", data.getPlotName()), false);
         sw.playSound(null, player.getBlockPos(), SoundEvents.ENTITY_ENDERMAN_TELEPORT, SoundCategory.PLAYERS, 1f, 1f);
     }
 
@@ -978,13 +1000,29 @@ public class PlotMenuHandler extends GenericContainerScreenHandler {
         PlotData fresh = manager.getPlot(plotPos);
         if (fresh == null) return;
 
+        SecurePlotsConfig cfg = SecurePlotsConfig.INSTANCE;
+
+        // enableUpgrades global toggle
+        if (cfg != null && !cfg.enableUpgrades) {
+            playSound(SoundEvents.ENTITY_VILLAGER_NO, 1f, 1f); return;
+        }
+
         PlotSize next = fresh.getSize().next();
         if (next == null) { playSound(SoundEvents.ENTITY_VILLAGER_NO, 1f, 1f); return; }
 
-        SecurePlotsConfig cfg = SecurePlotsConfig.INSTANCE;
         SecurePlotsConfig.UpgradeCost cost = cfg != null ? cfg.getUpgradeCost(fresh.getSize().tier) : null;
 
         if (cost != null) {
+            // Check and consume cobblecoins if configured
+            if (cost.cobblecoins > 0 && cfg != null && !cfg.cobblescoinsItemId.isBlank()) {
+                net.minecraft.util.Identifier coinId = net.minecraft.util.Identifier.of(cfg.cobblescoinsItemId);
+                net.minecraft.item.Item coinItem = net.minecraft.registry.Registries.ITEM.get(coinId);
+                if (countItem(player, coinItem) < cost.cobblecoins) {
+                    playSound(SoundEvents.ENTITY_VILLAGER_NO, 1f, 0.8f);
+                    refreshMenu(); return;
+                }
+            }
+            // Check regular items
             for (SecurePlotsConfig.UpgradeCost.ItemCost ic : cost.items) {
                 net.minecraft.util.Identifier id = net.minecraft.util.Identifier.of(ic.itemId);
                 net.minecraft.item.Item item = net.minecraft.registry.Registries.ITEM.get(id);
@@ -993,6 +1031,13 @@ public class PlotMenuHandler extends GenericContainerScreenHandler {
                     refreshMenu(); return;
                 }
             }
+            // Consume cobblecoins
+            if (cost.cobblecoins > 0 && cfg != null && !cfg.cobblescoinsItemId.isBlank()) {
+                net.minecraft.util.Identifier coinId = net.minecraft.util.Identifier.of(cfg.cobblescoinsItemId);
+                net.minecraft.item.Item coinItem = net.minecraft.registry.Registries.ITEM.get(coinId);
+                removeItem(player, coinItem, cost.cobblecoins);
+            }
+            // Consume regular items
             for (SecurePlotsConfig.UpgradeCost.ItemCost ic : cost.items) {
                 net.minecraft.util.Identifier id = net.minecraft.util.Identifier.of(ic.itemId);
                 net.minecraft.item.Item item = net.minecraft.registry.Registries.ITEM.get(id);
@@ -1011,7 +1056,8 @@ public class PlotMenuHandler extends GenericContainerScreenHandler {
 
         player.closeHandledScreen();
         com.zhilius.secureplots.network.ModPackets.sendShowPlotBorder(player, fresh);
-        player.sendMessage(Text.literal("§a✔ Plot upgraded to §e" + next.getDisplayName() + "§a!"), false);
+        player.sendMessage(Text.translatable("sp.upgrade.success",
+            next.getDisplayName(), next.getRadius(), next.getRadius()), false);
     }
 
     private void spawnUpgradeParticles(ServerWorld sw, BlockPos pos) {
@@ -1059,7 +1105,7 @@ public class PlotMenuHandler extends GenericContainerScreenHandler {
         manager.markDirty();
         this.data = fresh;
         playSound(SoundEvents.ENTITY_ITEM_BREAK, 1f, 0.8f);
-        player.sendMessage(Text.literal("§a✔ " + name + " eliminado."), false);
+        player.sendMessage(Text.translatable("sp.member.removed_sender", name), false);
         refreshMenu();
     }
 

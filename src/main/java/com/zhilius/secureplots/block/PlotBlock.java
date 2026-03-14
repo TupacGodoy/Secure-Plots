@@ -43,6 +43,9 @@ import net.minecraft.world.World;
 import java.util.List;
 import java.util.UUID;
 
+// Helper for building translated Text with appended colored values
+// Used to avoid verbose chaining in sendMessage calls.
+
 public class PlotBlock extends BlockWithEntity {
 
     // Tier de este bloque específico (0=bronze, 1=iron/emerald, 2=gold, 3=diamond, 4=netherite)
@@ -86,7 +89,7 @@ public class PlotBlock extends BlockWithEntity {
             com.zhilius.secureplots.plot.PlotData data = manager.getPlot(pos);
             if (data != null) {
                 com.zhilius.secureplots.network.ModPackets.sendShowPlotBorder((ServerPlayerEntity) player, data);
-                com.zhilius.secureplots.network.ModPackets.sendShowPlotInfo((ServerPlayerEntity) player, pos, data);
+                com.zhilius.secureplots.network.ModPackets.sendOpenPlotScreen((ServerPlayerEntity) player, pos, data);
             }
         }
         return ActionResult.SUCCESS;
@@ -103,8 +106,7 @@ public class PlotBlock extends BlockWithEntity {
 
             if (!manager.canPlace(pos, plotSize)) {
                 world.breakBlock(pos, true, player);
-                player.sendMessage(Text.literal("✗ Cannot place a plot here, it is too close to another.")
-                        .formatted(Formatting.RED), false);
+                player.sendMessage(Text.translatable("sp.block.too_close"), false);
                 return;
             }
 
@@ -112,74 +114,74 @@ public class PlotBlock extends BlockWithEntity {
             String ownerName = player.getName().getString();
             long tick = world.getTime();
 
+            // maxPlotsPerPlayer check (0 = unlimited)
+            com.zhilius.secureplots.config.SecurePlotsConfig cfgPl =
+                com.zhilius.secureplots.config.SecurePlotsConfig.INSTANCE;
+            if (cfgPl != null && cfgPl.maxPlotsPerPlayer > 0) {
+                long owned = manager.getPlayerPlots(ownerId).size();
+                if (owned >= cfgPl.maxPlotsPerPlayer) {
+                    world.breakBlock(pos, true, player);
+                    player.sendMessage(Text.translatable("sp.block.max_plots", cfgPl.maxPlotsPerPlayer), false);
+                    return;
+                }
+            }
+
             PlotData data = new PlotData(ownerId, ownerName, pos, plotSize, tick);
             manager.addPlot(data);
 
-            player.sendMessage(Text.literal("═══════════════════════════").formatted(Formatting.GOLD), false);
-            player.sendMessage(Text.literal("  🛡 Plot created!").formatted(Formatting.YELLOW, Formatting.BOLD), false);
-            player.sendMessage(Text.literal("═══════════════════════════").formatted(Formatting.GOLD), false);
-            player.sendMessage(Text.literal("  Size: ").formatted(Formatting.GRAY)
-                    .append(Text.literal(plotSize.getRadius() + "x" + plotSize.getRadius() + " blocks").formatted(Formatting.AQUA)), false);
-            player.sendMessage(Text.literal("  Tier: ").formatted(Formatting.GRAY)
+            int r = plotSize.getRadius();
+            player.sendMessage(Text.translatable("sp.block.created_header"), false);
+            player.sendMessage(Text.translatable("sp.block.created_title").formatted(Formatting.YELLOW, Formatting.BOLD), false);
+            player.sendMessage(Text.translatable("sp.block.created_header"), false);
+            player.sendMessage(Text.translatable("sp.block.created_size").formatted(Formatting.GRAY)
+                    .append(Text.translatable("sp.block.created_size_value", r, r).formatted(Formatting.AQUA)), false);
+            player.sendMessage(Text.translatable("sp.block.created_tier").formatted(Formatting.GRAY)
                     .append(Text.literal(plotSize.getDisplayName()).formatted(Formatting.AQUA)), false);
-            player.sendMessage(Text.literal("  Use the §6Plot Blueprint §7to manage it.").formatted(Formatting.GRAY), false);
-            player.sendMessage(Text.literal("═══════════════════════════").formatted(Formatting.GOLD), false);
+            player.sendMessage(Text.translatable("sp.block.created_hint"), false);
+            player.sendMessage(Text.translatable("sp.block.created_header"), false);
 
             // HUD message (action bar)
             player.sendMessage(
-                Text.literal("🛡 " + plotSize.getDisplayName() + " plot created! (" + plotSize.getRadius() + "x" + plotSize.getRadius() + ")")
+                Text.translatable("sp.block.created_hud", plotSize.getDisplayName(), r, r)
                     .formatted(Formatting.GREEN, Formatting.BOLD),
-                true // true = action bar (HUD), not chat
-            );
+                true);
 
             // Sound
             world.playSound(null, pos,
                 SoundEvents.UI_TOAST_CHALLENGE_COMPLETE,
                 SoundCategory.PLAYERS, 0.6f, 1.2f);
 
-            com.zhilius.secureplots.network.ModPackets.sendShowPlotInfo(player, pos, data);
+            com.zhilius.secureplots.network.ModPackets.sendOpenPlotScreen(player, pos, data);
             com.zhilius.secureplots.network.ModPackets.sendShowPlotBorder(player, data);
         }
-    }
-
-    private void sendInfoToChat(ServerPlayerEntity player, com.zhilius.secureplots.plot.PlotData data) {
-        String name = (data.getPlotName() != null && !data.getPlotName().isBlank())
-                ? data.getPlotName() : "Protected Plot";
-        int size = data.getSize().getRadius();
-        String membersStr = data.getMembers().isEmpty() ? "Ninguno" : String.valueOf(data.getMembers().size());
-
-        player.sendMessage(Text.literal("═══════════════════════════").formatted(Formatting.GOLD), false);
-        player.sendMessage(Text.literal("  🛡 " + name).formatted(Formatting.YELLOW, Formatting.BOLD), false);
-        player.sendMessage(Text.literal("═══════════════════════════").formatted(Formatting.GOLD), false);
-        player.sendMessage(Text.literal("  Owner: ").formatted(Formatting.GRAY)
-                .append(Text.literal(data.getOwnerName()).formatted(Formatting.WHITE)), false);
-        player.sendMessage(Text.literal("  Tier: ").formatted(Formatting.GRAY)
-                .append(Text.literal(data.getSize().getDisplayName()).formatted(Formatting.AQUA)), false);
-        player.sendMessage(Text.literal("  Size: ").formatted(Formatting.GRAY)
-                .append(Text.literal(size + "x" + size + " blocks").formatted(Formatting.AQUA)), false);
-        player.sendMessage(Text.literal("  Members: ").formatted(Formatting.GRAY)
-                .append(Text.literal(membersStr).formatted(Formatting.GREEN)), false);
-        player.sendMessage(Text.literal("  ⚠ Use the ").formatted(Formatting.YELLOW)
-                .append(Text.literal("Plot Blueprint").formatted(Formatting.GOLD))
-                .append(Text.literal(" to manage.").formatted(Formatting.YELLOW)), false);
-        player.sendMessage(Text.literal("═══════════════════════════").formatted(Formatting.GOLD), false);
     }
 
     @Override
     public BlockState onBreak(World world, BlockPos pos, BlockState state, PlayerEntity player) {
         if (!world.isClient) {
+            com.zhilius.secureplots.config.SecurePlotsConfig cfg =
+                com.zhilius.secureplots.config.SecurePlotsConfig.INSTANCE;
             PlotManager manager = PlotManager.getOrCreate((net.minecraft.server.world.ServerWorld) world);
             PlotData data = manager.getPlot(pos);
             if (data != null) {
-                if (!data.getOwnerId().equals(player.getUuid()) && !player.hasPermissionLevel(2)) {
-                    player.sendMessage(Text.literal("✗ You are not the owner of this plot.").formatted(Formatting.RED), false);
+                int opLevel = cfg != null ? cfg.adminOpLevel : 2;
+                boolean isAdmin = player.hasPermissionLevel(opLevel);
+                // plotBlocksUnbreakable: non-owners cannot break the block at all
+                if (cfg != null && cfg.plotBlocksUnbreakable
+                        && !data.getOwnerId().equals(player.getUuid()) && !isAdmin) {
+                    player.sendMessage(Text.translatable("sp.block.not_owner"), false);
+                    world.setBlockState(pos, state);
+                    return state;
+                }
+                if (!data.getOwnerId().equals(player.getUuid()) && !isAdmin) {
+                    player.sendMessage(Text.translatable("sp.block.not_owner"), false);
                     world.setBlockState(pos, state);
                     return state;
                 }
                 manager.removePlot(pos);
-                
-                com.zhilius.secureplots.network.ModPackets.sendHidePlotBorder((net.minecraft.server.network.ServerPlayerEntity) player, pos);
-                player.sendMessage(Text.literal("✗ Plot removed.").formatted(Formatting.RED), false);
+                com.zhilius.secureplots.network.ModPackets.sendHidePlotBorder(
+                    (net.minecraft.server.network.ServerPlayerEntity) player, pos);
+                player.sendMessage(Text.translatable("sp.block.removed"), false);
             }
         }
         return super.onBreak(world, pos, state, player);
@@ -189,9 +191,9 @@ public class PlotBlock extends BlockWithEntity {
     public void appendTooltip(ItemStack stack, TooltipContext context, List<Text> tooltip, TooltipType options) {
         PlotSize plotSize = PlotSize.fromTier(this.tier);
         int size = plotSize.getRadius();
-        tooltip.add(Text.literal("Protege: " + size + "x" + size + " blocks").formatted(Formatting.AQUA));
-        tooltip.add(Text.literal("Tier " + (this.tier + 1) + " — " + plotSize.getDisplayName()).formatted(Formatting.GRAY));
-        tooltip.add(Text.literal("Coloca para reclamar tu parcela.").formatted(Formatting.DARK_GRAY));
+        tooltip.add(Text.translatable("sp.block.tooltip_size", size, size).formatted(Formatting.AQUA));
+        tooltip.add(Text.translatable("sp.block.tooltip_tier", this.tier + 1, plotSize.getDisplayName()).formatted(Formatting.GRAY));
+        tooltip.add(Text.translatable("sp.block.tooltip_hint").formatted(Formatting.DARK_GRAY));
     }
 
     @Override

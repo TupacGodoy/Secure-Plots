@@ -6,14 +6,6 @@
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 package com.zhilius.secureplots.blockentity;
 
@@ -34,10 +26,10 @@ public class ModBlockEntities {
                 Identifier.of(SecurePlots.MOD_ID, "plot_block_entity"),
                 BlockEntityType.Builder.create(PlotBlockEntity::new,
                         ModBlocks.BRONZE_PLOT_BLOCK,
-                        ModBlocks.emerald_PLOT_BLOCK,
+                        ModBlocks.EMERALD_PLOT_BLOCK,   // Fixed: was emerald_PLOT_BLOCK
                         ModBlocks.GOLD_PLOT_BLOCK,
                         ModBlocks.DIAMOND_PLOT_BLOCK,
                         ModBlocks.NETHERITE_PLOT_BLOCK).build());
-        SecurePlots.LOGGER.info("Registrando block entities de Secure Plots...");
+        SecurePlots.LOGGER.info("Registering Secure Plots block entities...");
     }
 }

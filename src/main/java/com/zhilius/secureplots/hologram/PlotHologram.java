@@ -75,6 +75,12 @@ public class PlotHologram {
         });
     }
 
+    /**
+     * @deprecated Server-side hologram spawning is no longer used.
+     * Holograms are rendered client-side by {@code PlotHologramClient}.
+     * This method is kept for API compatibility but does nothing useful.
+     */
+    @Deprecated
     public static void spawn(ServerWorld world, BlockPos blockPos, PlotData data,
                               int durationTicks, float playerYaw) {
         spawn(world, blockPos, data, durationTicks, playerYaw, null);

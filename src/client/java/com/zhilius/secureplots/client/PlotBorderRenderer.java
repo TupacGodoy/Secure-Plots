@@ -6,14 +6,6 @@
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 package com.zhilius.secureplots.client;
 
@@ -37,22 +29,27 @@ public class PlotBorderRenderer {
         return (double)(n & 0x7fffffffL) / 1073741824.0 - 1.0;
     }
 
+    /** Linearly interpolate a single float channel. */
+    private static float lerp(float a, float b, float t) {
+        return a + t * (b - a);
+    }
+
     public static void render(WorldRenderContext context, SecurePlotsClient.BorderDisplay display) {
         PlotData data = display.data;
         MinecraftClient client = MinecraftClient.getInstance();
         if (client.player == null) return;
 
-        // Use live config from server
         BorderConfig cfg = PlotBorderRendererConfig.current;
 
-        float halfF = display.effectiveRadiusF() / 2f;
+        float halfF  = display.effectiveRadiusF() / 2f;
         BlockPos center = data.getCenter();
 
-        // Lerped tier for color blending
-        float transP = display.transitionProgress();
-        int fromTier = display.prevTier < 0 ? data.getSize().tier : display.prevTier;
-        int toTier   = data.getSize().tier;
-        int maxTier  = cfg.tierColors.size() - 1;
+        // Lerped tier for color blending — use effectiveTier() to avoid direct field access
+        float transP   = display.transitionProgress();
+        int fromTier   = display.effectiveTier() == data.getSize().tier && display.isTransitioning()
+                         ? display.prevTier : data.getSize().tier;
+        int toTier     = data.getSize().tier;
+        int maxTier    = cfg.tierColors.size() - 1;
         fromTier = Math.max(0, Math.min(fromTier, maxTier));
         toTier   = Math.max(0, Math.min(toTier,   maxTier));
 
@@ -71,22 +68,18 @@ public class PlotBorderRenderer {
         float[] cf = cfg.getTierColors(fromTier);
         float[] ct = cfg.getTierColors(toTier);
 
-        // Lerp all 9 color channels
-        float r  = cf[0] + transP * (ct[0] - cf[0]);
-        float g  = cf[1] + transP * (ct[1] - cf[1]);
-        float b  = cf[2] + transP * (ct[2] - cf[2]);
-        float gr = cf[3] + transP * (ct[3] - cf[3]);
-        float gg = cf[4] + transP * (ct[4] - cf[4]);
-        float gb = cf[5] + transP * (ct[5] - cf[5]);
-        float wr = cf[6] + transP * (ct[6] - cf[6]);
-        float wg = cf[7] + transP * (ct[7] - cf[7]);
-        float wb = cf[8] + transP * (ct[8] - cf[8]);
+        // Lerp all 9 color channels in a loop instead of 9 individual statements
+        float[] c = new float[9];
+        for (int i = 0; i < 9; i++) c[i] = lerp(cf[i], ct[i], transP);
+
+        float r  = c[0], g  = c[1], b  = c[2];
+        float gr = c[3], gg = c[4], gb = c[5];
+        float wr = c[6], wg = c[7], wb = c[8];
 
         long  time  = System.currentTimeMillis();
         float t     = (time % cfg.pulseCycleMs) / (float) cfg.pulseCycleMs;
         float pulse = cfg.pulseMin + cfg.pulseRange * (float) Math.sin(t * Math.PI * 2);
 
-        // Pre-calculate alpha and width values for this frame
         float W  = cfg.edgeThickness;
         float WG = cfg.glowThickness;
         float SW = cfg.scanlineThickness;
@@ -113,22 +106,22 @@ public class PlotBorderRenderer {
         {
             BufferBuilder buf = tess.begin(VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_COLOR);
 
+            // Corner coordinates — computed once, reused across passes
+            double[] cx = { minX, maxX, minX, maxX };
+            double[] cz = { minZ, minZ, maxZ, maxZ };
+
             // 1. Outer glow halo
             for (int i = 0; i < 4; i++) {
-                double cx = (i == 0 || i == 2) ? minX : maxX;
-                double cz = (i == 0 || i == 1) ? minZ : maxZ;
-                quadPillarX(buf, mx, cx, cz, baseY, topY, WG, gr, gg, gb, ga);
-                quadPillarZ(buf, mx, cx, cz, baseY, topY, WG, gr, gg, gb, ga);
+                quadPillarX(buf, mx, cx[i], cz[i], baseY, topY, WG, gr, gg, gb, ga);
+                quadPillarZ(buf, mx, cx[i], cz[i], baseY, topY, WG, gr, gg, gb, ga);
             }
 
             // 2. Core edges + white core overlay
             for (int i = 0; i < 4; i++) {
-                double cx = (i == 0 || i == 2) ? minX : maxX;
-                double cz = (i == 0 || i == 1) ? minZ : maxZ;
-                quadPillarX(buf, mx, cx, cz, baseY, topY, W,  r,  g,  b,  ea);
-                quadPillarZ(buf, mx, cx, cz, baseY, topY, W,  r,  g,  b,  ea);
-                quadPillarX(buf, mx, cx, cz, baseY, topY, WW, wr, wg, wb, wa);
-                quadPillarZ(buf, mx, cx, cz, baseY, topY, WW, wr, wg, wb, wa);
+                quadPillarX(buf, mx, cx[i], cz[i], baseY, topY, W,  r,  g,  b,  ea);
+                quadPillarZ(buf, mx, cx[i], cz[i], baseY, topY, W,  r,  g,  b,  ea);
+                quadPillarX(buf, mx, cx[i], cz[i], baseY, topY, WW, wr, wg, wb, wa);
+                quadPillarZ(buf, mx, cx[i], cz[i], baseY, topY, WW, wr, wg, wb, wa);
             }
 
             // 3. Horizontal rings at bottom and top
@@ -162,14 +155,15 @@ public class PlotBorderRenderer {
             for (int i = 0; i < 2; i++) {
                 double ry    = (i == 0) ? ringY : ring2Y;
                 float  alpha = (i == 0) ? 0.95f * pulse : 0.55f * pulse;
+                float  rwa   = alpha * 0.6f;
                 quadBeamZ(buf, mx, minX, maxX, ry, minZ, RW,        r,  g,  b,  alpha);
                 quadBeamZ(buf, mx, minX, maxX, ry, maxZ, RW,        r,  g,  b,  alpha);
                 quadBeamX(buf, mx, minX, ry, minZ, maxZ, RW,        r,  g,  b,  alpha);
                 quadBeamX(buf, mx, maxX, ry, minZ, maxZ, RW,        r,  g,  b,  alpha);
-                quadBeamZ(buf, mx, minX, maxX, ry, minZ, RW * 0.4f, wr, wg, wb, alpha * 0.6f);
-                quadBeamZ(buf, mx, minX, maxX, ry, maxZ, RW * 0.4f, wr, wg, wb, alpha * 0.6f);
-                quadBeamX(buf, mx, minX, ry, minZ, maxZ, RW * 0.4f, wr, wg, wb, alpha * 0.6f);
-                quadBeamX(buf, mx, maxX, ry, minZ, maxZ, RW * 0.4f, wr, wg, wb, alpha * 0.6f);
+                quadBeamZ(buf, mx, minX, maxX, ry, minZ, RW * 0.4f, wr, wg, wb, rwa);
+                quadBeamZ(buf, mx, minX, maxX, ry, maxZ, RW * 0.4f, wr, wg, wb, rwa);
+                quadBeamX(buf, mx, minX, ry, minZ, maxZ, RW * 0.4f, wr, wg, wb, rwa);
+                quadBeamX(buf, mx, maxX, ry, minZ, maxZ, RW * 0.4f, wr, wg, wb, rwa);
             }
 
             BufferRenderer.drawWithGlobalProgram(buf.end());
@@ -179,12 +173,12 @@ public class PlotBorderRenderer {
         {
             long boltSlot = time / cfg.boltFlickerMs;
             BufferBuilder buf = tess.begin(VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_COLOR);
+            double[] cx = { minX, maxX, minX, maxX };
+            double[] cz = { minZ, minZ, maxZ, maxZ };
             for (int i = 0; i < 4; i++) {
-                double cx = (i == 0 || i == 2) ? minX : maxX;
-                double cz = (i == 0 || i == 1) ? minZ : maxZ;
-                boltQuad(buf, mx, cx, cz, baseY, topY, gr, gg, gb, 0.50f, boltSlot * 11L + (i * 3 + 1), 0.48, 0.05f);
-                boltQuad(buf, mx, cx, cz, baseY, topY, r,  g,  b,  0.90f, boltSlot * 11L + (i * 3 + 2), 0.26, 0.035f);
-                boltQuad(buf, mx, cx, cz, baseY, topY, wr, wg, wb, 0.60f, boltSlot * 11L + (i * 3 + 3), 0.10, 0.015f);
+                boltQuad(buf, mx, cx[i], cz[i], baseY, topY, gr, gg, gb, 0.50f, boltSlot * 11L + (i * 3 + 1), 0.48, 0.05f);
+                boltQuad(buf, mx, cx[i], cz[i], baseY, topY, r,  g,  b,  0.90f, boltSlot * 11L + (i * 3 + 2), 0.26, 0.035f);
+                boltQuad(buf, mx, cx[i], cz[i], baseY, topY, wr, wg, wb, 0.60f, boltSlot * 11L + (i * 3 + 3), 0.10, 0.015f);
             }
             BufferRenderer.drawWithGlobalProgram(buf.end());
         }
@@ -211,11 +205,11 @@ public class PlotBorderRenderer {
             quadBeamZ(buf, mx, pMinX, pMaxX, topY - 2, pMaxZ, PW, ct2[6], ct2[7], ct2[8], pa70);
             quadBeamX(buf, mx, pMinX, topY - 2, pMinZ, pMaxZ, PW, ct2[6], ct2[7], ct2[8], pa70);
             quadBeamX(buf, mx, pMaxX, topY - 2, pMinZ, pMaxZ, PW, ct2[6], ct2[7], ct2[8], pa70);
+            double[] px = { pMinX, pMaxX, pMinX, pMaxX };
+            double[] pz = { pMinZ, pMinZ, pMaxZ, pMaxZ };
             for (int i = 0; i < 4; i++) {
-                double cx = (i == 0 || i == 2) ? pMinX : pMaxX;
-                double cz = (i == 0 || i == 1) ? pMinZ : pMaxZ;
-                quadPillarX(buf, mx, cx, cz, baseY, topY, PW, ct2[0], ct2[1], ct2[2], pulseAlpha);
-                quadPillarZ(buf, mx, cx, cz, baseY, topY, PW, ct2[0], ct2[1], ct2[2], pulseAlpha);
+                quadPillarX(buf, mx, px[i], pz[i], baseY, topY, PW, ct2[0], ct2[1], ct2[2], pulseAlpha);
+                quadPillarZ(buf, mx, px[i], pz[i], baseY, topY, PW, ct2[0], ct2[1], ct2[2], pulseAlpha);
             }
             BufferRenderer.drawWithGlobalProgram(buf.end());
         }

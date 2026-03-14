@@ -153,24 +153,24 @@ public class SignInputManager {
         PlotManager manager = PlotManager.getOrCreate(sw);
         PlotData data = manager.getPlot(plotPos);
         if (data == null) {
-            player.sendMessage(Text.literal("✗ Plot not found.").formatted(Formatting.RED), false);
+            player.sendMessage(Text.translatable("sp.error.not_in_plot"), false);
             return;
         }
         boolean isAdmin = player.getCommandTags().contains(SecurePlotsConfig.INSTANCE != null ? SecurePlotsConfig.INSTANCE.adminTag : "plot_admin");
         if (!data.getOwnerId().equals(player.getUuid()) && !isAdmin) {
-            player.sendMessage(Text.literal("✗ Only the owner can rename.").formatted(Formatting.RED), false);
+            player.sendMessage(Text.translatable("sp.error.not_owner"), false);
             reopenMenu(player, plotPos, PlotMenuHandler.MenuPage.INFO);
             return;
         }
         newName = newName.trim();
         if (newName.isEmpty() || newName.length() > 32) {
-            player.sendMessage(Text.literal("✗ Invalid name (1-32 characters).").formatted(Formatting.RED), false);
+            player.sendMessage(Text.translatable("sp.rename.invalid_name"), false);
             reopenMenu(player, plotPos, PlotMenuHandler.MenuPage.INFO);
             return;
         }
         for (PlotData p : manager.getPlayerPlots(data.getOwnerId())) {
             if (p != data && p.getPlotName().equalsIgnoreCase(newName)) {
-                player.sendMessage(Text.literal("✗ A plot with that name already exists.").formatted(Formatting.RED), false);
+                player.sendMessage(Text.translatable("sp.rename.duplicate"), false);
                 reopenMenu(player, plotPos, PlotMenuHandler.MenuPage.INFO);
                 return;
             }
@@ -196,7 +196,7 @@ public class SignInputManager {
         PlotManager manager = PlotManager.getOrCreate(sw);
         PlotData data = manager.getPlot(plotPos);
         if (data == null) {
-            player.sendMessage(Text.literal("✗ Plot not found.").formatted(Formatting.RED), false);
+            player.sendMessage(Text.translatable("sp.error.not_in_plot"), false);
             return;
         }
         boolean isAdmin = player.getCommandTags().contains(SecurePlotsConfig.INSTANCE != null ? SecurePlotsConfig.INSTANCE.adminTag : "plot_admin");
@@ -206,17 +206,17 @@ public class SignInputManager {
         }
         ServerPlayerEntity target = player.getServer().getPlayerManager().getPlayer(targetName);
         if (target == null) {
-            player.sendMessage(Text.literal("✗ \"" + targetName + "\" is not online.").formatted(Formatting.RED), false);
+            player.sendMessage(Text.translatable("sp.add.player_not_found", targetName), false);
             reopenMenu(player, plotPos, PlotMenuHandler.MenuPage.MEMBERS);
             return;
         }
         if (target.getUuid().equals(player.getUuid()) && !isAdmin) {
-            player.sendMessage(Text.literal("✗ You cannot add yourself.").formatted(Formatting.RED), false);
+            player.sendMessage(Text.translatable("sp.add.self"), false);
             reopenMenu(player, plotPos, PlotMenuHandler.MenuPage.MEMBERS);
             return;
         }
         if (data.getRoleOf(target.getUuid()) != PlotData.Role.VISITOR) {
-            player.sendMessage(Text.literal("✗ " + targetName + " already has access.").formatted(Formatting.YELLOW), false);
+            player.sendMessage(Text.translatable("sp.add.already_member", targetName), false);
             reopenMenu(player, plotPos, PlotMenuHandler.MenuPage.MEMBERS);
             return;
         }
@@ -225,8 +225,9 @@ public class SignInputManager {
         sw.playSound(null, player.getBlockPos(),
             SoundEvents.ENTITY_EXPERIENCE_ORB_PICKUP,
             SoundCategory.PLAYERS, 1f, 1.5f);
-        player.sendMessage(Text.literal("✔ " + targetName + " added as a member.").formatted(Formatting.GREEN), false);
-        target.sendMessage(Text.literal("✔ You were added to \"" + data.getPlotName() + "\" by " + player.getName().getString()).formatted(Formatting.GREEN), false);
+        player.sendMessage(Text.translatable("sp.member.added_sender", targetName), false);
+        target.sendMessage(Text.translatable("sp.member.added_target",
+            data.getPlotName(), player.getName().getString()), false);
         reopenMenu(player, plotPos, PlotMenuHandler.MenuPage.MEMBERS);
     }
 
@@ -236,29 +237,29 @@ public class SignInputManager {
         PlotManager manager = PlotManager.getOrCreate(sw);
         PlotData data = manager.getPlot(plotPos);
         if (data == null) {
-            player.sendMessage(Text.literal("✗ Plot not found.").formatted(Formatting.RED), false);
+            player.sendMessage(Text.translatable("sp.error.not_in_plot"), false);
             return;
         }
         boolean isAdmin = player.getCommandTags().contains(SecurePlotsConfig.INSTANCE != null ? SecurePlotsConfig.INSTANCE.adminTag : "plot_admin");
         if (!data.hasPermission(player.getUuid(), PlotData.Permission.MANAGE_GROUPS) && !isAdmin) {
-            player.sendMessage(Text.literal("✗ You do not have permission to create groups.").formatted(Formatting.RED), false);
+            player.sendMessage(Text.translatable("sp.error.no_group_perm"), false);
             reopenMenu(player, plotPos, PlotMenuHandler.MenuPage.MEMBERS);
             return;
         }
         groupName = groupName.trim();
         if (groupName.isEmpty() || groupName.length() > 24) {
-            player.sendMessage(Text.literal("✗ Invalid group name (1-24 characters).").formatted(Formatting.RED), false);
+            player.sendMessage(Text.translatable("sp.group.invalid_name"), false);
             reopenMenu(player, plotPos, PlotMenuHandler.MenuPage.MEMBERS);
             return;
         }
         if (data.getGroup(groupName) != null) {
-            player.sendMessage(Text.literal("✗ Ya existe un grupo con ese nombre.").formatted(Formatting.YELLOW), false);
+            player.sendMessage(Text.translatable("sp.group.already_exists"), false);
             reopenMenu(player, plotPos, PlotMenuHandler.MenuPage.MEMBERS);
             return;
         }
         data.getOrCreateGroup(groupName);
         manager.markDirty();
-        player.sendMessage(Text.literal("§a✔ Group §d\"" + groupName + "\" §acreated."), false);
+        player.sendMessage(Text.translatable("sp.group.created", groupName), false);
         reopenMenu(player, plotPos, PlotMenuHandler.MenuPage.GLOBAL_PERMS);
     }
 
@@ -268,11 +269,11 @@ public class SignInputManager {
         PlotManager manager = PlotManager.getOrCreate(sw);
         PlotData data = manager.getPlot(plotPos);
         if (data == null) {
-            player.sendMessage(Text.literal("✗ Plot not found.").formatted(Formatting.RED), false);
+            player.sendMessage(Text.translatable("sp.error.not_in_plot"), false);
             return;
         }
         if (!data.getOwnerId().equals(player.getUuid())) {
-            player.sendMessage(Text.literal("✗ Only the owner can change messages.").formatted(Formatting.RED), false);
+            player.sendMessage(Text.translatable("sp.error.not_owner"), false);
             reopenMenu(player, plotPos, PlotMenuHandler.MenuPage.INFO);
             return;
         }
@@ -280,7 +281,7 @@ public class SignInputManager {
         if (isEnter) data.setEnterMessage(msg);
         else         data.setExitMessage(msg);
         manager.markDirty();
-        player.sendMessage(Text.literal("§a✔ Message updated: §f" + msg), false);
+        player.sendMessage(Text.translatable("sp.message.updated", msg), false);
         reopenMenu(player, plotPos, PlotMenuHandler.MenuPage.AMBIENT);
     }
 
@@ -289,16 +290,16 @@ public class SignInputManager {
         if (!(player.getWorld() instanceof ServerWorld sw)) return;
         PlotManager manager = PlotManager.getOrCreate(sw);
         PlotData data = manager.getPlot(plotPos);
-        if (data == null) { player.sendMessage(Text.literal("✗ Plot not found.").formatted(Formatting.RED), false); return; }
+        if (data == null) { player.sendMessage(Text.translatable("sp.error.not_in_plot"), false); return; }
         boolean isAdmin = player.getCommandTags().contains(
             com.zhilius.secureplots.config.SecurePlotsConfig.INSTANCE != null
             ? com.zhilius.secureplots.config.SecurePlotsConfig.INSTANCE.adminTag : "plot_admin");
         boolean canEdit = data.getOwnerId().equals(player.getUuid())
             || data.getRoleOf(player.getUuid()) == PlotData.Role.ADMIN || isAdmin;
-        if (!canEdit) { player.sendMessage(Text.literal("✗ Only the owner or admin can change this.").formatted(Formatting.RED), false); return; }
+        if (!canEdit) { player.sendMessage(Text.translatable("sp.error.not_owner_or_admin"), false); return; }
         data.setParticleEffect(value.trim());
         manager.markDirty();
-        player.sendMessage(Text.literal("§a✔ Particle set to: §f" + value.trim()), false);
+        player.sendMessage(Text.translatable("sp.plot.particle_set", value.trim()), false);
         reopenMenu(player, plotPos, PlotMenuHandler.MenuPage.AMBIENT);
     }
 
@@ -307,16 +308,16 @@ public class SignInputManager {
         if (!(player.getWorld() instanceof ServerWorld sw)) return;
         PlotManager manager = PlotManager.getOrCreate(sw);
         PlotData data = manager.getPlot(plotPos);
-        if (data == null) { player.sendMessage(Text.literal("✗ Plot not found.").formatted(Formatting.RED), false); return; }
+        if (data == null) { player.sendMessage(Text.translatable("sp.error.not_in_plot"), false); return; }
         boolean isAdmin = player.getCommandTags().contains(
             com.zhilius.secureplots.config.SecurePlotsConfig.INSTANCE != null
             ? com.zhilius.secureplots.config.SecurePlotsConfig.INSTANCE.adminTag : "plot_admin");
         boolean canEdit = data.getOwnerId().equals(player.getUuid())
             || data.getRoleOf(player.getUuid()) == PlotData.Role.ADMIN || isAdmin;
-        if (!canEdit) { player.sendMessage(Text.literal("✗ Only the owner or admin can change this.").formatted(Formatting.RED), false); return; }
+        if (!canEdit) { player.sendMessage(Text.translatable("sp.error.not_owner_or_admin"), false); return; }
         data.setMusicSound(value.trim());
         manager.markDirty();
-        player.sendMessage(Text.literal("§a✔ Music set to: §f" + value.trim()), false);
+        player.sendMessage(Text.translatable("sp.plot.music_set", value.trim()), false);
         reopenMenu(player, plotPos, PlotMenuHandler.MenuPage.AMBIENT);
     }
 

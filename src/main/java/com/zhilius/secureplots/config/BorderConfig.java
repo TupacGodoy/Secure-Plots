@@ -71,6 +71,9 @@ public class BorderConfig {
 
     // ── Hologram ──────────────────────────────────────────────────────────────
 
+    /** Whether to show the floating hologram above plot blocks. Synced from SecurePlotsConfig.enableHologram. */
+    public boolean hologramEnabled = true;
+
     /** Hologram height above the plot block in blocks. */
     public float hologramHeight = 3.0f;
 

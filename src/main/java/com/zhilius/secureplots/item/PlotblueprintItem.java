@@ -81,7 +81,7 @@ public class PlotblueprintItem extends Item {
                 if (atPos != null && (atPos.getRoleOf(player.getUuid()) != PlotData.Role.VISITOR || isAdmin)) {
                     ModPackets.sendShowPlotBorder(player, atPos);
                 } else {
-                    player.sendMessage(Text.literal("✗ You are not inside one of your plots.").formatted(Formatting.RED), false);
+                    player.sendMessage(Text.translatable("sp.block.not_owner"), false);
                 }
             } else {
                 // Click normal: si está dentro de una plot propia → abrir menú de la plot
@@ -96,7 +96,7 @@ public class PlotblueprintItem extends Item {
                     // Fuera de protección → siempre abrir lista (sin shift requerido)
                     List<PlotData> playerPlots = manager.getPlayerPlots(player.getUuid());
                     if (playerPlots.isEmpty()) {
-                        player.sendMessage(Text.literal("✗ You have no plots placed.").formatted(Formatting.RED), false);
+                        player.sendMessage(Text.translatable("sp.error.no_plots"), false);
                     } else {
                         openPlotListMenu(player, playerPlots, manager);
                     }
@@ -133,10 +133,10 @@ public class PlotblueprintItem extends Item {
 
             List<Text> lore = new ArrayList<>();
             lore.add(Text.literal("§7X: §f" + c.getX() + "  §7Z: §f" + c.getZ()).styled(s -> s.withItalic(false)));
-            lore.add(Text.literal("§7Nivel: §b" + p.getSize().getDisplayName()).styled(s -> s.withItalic(false)));
+            lore.add(Text.translatable("sp.blueprint.lore_tier", p.getSize().getDisplayName()).styled(s -> s.withItalic(false)));
             lore.add(Text.literal(tpStatus).styled(s -> s.withItalic(false)));
-            lore.add(Text.literal("§eClick: Teleport here").styled(s -> s.withItalic(false)));
-            lore.add(Text.literal("§7Right-click: Open menu").styled(s -> s.withItalic(false)));
+            lore.add(Text.translatable("sp.blueprint.lore_click").styled(s -> s.withItalic(false)));
+            lore.add(Text.translatable("sp.blueprint.lore_rightclick").styled(s -> s.withItalic(false)));
 
             ItemStack plotItem = new ItemStack(itemForTier(p.getSize().tier));
             plotItem.set(DataComponentTypes.CUSTOM_NAME,
@@ -207,7 +207,7 @@ public class PlotblueprintItem extends Item {
             player.closeHandledScreen();
             player.teleport(sw, c.getX() + 0.5, tpY, c.getZ() + 0.5,
                 Set.of(), player.getYaw(), player.getPitch());
-            player.sendMessage(Text.literal("§a✔ Teleportado a §e" + plot.getPlotName()), false);
+            player.sendMessage(Text.translatable("sp.tp.success", plot.getPlotName()), false);
             sw.playSound(null, player.getBlockPos(), SoundEvents.ENTITY_ENDERMAN_TELEPORT, SoundCategory.PLAYERS, 1f, 1f);
         }
 
@@ -256,7 +256,7 @@ public class PlotblueprintItem extends Item {
 
     @Override
     public void appendTooltip(ItemStack stack, TooltipContext context, List<Text> tooltip, TooltipType type) {
-        tooltip.add(Text.literal("Click: open menu / plot list").formatted(Formatting.GRAY));
-        tooltip.add(Text.literal("Shift+Click: show plot borders").formatted(Formatting.DARK_GRAY));
+        tooltip.add(Text.translatable("sp.blueprint.tooltip_click").formatted(Formatting.GRAY));
+        tooltip.add(Text.translatable("sp.blueprint.tooltip_shift").formatted(Formatting.DARK_GRAY));
     }
 }

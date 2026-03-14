@@ -6,14 +6,6 @@
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 package com.zhilius.secureplots.block;
 
@@ -30,36 +22,16 @@ import net.minecraft.util.Identifier;
 
 public class ModBlocks {
 
-    // Los valores de luminance/hardness/blastResistance se leen del config.
-    // El config ya estará cargado cuando se llame a initialize() desde SecurePlots.onInitialize().
+    public static final Block BRONZE_PLOT_BLOCK    = register("bronze_plot_block",    new PlotBlock(buildSettings(MapColor.ORANGE,       0), 0));
+    public static final Block GOLD_PLOT_BLOCK      = register("gold_plot_block",      new PlotBlock(buildSettings(MapColor.GOLD,         1), 1));
+    // Fixed: was "emerald_PLOT_BLOCK" (inconsistent naming)
+    public static final Block EMERALD_PLOT_BLOCK   = register("emerald_plot_block",   new PlotBlock(buildSettings(MapColor.GREEN,        2), 2));
+    public static final Block DIAMOND_PLOT_BLOCK   = register("diamond_plot_block",   new PlotBlock(buildSettings(MapColor.DIAMOND_BLUE, 3), 3));
+    public static final Block NETHERITE_PLOT_BLOCK = register("netherite_plot_block", new PlotBlock(buildSettings(MapColor.BLACK,        4), 4));
 
-    // Tier 0 - Bronze
-    public static final Block BRONZE_PLOT_BLOCK = register("bronze_plot_block",
-            new PlotBlock(buildSettings(MapColor.ORANGE, 0), 0));
-
-    // Tier 1 - Gold
-    public static final Block GOLD_PLOT_BLOCK = register("gold_plot_block",
-            new PlotBlock(buildSettings(MapColor.GOLD, 1), 1));
-
-    // Tier 2 - Emerald
-    public static final Block emerald_PLOT_BLOCK = register("emerald_plot_block",
-            new PlotBlock(buildSettings(MapColor.GREEN, 2), 2));
-
-    // Tier 3 - Diamond
-    public static final Block DIAMOND_PLOT_BLOCK = register("diamond_plot_block",
-            new PlotBlock(buildSettings(MapColor.DIAMOND_BLUE, 3), 3));
-
-    // Tier 4 - Netherite
-    public static final Block NETHERITE_PLOT_BLOCK = register("netherite_plot_block",
-            new PlotBlock(buildSettings(MapColor.BLACK, 4), 4));
-
-    /**
-     * Construye los settings del bloque leyendo luminance, hardness y blastResistance del config.
-     * Si el config no está disponible (arranque muy temprano), usa los valores por defecto.
-     */
     private static AbstractBlock.Settings buildSettings(MapColor color, int tier) {
-        int luminance = 4 + tier;       // fallback
-        float hardness = 50f;
+        int   luminance       = 4 + tier;
+        float hardness        = 50f;
         float blastResistance = 1200f;
 
         if (SecurePlotsConfig.INSTANCE != null) {
@@ -79,11 +51,11 @@ public class ModBlocks {
 
     public static Block fromTier(int tier) {
         return switch (tier) {
-            case 0 -> BRONZE_PLOT_BLOCK;
-            case 1 -> GOLD_PLOT_BLOCK;
-            case 2 -> emerald_PLOT_BLOCK;
-            case 3 -> DIAMOND_PLOT_BLOCK;
-            case 4 -> NETHERITE_PLOT_BLOCK;
+            case 0  -> BRONZE_PLOT_BLOCK;
+            case 1  -> GOLD_PLOT_BLOCK;
+            case 2  -> EMERALD_PLOT_BLOCK;
+            case 3  -> DIAMOND_PLOT_BLOCK;
+            case 4  -> NETHERITE_PLOT_BLOCK;
             default -> BRONZE_PLOT_BLOCK;
         };
     }
@@ -95,6 +67,6 @@ public class ModBlocks {
     }
 
     public static void initialize() {
-        SecurePlots.LOGGER.info("Registrando bloques de Secure Plots...");
+        SecurePlots.LOGGER.info("Registering Secure Plots blocks...");
     }
 }
