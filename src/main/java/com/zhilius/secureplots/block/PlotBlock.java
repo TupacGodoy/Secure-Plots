@@ -31,6 +31,8 @@ import net.minecraft.item.Item.TooltipContext;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.tooltip.TooltipType;
 import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.sound.SoundCategory;
+import net.minecraft.sound.SoundEvents;
 import net.minecraft.text.Text;
 import net.minecraft.util.ActionResult;
 import net.minecraft.util.Formatting;
@@ -122,6 +124,18 @@ public class PlotBlock extends BlockWithEntity {
                     .append(Text.literal(plotSize.getDisplayName()).formatted(Formatting.AQUA)), false);
             player.sendMessage(Text.literal("  Use the §6Plot Blueprint §7to manage it.").formatted(Formatting.GRAY), false);
             player.sendMessage(Text.literal("═══════════════════════════").formatted(Formatting.GOLD), false);
+
+            // HUD message (action bar)
+            player.sendMessage(
+                Text.literal("🛡 " + plotSize.getDisplayName() + " plot created! (" + plotSize.getRadius() + "x" + plotSize.getRadius() + ")")
+                    .formatted(Formatting.GREEN, Formatting.BOLD),
+                true // true = action bar (HUD), not chat
+            );
+
+            // Sound
+            world.playSound(null, pos,
+                SoundEvents.UI_TOAST_CHALLENGE_COMPLETE,
+                SoundCategory.PLAYERS, 0.6f, 1.2f);
 
             com.zhilius.secureplots.network.ModPackets.sendShowPlotInfo(player, pos, data);
             com.zhilius.secureplots.network.ModPackets.sendShowPlotBorder(player, data);

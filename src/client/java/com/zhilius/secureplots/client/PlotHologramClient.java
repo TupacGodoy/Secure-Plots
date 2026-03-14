@@ -50,12 +50,30 @@ public class PlotHologramClient {
         float   fixedYaw    = 0f;
         boolean yawCaptured = false;
 
+        // Cached lines — rebuilt only when data or language changes
+        String[] cachedLines   = null;
+        boolean  cachedSpanish = false;
+
         HologramDisplay(PlotData data, BlockPos pos, long durationMs) {
             this.data      = data;
             this.pos       = pos;
             long now       = System.currentTimeMillis();
             this.createdAt = now;
             this.expiresAt = now + durationMs;
+        }
+
+        /** Returns cached lines, rebuilding if language changed. */
+        String[] getLines(boolean es) {
+            if (cachedLines == null || cachedSpanish != es) {
+                cachedLines   = buildLines(data, es);
+                cachedSpanish = es;
+            }
+            return cachedLines;
+        }
+
+        /** Call when data changes to force a rebuild on next render. */
+        void invalidateCache() {
+            cachedLines = null;
         }
     }
 
@@ -66,10 +84,6 @@ public class PlotHologramClient {
         return lang != null && lang.startsWith("es");
     }
 
-    private static String t(boolean es, String en, String esp) {
-        return es ? esp : en;
-    }
-
     // ── Public API ────────────────────────────────────────────────────────────
 
     public static void register() {
@@ -78,11 +92,12 @@ public class PlotHologramClient {
             if (mc.player == null || mc.world == null) return;
 
             long now = System.currentTimeMillis();
+            boolean es = isSpanish(); // compute once per frame for all holograms
             Iterator<HologramDisplay> iter = active.iterator();
             while (iter.hasNext()) {
                 HologramDisplay h = iter.next();
                 if (h.expiresAt < now) { iter.remove(); continue; }
-                renderHologram(context, h, mc, now);
+                renderHologram(context, h, mc, now, es);
             }
         });
     }
@@ -90,11 +105,12 @@ public class PlotHologramClient {
     public static void show(PlotData data, BlockPos pos, long durationMs) {
         for (HologramDisplay h : active) {
             if (h.pos.equals(pos)) {
-                h.data        = data;
-                long now      = System.currentTimeMillis();
-                h.createdAt   = now;
-                h.expiresAt   = now + durationMs;
+                h.data      = data;
+                long now    = System.currentTimeMillis();
+                h.createdAt = now;
+                h.expiresAt = now + durationMs;
                 h.yawCaptured = false;
+                h.invalidateCache();
                 return;
             }
         }
@@ -116,13 +132,14 @@ public class PlotHologramClient {
     // ── Rendering ────────────────────────────────────────────────────────────
 
     private static void renderHologram(WorldRenderContext context,
-                                        HologramDisplay h, MinecraftClient mc, long now) {
+                                        HologramDisplay h, MinecraftClient mc,
+                                        long now, boolean es) {
         BorderConfig cfg = PlotBorderRendererConfig.current;
 
         float maxDist = cfg.hologramMaxDistance;
         Vec3d cam = context.camera().getPos();
 
-        // Float animation — bob up and down
+        // Float animation
         double floatOffset = 0.0;
         if (cfg.hologramFloat) {
             float ft = (now % cfg.hologramFloatCycleMs) / (float) cfg.hologramFloatCycleMs;
@@ -140,9 +157,9 @@ public class PlotHologramClient {
             h.yawCaptured = true;
         }
 
-        // Fade in / fade out alpha multiplier
+        // Fade in / fade out alpha
         float alpha = 1.0f;
-        long elapsed = now - h.createdAt;
+        long elapsed   = now - h.createdAt;
         long remaining = h.expiresAt - now;
         if (elapsed < cfg.hologramFadeInMs) {
             alpha = (float) elapsed / cfg.hologramFadeInMs;
@@ -151,9 +168,8 @@ public class PlotHologramClient {
         }
         alpha = Math.max(0f, Math.min(1f, alpha));
 
-        // Calculate language once for all t() calls
-        boolean es = isSpanish();
-        String[] lines = buildLines(h.data, es);
+        // Use cached lines — only rebuilt on data change or language switch
+        String[] lines = h.getLines(es);
 
         MatrixStack matrices = context.matrixStack();
         matrices.push();
@@ -204,13 +220,13 @@ public class PlotHologramClient {
         RenderSystem.depthMask(true);
         RenderSystem.enableCull();
 
-        // Draw text lines — fade applied to text color alpha
-        int textAlpha = (int)(255 * alpha) << 24 | 0x00FFFFFF;
+        // Draw text lines
+        int textColor = (int)(255 * alpha) << 24 | 0x00FFFFFF;
         int y = startY + 3;
         VertexConsumerProvider.Immediate consumers = mc.getBufferBuilders().getEntityVertexConsumers();
         for (int i = 0; i < lines.length; i++) {
             int x = startX + (panelW - widths[i]) / 2;
-            tr.draw(lines[i], x, y, textAlpha, false, mx,
+            tr.draw(lines[i], x, y, textColor, false, mx,
                     consumers, TextRenderer.TextLayerType.NORMAL, 0,
                     LightmapTextureManager.MAX_LIGHT_COORDINATE);
             y += tr.fontHeight + cfg.hologramLineSpacing;
@@ -221,27 +237,32 @@ public class PlotHologramClient {
         matrices.pop();
     }
 
-    private static String[] buildLines(PlotData data, boolean es) {
-        String name = (data.getPlotName() != null && !data.getPlotName().isBlank())
-                ? data.getPlotName().toUpperCase()
-                : t(es, "PROTECTED PLOT", "PARCELA PROTEGIDA");
+    // ── Line building ─────────────────────────────────────────────────────────
 
+    private static String[] buildLines(PlotData data, boolean es) {
+        BorderConfig cfg = PlotBorderRendererConfig.current;
+
+        // Labels — from config if not Spanish, or Spanish hardcoded fallback
+        String defaultName  = es ? "PARCELA PROTEGIDA"   : cfg.hologramDefaultName;
+        String ownerLabel   = es ? "Due\u00f1o:   "      : cfg.hologramLabelOwner;
+        String tierLabel    = es ? "Nivel:    "           : cfg.hologramLabelTier;
+        String sizeLabel    = es ? "Tama\u00f1o:  "      : cfg.hologramLabelSize;
+        String membersLabel = es ? "Miembros: "           : cfg.hologramLabelMembers;
+        String nextLabel    = es ? "Siguiente: "          : cfg.hologramLabelNext;
+        String maxLabel     = es ? "\u00a76\u00a7l\u2605 Nivel Maximo \u2605" : cfg.hologramLabelMaxLevel;
+
+        String name   = (data.getPlotName() != null && !data.getPlotName().isBlank())
+                ? data.getPlotName().toUpperCase() : defaultName;
         String tc     = tierColor(data.getSize().tier);
         PlotSize next = data.getSize().next();
         String ntc    = next != null ? tierColor(next.tier) : "";
         String radius = data.getSize().getRadius() + "x" + data.getSize().getRadius();
 
         String nextLine = (next != null)
-                ? "\u00a7e\u2b06 \u00a77" + t(es, "Next: ", "Siguiente: ") + ntc + "\u00a7l" + next.getDisplayName()
-                : "\u00a76\u00a7l\u2605 " + t(es, "Max Level", "Nivel Maximo") + " \u2605";
+                ? "\u00a7e\u2b06 \u00a77" + nextLabel + ntc + "\u00a7l" + next.getDisplayName()
+                : maxLabel;
 
-        String ownerLabel   = t(es, "Owner:   ", "Due\u00f1o:   ");
-        String tierLabel    = t(es, "Tier:    ", "Nivel:    ");
-        String sizeLabel    = t(es, "Size:    ", "Tama\u00f1o:  ");
-        String membersLabel = t(es, "Members: ", "Miembros: ");
-        String nextLabel    = t(es, "Next: ",    "Siguiente: ");
-        String maxLabel     = t(es, "Max Level", "Nivel Maximo");
-
+        // Measure widths to size the dash border
         int maxPx = mcWidth(" " + name);
         maxPx = Math.max(maxPx, mcWidth(" " + ownerLabel   + data.getOwnerName()));
         maxPx = Math.max(maxPx, mcWidth(" " + tierLabel    + data.getSize().getDisplayName()));

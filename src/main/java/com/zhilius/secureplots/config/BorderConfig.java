@@ -109,6 +109,29 @@ public class BorderConfig {
     /** Float cycle duration in milliseconds. */
     public int hologramFloatCycleMs = 3000;
 
+    // ── Hologram text labels ─────────────────────────────────────────────────────
+
+    /** Label shown when the plot has no name. */
+    public String hologramDefaultName = "PROTECTED PLOT";
+
+    /** Label for the owner field. */
+    public String hologramLabelOwner = "Owner:   ";
+
+    /** Label for the tier field. */
+    public String hologramLabelTier = "Tier:    ";
+
+    /** Label for the size field. */
+    public String hologramLabelSize = "Size:    ";
+
+    /** Label for the members field. */
+    public String hologramLabelMembers = "Members: ";
+
+    /** Label for the next tier field. */
+    public String hologramLabelNext = "Next: ";
+
+    /** Label shown when the plot is at max level. */
+    public String hologramLabelMaxLevel = "§6§l★ Max Level ★";
+
     // ── Tier colors ───────────────────────────────────────────────────────────
 
     /**
@@ -206,6 +229,13 @@ public class BorderConfig {
         if (hologramFadeOutMs   <= 0) hologramFadeOutMs   = 600;
         if (hologramFloatAmplitude < 0) hologramFloatAmplitude = 0.1f;
         if (hologramFloatCycleMs   <= 0) hologramFloatCycleMs  = 3000;
+        if (hologramDefaultName == null || hologramDefaultName.isBlank()) hologramDefaultName = "PROTECTED PLOT";
+        if (hologramLabelOwner   == null) hologramLabelOwner   = "Owner:   ";
+        if (hologramLabelTier    == null) hologramLabelTier    = "Tier:    ";
+        if (hologramLabelSize    == null) hologramLabelSize    = "Size:    ";
+        if (hologramLabelMembers == null) hologramLabelMembers = "Members: ";
+        if (hologramLabelNext    == null) hologramLabelNext    = "Next: ";
+        if (hologramLabelMaxLevel== null) hologramLabelMaxLevel= "§6§l★ Max Level ★";
         if (tierColors == null || tierColors.isEmpty()) {
             tierColors = createDefaultTierColors();
         }
