@@ -229,12 +229,12 @@ public class ModPackets {
 
                 ServerPlayerEntity target = context.server().getPlayerManager().getPlayer(targetName);
                 if (target == null) {
-                    player.sendMessage(net.minecraft.text.Text.literal("✗ Jugador \"" + targetName + "\" no está en línea.")
+                    player.sendMessage(net.minecraft.text.Text.literal("✗ Player \"" + targetName + "\" is not online.")
                             .formatted(net.minecraft.util.Formatting.RED), false);
                     return;
                 }
                 if (target.getUuid().equals(player.getUuid())) {
-                    player.sendMessage(net.minecraft.text.Text.literal("✗ No podés agregarte a vos mismo.")
+                    player.sendMessage(net.minecraft.text.Text.literal("✗ You cannot add yourself.")
                             .formatted(net.minecraft.util.Formatting.RED), false);
                     return;
                 }

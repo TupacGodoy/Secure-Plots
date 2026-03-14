@@ -85,7 +85,7 @@ public class PlotBlock extends BlockWithEntity {
 
             if (!manager.canPlace(pos, plotSize)) {
                 world.breakBlock(pos, true, player);
-                player.sendMessage(Text.literal("✗ No puedes colocar una protección aquí, está muy cerca de otra.")
+                player.sendMessage(Text.literal("✗ Cannot place a plot here, it is too close to another.")
                         .formatted(Formatting.RED), false);
                 return;
             }
@@ -98,13 +98,13 @@ public class PlotBlock extends BlockWithEntity {
             manager.addPlot(data);
 
             player.sendMessage(Text.literal("═══════════════════════════").formatted(Formatting.GOLD), false);
-            player.sendMessage(Text.literal("  🛡 ¡Parcela creada!").formatted(Formatting.YELLOW, Formatting.BOLD), false);
+            player.sendMessage(Text.literal("  🛡 Plot created!").formatted(Formatting.YELLOW, Formatting.BOLD), false);
             player.sendMessage(Text.literal("═══════════════════════════").formatted(Formatting.GOLD), false);
-            player.sendMessage(Text.literal("  Tamaño: ").formatted(Formatting.GRAY)
+            player.sendMessage(Text.literal("  Size: ").formatted(Formatting.GRAY)
                     .append(Text.literal(plotSize.getRadius() + "x" + plotSize.getRadius() + " bloques").formatted(Formatting.AQUA)), false);
             player.sendMessage(Text.literal("  Nivel: ").formatted(Formatting.GRAY)
                     .append(Text.literal(plotSize.getDisplayName()).formatted(Formatting.AQUA)), false);
-            player.sendMessage(Text.literal("  Usá el §6Plano de Protección §7para gestionarla.").formatted(Formatting.GRAY), false);
+            player.sendMessage(Text.literal("  Use the §6Plot Blueprint §7to manage it.").formatted(Formatting.GRAY), false);
             player.sendMessage(Text.literal("═══════════════════════════").formatted(Formatting.GOLD), false);
 
             PlotHologram.spawn((net.minecraft.server.world.ServerWorld) world, pos, data, 200, placer.getYaw(), player);
@@ -121,16 +121,16 @@ public class PlotBlock extends BlockWithEntity {
         player.sendMessage(Text.literal("═══════════════════════════").formatted(Formatting.GOLD), false);
         player.sendMessage(Text.literal("  🛡 " + name).formatted(Formatting.YELLOW, Formatting.BOLD), false);
         player.sendMessage(Text.literal("═══════════════════════════").formatted(Formatting.GOLD), false);
-        player.sendMessage(Text.literal("  Dueño: ").formatted(Formatting.GRAY)
+        player.sendMessage(Text.literal("  Owner: ").formatted(Formatting.GRAY)
                 .append(Text.literal(data.getOwnerName()).formatted(Formatting.WHITE)), false);
         player.sendMessage(Text.literal("  Nivel: ").formatted(Formatting.GRAY)
                 .append(Text.literal(data.getSize().getDisplayName()).formatted(Formatting.AQUA)), false);
-        player.sendMessage(Text.literal("  Tamaño: ").formatted(Formatting.GRAY)
+        player.sendMessage(Text.literal("  Size: ").formatted(Formatting.GRAY)
                 .append(Text.literal(size + "x" + size + " bloques").formatted(Formatting.AQUA)), false);
         player.sendMessage(Text.literal("  Miembros: ").formatted(Formatting.GRAY)
                 .append(Text.literal(membersStr).formatted(Formatting.GREEN)), false);
-        player.sendMessage(Text.literal("  ⚠ Usá el ").formatted(Formatting.YELLOW)
-                .append(Text.literal("Plano de Protección").formatted(Formatting.GOLD))
+        player.sendMessage(Text.literal("  ⚠ Use the ").formatted(Formatting.YELLOW)
+                .append(Text.literal("Plot Blueprint").formatted(Formatting.GOLD))
                 .append(Text.literal(" para gestionar.").formatted(Formatting.YELLOW)), false);
         player.sendMessage(Text.literal("═══════════════════════════").formatted(Formatting.GOLD), false);
     }
@@ -142,14 +142,14 @@ public class PlotBlock extends BlockWithEntity {
             PlotData data = manager.getPlot(pos);
             if (data != null) {
                 if (!data.getOwnerId().equals(player.getUuid()) && !player.hasPermissionLevel(2)) {
-                    player.sendMessage(Text.literal("✗ No eres el dueño de esta protección.").formatted(Formatting.RED), false);
+                    player.sendMessage(Text.literal("✗ You are not the owner of this plot.").formatted(Formatting.RED), false);
                     world.setBlockState(pos, state);
                     return state;
                 }
                 manager.removePlot(pos);
                 PlotHologram.remove((net.minecraft.server.world.ServerWorld) world, pos);
                 com.zhilius.secureplots.network.ModPackets.sendHidePlotBorder((net.minecraft.server.network.ServerPlayerEntity) player, pos);
-                player.sendMessage(Text.literal("✗ Protección eliminada.").formatted(Formatting.RED), false);
+                player.sendMessage(Text.literal("✗ Plot removed.").formatted(Formatting.RED), false);
             }
         }
         return super.onBreak(world, pos, state, player);

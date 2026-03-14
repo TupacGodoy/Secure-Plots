@@ -24,20 +24,22 @@ public class PlotScreen extends Screen {
     private static final int TAB_INFO    = 0;
     private static final int TAB_MEMBERS = 1;
     private static final int TAB_UPGRADE = 2;
-    private static final int TAB_CREATIVE = 3;
+    private static final int TAB_AMBIENT = 3;
+    private static final int TAB_CREATIVE = 4;
     private int activeTab = TAB_INFO;
 
     private TextFieldWidget nameField;
     private TextFieldWidget addPlayerField;
+    private TextFieldWidget particleField;
+    private TextFieldWidget musicField;
 
-    // If non-null, we're showing the permission sub-screen for this member
     private UUID selectedMember = null;
 
-    private static final int PW = 300;
-    private static final int PH = 230;
+    private static final int PW = 320;
+    private static final int PH = 240;
 
     public PlotScreen(BlockPos plotPos, PlotData data) {
-        super(Text.literal("Parcela"));
+        super(Text.literal("Plot"));
         this.plotPos = plotPos;
         this.data    = data;
     }
@@ -51,35 +53,36 @@ public class PlotScreen extends Screen {
         myRole = data.getRoleOf(this.client.player.getUuid());
         int px = px(), py = py();
 
-        // If showing member permissions sub-screen, only add back button + perm toggles
         if (selectedMember != null) {
             initPermissionsSubScreen(px, py);
             return;
         }
 
-        int tw = PW / 4;
+        int tw = PW / 5;
         addDrawableChild(ButtonWidget.builder(Text.literal("Info"), b -> { activeTab = TAB_INFO; selectedMember = null; clearAndInit(); })
-                .dimensions(px,          py - 20, tw - 1, 20).build());
-        addDrawableChild(ButtonWidget.builder(Text.literal("Miembros"), b -> { activeTab = TAB_MEMBERS; selectedMember = null; clearAndInit(); })
-                .dimensions(px + tw,     py - 20, tw - 1, 20).build());
-        addDrawableChild(ButtonWidget.builder(Text.literal("Mejorar"), b -> { activeTab = TAB_UPGRADE; selectedMember = null; clearAndInit(); })
-                .dimensions(px + tw * 2, py - 20, tw - 1, 20).build());
+                .dimensions(px,           py - 20, tw - 1, 20).build());
+        addDrawableChild(ButtonWidget.builder(Text.literal("Members"), b -> { activeTab = TAB_MEMBERS; selectedMember = null; clearAndInit(); })
+                .dimensions(px + tw,      py - 20, tw - 1, 20).build());
+        addDrawableChild(ButtonWidget.builder(Text.literal("Upgrade"), b -> { activeTab = TAB_UPGRADE; selectedMember = null; clearAndInit(); })
+                .dimensions(px + tw * 2,  py - 20, tw - 1, 20).build());
+        addDrawableChild(ButtonWidget.builder(Text.literal("Ambient"), b -> { activeTab = TAB_AMBIENT; selectedMember = null; clearAndInit(); })
+                .dimensions(px + tw * 3,  py - 20, tw - 1, 20).build());
         addDrawableChild(ButtonWidget.builder(Text.literal("Creative"), b -> { activeTab = TAB_CREATIVE; selectedMember = null; clearAndInit(); })
-                .dimensions(px + tw * 3, py - 20, tw,     20).build());
+                .dimensions(px + tw * 4,  py - 20, tw,     20).build());
 
         int cy = py + 28;
 
         if (activeTab == TAB_INFO)     initInfoTab(px, cy);
         if (activeTab == TAB_MEMBERS)  initMembersTab(px, cy);
         if (activeTab == TAB_UPGRADE)  initUpgradeTab(px, cy);
+        if (activeTab == TAB_AMBIENT)  initAmbientTab(px, cy);
         if (activeTab == TAB_CREATIVE) initCreativeTab(px, cy);
     }
 
     // ── PERMISSIONS SUB-SCREEN ───────────────────────────────────────────────
     private void initPermissionsSubScreen(int px, int py) {
         boolean canManage = myRole == PlotData.Role.OWNER || myRole == PlotData.Role.ADMIN;
-        // Back button
-        addDrawableChild(ButtonWidget.builder(Text.literal("← Volver"), b -> {
+        addDrawableChild(ButtonWidget.builder(Text.literal("\u2190 Back"), b -> {
             selectedMember = null; activeTab = TAB_MEMBERS; clearAndInit();
         }).dimensions(px, py - 20, 80, 20).build());
 
@@ -90,7 +93,7 @@ public class PlotScreen extends Screen {
 
         for (PlotData.Permission perm : PlotData.Permission.values()) {
             boolean has = data.hasPermission(selectedMember, perm);
-            String label = (has ? "§a✔ " : "§c✗ ") + permLabel(perm) + " §7— " + permDesc(perm);
+            String label = (has ? "\u00a7a\u2714 " : "\u00a7c\u2718 ") + permLabel(perm) + " \u00a77\u2014 " + permDesc(perm);
             final PlotData.Permission p = perm;
             addDrawableChild(ButtonWidget.builder(Text.literal(label), b -> {
                 boolean current = data.hasPermission(selectedMember, p);
@@ -100,11 +103,10 @@ public class PlotScreen extends Screen {
             cy += 22;
         }
 
-        // Remove member button
         cy += 8;
         String memberName = data.getMemberName(selectedMember);
         addDrawableChild(ButtonWidget.builder(
-            Text.literal("§c🗑 Eliminar a " + memberName + " de la plot"), b ->
+            Text.literal("\u00a7c\uD83D\uDDD1 Remove " + memberName + " from plot"), b ->
                 ClientPlayNetworking.send(new ModPackets.RemoveMemberPayload(plotPos, memberName))
         ).dimensions(px + 12, cy, btnW, 18).build());
     }
@@ -117,24 +119,24 @@ public class PlotScreen extends Screen {
             nameField.setMaxLength(32);
             addDrawableChild(nameField);
 
-            addDrawableChild(ButtonWidget.builder(Text.literal("Guardar"), b -> {
+            addDrawableChild(ButtonWidget.builder(Text.literal("Save"), b -> {
                 data.setPlotName(nameField.getText());
                 ClientPlayNetworking.send(new ModPackets.UpdatePlotPayload(plotPos, data.toNbt()));
                 assert this.client != null;
-                this.client.player.sendMessage(Text.literal("✓ Guardado").formatted(Formatting.GREEN), true);
+                this.client.player.sendMessage(Text.literal("\u2713 Saved").formatted(Formatting.GREEN), true);
             }).dimensions(px + PW - 74, cy + 1, 66, 18).build());
         }
     }
 
-    // ── MIEMBROS ─────────────────────────────────────────────────────────────
+    // ── MEMBERS ──────────────────────────────────────────────────────────────
     private void initMembersTab(int px, int cy) {
         boolean canManage = myRole == PlotData.Role.OWNER || myRole == PlotData.Role.ADMIN;
         if (canManage) {
             addPlayerField = new TextFieldWidget(textRenderer, px + 8, cy + 16, PW - 100, 16, Text.empty());
-            addPlayerField.setPlaceholder(Text.literal("Jugador (online)...").formatted(Formatting.DARK_GRAY));
+            addPlayerField.setPlaceholder(Text.literal("Player (online)...").formatted(Formatting.DARK_GRAY));
             addDrawableChild(addPlayerField);
 
-            addDrawableChild(ButtonWidget.builder(Text.literal("+ Agregar"), b -> {
+            addDrawableChild(ButtonWidget.builder(Text.literal("+ Add"), b -> {
                 String name = addPlayerField.getText().trim();
                 if (!name.isEmpty()) {
                     ClientPlayNetworking.send(new ModPackets.AddMemberPayload(plotPos, name));
@@ -152,18 +154,16 @@ public class PlotScreen extends Screen {
             UUID uuid = entry.getKey();
             String memberName = data.getMemberName(uuid);
 
-            // Click row → open permissions sub-screen
             if (canManage) {
                 addDrawableChild(ButtonWidget.builder(
-                    Text.literal("⚙ " + memberName), b -> {
+                    Text.literal("\u2699 " + memberName), b -> {
                         selectedMember = uuid;
                         clearAndInit();
                     }).dimensions(px + 8, rowY - 2, PW - 40, 16).build());
             }
 
-            // Quick remove (✕) button
             if (canManage) {
-                addDrawableChild(ButtonWidget.builder(Text.literal("✕"), b ->
+                addDrawableChild(ButtonWidget.builder(Text.literal("\u2715"), b ->
                     ClientPlayNetworking.send(new ModPackets.RemoveMemberPayload(plotPos, memberName)))
                     .dimensions(px + PW - 26, rowY - 2, 16, 14).build());
             }
@@ -171,28 +171,108 @@ public class PlotScreen extends Screen {
         }
     }
 
-    // ── CREATIVO ─────────────────────────────────────────────────────────────
+    // ── AMBIENT ──────────────────────────────────────────────────────────────
+    private void initAmbientTab(int px, int cy) {
+        boolean canEdit = myRole == PlotData.Role.OWNER || myRole == PlotData.Role.ADMIN;
+        if (!canEdit) return;
+
+        int labelW = 60;
+        int fieldW = PW - labelW - 78;
+        int btnW   = 56;
+        int gap    = 26;
+
+        // Particles
+        particleField = new TextFieldWidget(textRenderer, px + labelW + 4, cy, fieldW, 16, Text.empty());
+        particleField.setText(data.getParticleEffect());
+        particleField.setMaxLength(128);
+        particleField.setPlaceholder(Text.literal("minecraft:happy_villager").formatted(Formatting.DARK_GRAY));
+        addDrawableChild(particleField);
+        addDrawableChild(ButtonWidget.builder(Text.literal("Set"), b -> {
+            data.setParticleEffect(particleField.getText().trim());
+            ClientPlayNetworking.send(new ModPackets.UpdatePlotPayload(plotPos, data.toNbt()));
+            assert this.client != null;
+            this.client.player.sendMessage(Text.literal("\u2713 Particles saved").formatted(Formatting.GREEN), true);
+        }).dimensions(px + labelW + 4 + fieldW + 4, cy, btnW, 16).build());
+        cy += gap;
+
+        // Music
+        musicField = new TextFieldWidget(textRenderer, px + labelW + 4, cy, fieldW, 16, Text.empty());
+        musicField.setText(data.getMusicSound());
+        musicField.setMaxLength(128);
+        musicField.setPlaceholder(Text.literal("minecraft:music.game").formatted(Formatting.DARK_GRAY));
+        addDrawableChild(musicField);
+        addDrawableChild(ButtonWidget.builder(Text.literal("Set"), b -> {
+            data.setMusicSound(musicField.getText().trim());
+            ClientPlayNetworking.send(new ModPackets.UpdatePlotPayload(plotPos, data.toNbt()));
+            assert this.client != null;
+            this.client.player.sendMessage(Text.literal("\u2713 Music saved").formatted(Formatting.GREEN), true);
+        }).dimensions(px + labelW + 4 + fieldW + 4, cy, btnW, 16).build());
+        cy += gap;
+
+        // Weather buttons
+        int wBtnW = (PW - 20) / 4 - 2;
+        String[] weatherLabels = { "Clear", "Rain", "Thunder", "None" };
+        String[] weatherValues = { "CLEAR", "RAIN",  "THUNDER", "" };
+        for (int i = 0; i < weatherLabels.length; i++) {
+            final String wv = weatherValues[i];
+            boolean active = data.getWeatherType().equalsIgnoreCase(wv);
+            String lbl = (active ? "\u00a7a" : "\u00a77") + weatherLabels[i];
+            addDrawableChild(ButtonWidget.builder(Text.literal(lbl), b -> {
+                data.setWeatherType(wv);
+                ClientPlayNetworking.send(new ModPackets.UpdatePlotPayload(plotPos, data.toNbt()));
+                clearAndInit();
+            }).dimensions(px + 10 + i * (wBtnW + 2), cy, wBtnW, 16).build());
+        }
+        cy += gap;
+
+        // Time buttons
+        String[] timeLabels = { "Day", "Noon", "Dusk", "Night", "None" };
+        long[]   timeValues = { 1000L, 6000L, 12500L, 18000L, -1L };
+        int tBtnW = (PW - 20) / 5 - 2;
+        for (int i = 0; i < timeLabels.length; i++) {
+            final long tv = timeValues[i];
+            boolean active = data.getPlotTime() == tv;
+            String lbl = (active ? "\u00a7a" : "\u00a77") + timeLabels[i];
+            addDrawableChild(ButtonWidget.builder(Text.literal(lbl), b -> {
+                data.setPlotTime(tv);
+                ClientPlayNetworking.send(new ModPackets.UpdatePlotPayload(plotPos, data.toNbt()));
+                clearAndInit();
+            }).dimensions(px + 10 + i * (tBtnW + 2), cy, tBtnW, 16).build());
+        }
+        cy += gap;
+
+        // Clear All
+        addDrawableChild(ButtonWidget.builder(Text.literal("\u00a7cClear All Ambient"), b -> {
+            data.setParticleEffect("");
+            data.setMusicSound("");
+            data.setWeatherType("");
+            data.setPlotTime(-1L);
+            ClientPlayNetworking.send(new ModPackets.UpdatePlotPayload(plotPos, data.toNbt()));
+            clearAndInit();
+        }).dimensions(px + 10, cy, PW - 20, 16).build());
+    }
+
+    // ── CREATIVE ─────────────────────────────────────────────────────────────
     private void initCreativeTab(int px, int cy) {
-        // Tiers: 0=Bronze, 1=Gold, 2=Emerald, 3=Diamond, 4=Netherite
-        String[] tierNames  = { "Bronce", "Oro", "Esmeralda", "Diamante", "Netherita" };
-        String[] tierColors = { "§6", "§e", "§a", "§b", "§7" };
+        String[] tierNames  = { "Bronze", "Gold", "Emerald", "Diamond", "Netherite" };
+        String[] tierColors = { "\u00a76", "\u00a7e", "\u00a7a", "\u00a7b", "\u00a77" };
         int btnW = PW - 28;
         for (int i = 0; i < tierNames.length; i++) {
             final int tier = i;
-            String label = tierColors[i] + "⬛ Bloque de Parcela — " + tierNames[i];
+            String label = tierColors[i] + "\u2B1B Plot Block \u2014 " + tierNames[i];
             addDrawableChild(ButtonWidget.builder(Text.literal(label), b ->
                 ClientPlayNetworking.send(new ModPackets.GiveBlockPayload(tier))
             ).dimensions(px + 12, cy + i * 24, btnW, 20).build());
         }
     }
 
-    // ── MEJORAR ──────────────────────────────────────────────────────────────
+    // ── UPGRADE ──────────────────────────────────────────────────────────────
     private void initUpgradeTab(int px, int cy) {
         if (myRole != PlotData.Role.OWNER) return;
         PlotSize next = data.getSize().next();
         if (next == null) return;
         addDrawableChild(ButtonWidget.builder(
-                Text.literal("Mejorar a " + next.getDisplayName() + "  ▶"),
+                Text.literal("Upgrade to " + next.getDisplayName() + "  \u25B6"),
                 b -> ClientPlayNetworking.send(new ModPackets.UpgradePlotPayload(plotPos)))
                 .dimensions(px + 14, py() + PH - 32, PW - 28, 20).build());
     }
@@ -214,21 +294,19 @@ public class PlotScreen extends Screen {
         ctx.fill(px, py, px + PW, py + 24, 0xFF555555);
         ctx.fill(px, py, px + PW, py + 23, 0xFF666666);
 
-        // Title
         String title = selectedMember != null
-            ? "⚙ Permisos de " + data.getMemberName(selectedMember)
-            : "🛡 " + data.getPlotName();
+            ? "\u2699 Permissions: " + data.getMemberName(selectedMember)
+            : "\uD83D\uDEE1 " + data.getPlotName();
         ctx.drawTextWithShadow(textRenderer,
                 Text.literal(title).formatted(Formatting.YELLOW),
                 px + 6, py + 7, 0xFFFFFF);
 
         ctx.fill(px + 4, py + 24, px + PW - 4, py + 25, 0xFF8B8B8B);
 
-        // Tab highlight (only when not in sub-screen)
         if (selectedMember == null) {
-            int tw = PW / 4;
+            int tw = PW / 5;
             int tabX = px + activeTab * tw;
-            ctx.fill(tabX, py - 20, tabX + tw - (activeTab == 3 ? 0 : 1), py, 0x55FFFFFF);
+            ctx.fill(tabX, py - 20, tabX + tw - (activeTab == 4 ? 0 : 1), py, 0x55FFFFFF);
         }
 
         int cy = py + 28;
@@ -240,6 +318,7 @@ public class PlotScreen extends Screen {
             if (activeTab == TAB_INFO)     renderInfo(ctx, x, cy);
             if (activeTab == TAB_MEMBERS)  renderMembers(ctx, x, cy);
             if (activeTab == TAB_UPGRADE)  renderUpgrade(ctx, x, cy);
+            if (activeTab == TAB_AMBIENT)  renderAmbient(ctx, x, cy);
             if (activeTab == TAB_CREATIVE) renderCreative(ctx, x, cy);
         }
 
@@ -252,9 +331,9 @@ public class PlotScreen extends Screen {
         String name = data.getMemberName(selectedMember);
         PlotData.Role role = data.getRoleOf(selectedMember);
         ctx.drawTextWithShadow(textRenderer,
-            Text.literal(name + " §8[" + role.name().toLowerCase() + "]"), x, y + 4, roleRgb(role));
+            Text.literal(name + " \u00a78[" + role.name().toLowerCase() + "]"), x, y + 4, roleRgb(role));
         ctx.drawTextWithShadow(textRenderer,
-            Text.literal("Activá o desactivá permisos individuales:").formatted(Formatting.DARK_GRAY),
+            Text.literal("Toggle individual permissions:").formatted(Formatting.DARK_GRAY),
             x, y + 18, 0x555555);
     }
 
@@ -264,7 +343,7 @@ public class PlotScreen extends Screen {
         long time = this.client.world != null ? this.client.world.getTime() : 0;
 
         ctx.drawTextWithShadow(textRenderer,
-                Text.literal("Nombre:").formatted(Formatting.DARK_GRAY), x, y + 6, 0x000000);
+                Text.literal("Name:").formatted(Formatting.DARK_GRAY), x, y + 6, 0x000000);
         if (myRole != PlotData.Role.OWNER) {
             ctx.drawTextWithShadow(textRenderer,
                     Text.literal(data.getPlotName()).formatted(Formatting.BLACK), x + 66, y + 6, 0x111111);
@@ -272,19 +351,19 @@ public class PlotScreen extends Screen {
 
         int row = y + 26; int gap = 16;
 
-        row(ctx, x, row, "Dueño",    data.getOwnerName(),               0x333333, 0x000000); row += gap;
-        row(ctx, x, row, "Nivel",    data.getSize().getDisplayName(),        0x333333, 0x006688); row += gap;
+        row(ctx, x, row, "Owner",      data.getOwnerName(),                 0x333333, 0x000000); row += gap;
+        row(ctx, x, row, "Tier",       data.getSize().getDisplayName(),     0x333333, 0x006688); row += gap;
         int sz = data.getSize().getRadius();
-        row(ctx, x, row, "Tamaño",   sz + "x" + sz + " bloques",       0x333333, 0x006688); row += gap;
-        row(ctx, x, row, "Tu rol",   myRole.name(),                     0x333333, roleRgb(myRole)); row += gap;
+        row(ctx, x, row, "Size",       sz + "x" + sz + " blocks",          0x333333, 0x006688); row += gap;
+        row(ctx, x, row, "Your role",  myRole.name(),                       0x333333, roleRgb(myRole)); row += gap;
 
         if (!data.hasRank()) {
             long days = data.getDaysRemaining(time);
             int col = days < 5 ? 0xAA0000 : days < 10 ? 0xAA7700 : 0x007700;
-            row(ctx, x, row, "Expira en", days + " días", 0x333333, col);
+            row(ctx, x, row, "Expires in", days + " days", 0x333333, col);
         } else {
             ctx.drawTextWithShadow(textRenderer,
-                    Text.literal("⚡ Permanente").formatted(Formatting.DARK_GREEN), x, row, 0x005500);
+                    Text.literal("\u26A1 Permanent").formatted(Formatting.DARK_GREEN), x, row, 0x005500);
         }
         row += gap;
 
@@ -293,12 +372,12 @@ public class PlotScreen extends Screen {
                 Text.literal(c.getX() + ", " + c.getY() + ", " + c.getZ()), x, row, 0x555555);
     }
 
-    // ── Render Miembros ──────────────────────────────────────────────────────
+    // ── Render Members ───────────────────────────────────────────────────────
     private void renderMembers(DrawContext ctx, int x, int y) {
         boolean canManage = myRole == PlotData.Role.OWNER || myRole == PlotData.Role.ADMIN;
         if (canManage) {
             ctx.drawTextWithShadow(textRenderer,
-                    Text.literal("Agregar miembro:"), x, y + 2, 0x333333);
+                    Text.literal("Add member:"), x, y + 2, 0x333333);
         }
 
         int sepY = y + (canManage ? 36 : 4);
@@ -307,31 +386,31 @@ public class PlotScreen extends Screen {
 
         int memberCount = data.getMembers().size();
         ctx.drawTextWithShadow(textRenderer,
-                Text.literal("Miembros (" + memberCount + ")  §8— clic para ver permisos"), x, sepY + 4, 0x333333);
+                Text.literal("Members (" + memberCount + ")  \u00a78\u2014 click to view permissions"), x, sepY + 4, 0x333333);
 
         if (data.getMembers().isEmpty()) {
             ctx.drawTextWithShadow(textRenderer,
-                    Text.literal("Ninguno todavía."), x, sepY + 22, 0x777777);
+                    Text.literal("None yet."), x, sepY + 22, 0x777777);
         }
     }
 
-    // ── Render Mejorar ───────────────────────────────────────────────────────
+    // ── Render Upgrade ───────────────────────────────────────────────────────
     private void renderUpgrade(DrawContext ctx, int x, int y) {
         PlotSize cur = data.getSize();
         PlotSize next = cur.next();
 
         int row = y; int gap = 16;
 
-        row(ctx, x, row, "Nivel actual", cur.getDisplayName() + " (" + cur.getRadius() + "x" + cur.getRadius() + ")",
+        row(ctx, x, row, "Current tier", cur.getDisplayName() + " (" + cur.getRadius() + "x" + cur.getRadius() + ")",
                 0x333333, 0x006688); row += gap;
 
         if (next == null) {
             ctx.drawTextWithShadow(textRenderer,
-                    Text.literal("⭐ ¡Máximo nivel alcanzado!"), x, row, 0x886600);
+                    Text.literal("\u2B50 Maximum tier reached!"), x, row, 0x886600);
             return;
         }
 
-        row(ctx, x, row, "Siguiente", next.getDisplayName() + " (" + next.getRadius() + "x" + next.getRadius() + ")",
+        row(ctx, x, row, "Next tier", next.getDisplayName() + " (" + next.getRadius() + "x" + next.getRadius() + ")",
                 0x333333, 0x005500); row += gap + 4;
 
         ctx.fill(x - 2, row, x + PW - 14, row + 1, 0xFF8B8B8B);
@@ -342,35 +421,57 @@ public class PlotScreen extends Screen {
         SecurePlotsConfig.UpgradeCost cost = cfg != null ? cfg.getUpgradeCost(cur.tier) : null;
 
         if (cost != null) {
-            ctx.drawTextWithShadow(textRenderer, Text.literal("Materiales:"), x, row, 0x333333);
+            ctx.drawTextWithShadow(textRenderer, Text.literal("Materials:"), x, row, 0x333333);
             row += gap;
             if (cost.cobblecoins > 0) {
                 ctx.drawTextWithShadow(textRenderer,
-                        Text.literal("  • " + cost.cobblecoins + " Cobblecoins"), x, row, 0x000000);
+                        Text.literal("  \u2022 " + cost.cobblecoins + " Cobblecoins"), x, row, 0x000000);
                 row += gap;
             }
             for (SecurePlotsConfig.UpgradeCost.ItemCost item : cost.items) {
                 String raw = item.itemId.contains(":") ? item.itemId.split(":")[1] : item.itemId;
                 String name = Character.toUpperCase(raw.charAt(0)) + raw.substring(1).replace("_", " ");
                 ctx.drawTextWithShadow(textRenderer,
-                        Text.literal("  • " + item.amount + "x " + name), x, row, 0x000000);
+                        Text.literal("  \u2022 " + item.amount + "x " + name), x, row, 0x000000);
                 row += gap;
             }
         }
 
         if (myRole != PlotData.Role.OWNER) {
             ctx.drawTextWithShadow(textRenderer,
-                    Text.literal("Solo el dueño puede mejorar."), x, py() + PH - 40, 0xAA0000);
+                    Text.literal("Only the owner can upgrade."), x, py() + PH - 40, 0xAA0000);
         }
     }
 
-    // ── Render Creativo ──────────────────────────────────────────────────────
+    // ── Render Ambient ───────────────────────────────────────────────────────
+    private void renderAmbient(DrawContext ctx, int x, int y) {
+        boolean canEdit = myRole == PlotData.Role.OWNER || myRole == PlotData.Role.ADMIN;
+        int gap = 26;
+        int labelW = 60;
+
+        ctx.drawTextWithShadow(textRenderer, Text.literal("Particles:").formatted(Formatting.DARK_GRAY), x, y + 4, 0x333333);
+        y += gap;
+        ctx.drawTextWithShadow(textRenderer, Text.literal("Music:").formatted(Formatting.DARK_GRAY), x, y + 4, 0x333333);
+        y += gap;
+        ctx.drawTextWithShadow(textRenderer, Text.literal("Weather:").formatted(Formatting.DARK_GRAY), x, y + 4, 0x333333);
+        y += gap;
+        ctx.drawTextWithShadow(textRenderer, Text.literal("Time:").formatted(Formatting.DARK_GRAY), x, y + 4, 0x333333);
+        y += gap;
+
+        if (!canEdit) {
+            ctx.drawTextWithShadow(textRenderer,
+                    Text.literal("Only the owner or admin can edit these.").formatted(Formatting.RED),
+                    x, y + 4, 0xAA0000);
+        }
+    }
+
+    // ── Render Creative ──────────────────────────────────────────────────────
     private void renderCreative(DrawContext ctx, int x, int y) {
         ctx.drawTextWithShadow(textRenderer,
-            Text.literal("Obtener bloques de parcela:").formatted(Formatting.DARK_GRAY),
+            Text.literal("Get plot blocks:").formatted(Formatting.DARK_GRAY),
             x, y - 14, 0x555555);
         ctx.drawTextWithShadow(textRenderer,
-            Text.literal("(Solo OPs / modo creativo)").formatted(Formatting.DARK_GRAY),
+            Text.literal("(OPs / creative mode only)").formatted(Formatting.DARK_GRAY),
             x, y - 4, 0x888888);
     }
 
@@ -392,85 +493,85 @@ public class PlotScreen extends Screen {
 
     private static String permLabel(PlotData.Permission perm) {
         return switch (perm) {
-            case BUILD          -> "Construir";
-            case BREAK          -> "Romper";
-            case PLACE          -> "Colocar";
-            case INTERACT       -> "Interactuar";
-            case CONTAINERS     -> "Contenedores";
-            case USE_BEDS       -> "Camas";
-            case USE_CRAFTING   -> "Crafteo";
-            case USE_ENCHANTING -> "Encantamiento";
-            case USE_ANVIL      -> "Yunque";
-            case USE_FURNACE    -> "Hornos";
-            case USE_BREWING    -> "Pociones";
-            case ATTACK_MOBS    -> "Atacar Mobs";
-            case ATTACK_ANIMALS -> "Atacar Animales";
+            case BUILD          -> "Build";
+            case BREAK          -> "Break";
+            case PLACE          -> "Place";
+            case INTERACT       -> "Interact";
+            case CONTAINERS     -> "Containers";
+            case USE_BEDS       -> "Beds";
+            case USE_CRAFTING   -> "Crafting";
+            case USE_ENCHANTING -> "Enchanting";
+            case USE_ANVIL      -> "Anvil";
+            case USE_FURNACE    -> "Furnace";
+            case USE_BREWING    -> "Brewing";
+            case ATTACK_MOBS    -> "Attack Mobs";
+            case ATTACK_ANIMALS -> "Attack Animals";
             case PVP            -> "PvP";
-            case RIDE_ENTITIES  -> "Montar Entidades";
-            case INTERACT_MOBS  -> "Interactuar Mobs";
-            case LEASH_MOBS     -> "Atar Mobs";
-            case SHEAR_MOBS     -> "Esquilar";
-            case MILK_MOBS      -> "Ordeñar";
-            case CROP_TRAMPLING -> "Pisotear Cultivos";
-            case PICKUP_ITEMS   -> "Recoger Ítems";
-            case DROP_ITEMS     -> "Tirar Ítems";
-            case BREAK_CROPS    -> "Romper Cultivos";
-            case PLANT_SEEDS    -> "Plantar";
-            case USE_BONEMEAL   -> "Hueso de Polvo";
-            case BREAK_DECOR    -> "Romper Decoración";
-            case DETONATE_TNT   -> "Detonar TNT";
+            case RIDE_ENTITIES  -> "Ride Entities";
+            case INTERACT_MOBS  -> "Interact Mobs";
+            case LEASH_MOBS     -> "Leash Mobs";
+            case SHEAR_MOBS     -> "Shear";
+            case MILK_MOBS      -> "Milk";
+            case CROP_TRAMPLING -> "Crop Trampling";
+            case PICKUP_ITEMS   -> "Pick Up Items";
+            case DROP_ITEMS     -> "Drop Items";
+            case BREAK_CROPS    -> "Break Crops";
+            case PLANT_SEEDS    -> "Plant Seeds";
+            case USE_BONEMEAL   -> "Bonemeal";
+            case BREAK_DECOR    -> "Break Decor";
+            case DETONATE_TNT   -> "Detonate TNT";
             case GRIEFING       -> "Griefing";
-            case TP             -> "Teleportar";
-            case FLY            -> "Volar";
-            case ENTER          -> "Entrar";
+            case TP             -> "Teleport";
+            case FLY            -> "Fly";
+            case ENTER          -> "Enter";
             case CHAT           -> "Chat";
-            case COMMAND_USE    -> "Comandos";
-            case MANAGE_MEMBERS -> "Gestionar Miembros";
-            case MANAGE_PERMS   -> "Gestionar Permisos";
-            case MANAGE_FLAGS   -> "Gestionar Flags";
-            case MANAGE_GROUPS  -> "Gestionar Grupos";
+            case COMMAND_USE    -> "Commands";
+            case MANAGE_MEMBERS -> "Manage Members";
+            case MANAGE_PERMS   -> "Manage Permissions";
+            case MANAGE_FLAGS   -> "Manage Flags";
+            case MANAGE_GROUPS  -> "Manage Groups";
         };
     }
 
     private static String permDesc(PlotData.Permission perm) {
         return switch (perm) {
-            case BUILD          -> "Colocar y romper bloques";
-            case BREAK          -> "Solo romper bloques";
-            case PLACE          -> "Solo colocar bloques";
-            case INTERACT       -> "Palancas, puertas, botones";
-            case CONTAINERS     -> "Abrir cofres e inventarios";
-            case USE_BEDS       -> "Usar camas para dormir";
-            case USE_CRAFTING   -> "Usar mesas de crafteo";
-            case USE_ENCHANTING -> "Mesas de encantamiento";
-            case USE_ANVIL      -> "Usar yunques";
-            case USE_FURNACE    -> "Hornos y ahumadores";
-            case USE_BREWING    -> "Soportes de pociones";
-            case ATTACK_MOBS    -> "Atacar mobs hostiles";
-            case ATTACK_ANIMALS -> "Atacar animales pasivos";
-            case PVP            -> "Atacar a otros jugadores";
-            case RIDE_ENTITIES  -> "Montar caballos, botes, etc.";
-            case INTERACT_MOBS  -> "Comerciar, nombrar mobs";
-            case LEASH_MOBS     -> "Atar y soltar mobs";
-            case SHEAR_MOBS     -> "Esquilar ovejas";
-            case MILK_MOBS      -> "Ordeñar vacas y cabras";
-            case CROP_TRAMPLING -> "Pisar y destruir cultivos";
-            case PICKUP_ITEMS   -> "Recoger ítems del suelo";
-            case DROP_ITEMS     -> "Tirar ítems al suelo";
-            case BREAK_CROPS    -> "Romper plantas y cultivos";
-            case PLANT_SEEDS    -> "Plantar semillas y saplings";
-            case USE_BONEMEAL   -> "Hueso de polvo en plantas";
-            case BREAK_DECOR    -> "Romper flores y decoraciones";
-            case DETONATE_TNT   -> "Encender y detonar TNT";
-            case GRIEFING       -> "Daño por creepers/wither/etc.";
-            case TP             -> "Usar /sp tp para llegar aquí";
-            case FLY            -> "Volar dentro de la parcela";
-            case ENTER          -> "Entrar al área de la parcela";
-            case CHAT           -> "Chatear en la parcela";
-            case COMMAND_USE    -> "Usar comandos en la parcela";
-            case MANAGE_MEMBERS -> "Agregar y remover miembros";
-            case MANAGE_PERMS   -> "Cambiar permisos de miembros";
-            case MANAGE_FLAGS   -> "Cambiar flags globales";
-            case MANAGE_GROUPS  -> "Crear y editar grupos";
+            case BUILD          -> "Place and break blocks";
+            case BREAK          -> "Break blocks only";
+            case PLACE          -> "Place blocks only";
+            case INTERACT       -> "Levers, doors, buttons";
+            case CONTAINERS     -> "Open chests and inventories";
+            case USE_BEDS       -> "Use beds to sleep";
+            case USE_CRAFTING   -> "Use crafting tables";
+            case USE_ENCHANTING -> "Use enchanting tables";
+            case USE_ANVIL      -> "Use anvils";
+            case USE_FURNACE    -> "Furnaces and smokers";
+            case USE_BREWING    -> "Brewing stands";
+            case ATTACK_MOBS    -> "Attack hostile mobs";
+            case ATTACK_ANIMALS -> "Attack passive animals";
+            case PVP            -> "Attack other players";
+            case RIDE_ENTITIES  -> "Ride horses, boats, etc.";
+            case INTERACT_MOBS  -> "Trade, name mobs";
+            case LEASH_MOBS     -> "Leash and unleash mobs";
+            case SHEAR_MOBS     -> "Shear sheep";
+            case MILK_MOBS      -> "Milk cows and goats";
+            case CROP_TRAMPLING -> "Trample and destroy crops";
+            case PICKUP_ITEMS   -> "Pick up items from ground";
+            case DROP_ITEMS     -> "Drop items on ground";
+            case BREAK_CROPS    -> "Break plants and crops";
+            case PLANT_SEEDS    -> "Plant seeds and saplings";
+            case USE_BONEMEAL   -> "Bonemeal on plants";
+            case BREAK_DECOR    -> "Break flowers and decor";
+            case DETONATE_TNT   -> "Light and detonate TNT";
+            case GRIEFING       -> "Creeper/wither/etc. damage";
+            case TP             -> "Use /sp tp to come here";
+            case FLY            -> "Fly inside the plot";
+            case ENTER          -> "Enter the plot area";
+            case CHAT           -> "Chat while in the plot";
+            case COMMAND_USE    -> "Use commands in the plot";
+            case MANAGE_MEMBERS -> "Add and remove members";
+            case MANAGE_PERMS   -> "Change member permissions";
+            case MANAGE_FLAGS   -> "Change global flags";
+            case MANAGE_GROUPS  -> "Create and edit groups";
         };
     }
 

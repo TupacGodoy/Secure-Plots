@@ -43,7 +43,7 @@ public class PlotInfoScreen extends Screen {
         PlotData.Role role = data.getRoleOf(this.client.player.getUuid());
         if (role != PlotData.Role.VISITOR) {
             addDrawableChild(ButtonWidget.builder(
-                    Text.literal("⚙  Gestionar  (Shift+clic)"),
+                    Text.literal("⚙  Manage  (Shift+click)"),
                     b -> this.close())
                     .dimensions(px + 10, py + PH - 30, PW - 20, 22).build());
         }
@@ -77,19 +77,19 @@ public class PlotInfoScreen extends Screen {
         assert this.client != null;
         long time = this.client.world != null ? this.client.world.getTime() : 0;
 
-        drawRow(ctx, x, y, "Dueño",   data.getOwnerName(),                Formatting.WHITE);  y += gap;
+        drawRow(ctx, x, y, "Owner",   data.getOwnerName(),                Formatting.WHITE);  y += gap;
         drawRow(ctx, x, y, "Nivel",   data.getSize().getDisplayName(),          Formatting.AQUA);   y += gap;
         int sz = data.getSize().getRadius();
-        drawRow(ctx, x, y, "Tamaño",  sz + "x" + sz + " bloques",         Formatting.AQUA);   y += gap;
+        drawRow(ctx, x, y, "Size",  sz + "x" + sz + " blocks",         Formatting.AQUA);   y += gap;
         drawRow(ctx, x, y, "Miembros", String.valueOf(data.getMembers().size()), Formatting.GREEN); y += gap;
 
         if (!data.hasRank()) {
             long days = data.getDaysRemaining(time);
             Formatting col = days < 5 ? Formatting.RED : days < 10 ? Formatting.YELLOW : Formatting.GREEN;
-            drawRow(ctx, x, y, "Expira en", days + " días", col);
+            drawRow(ctx, x, y, "Expires in", days + " days", col);
         } else {
             ctx.drawTextWithShadow(textRenderer,
-                    Text.literal("⚡  Permanente (Rango activo)").formatted(Formatting.GREEN), x, y, 0xFFFFFF);
+                    Text.literal("⚡  Permanent (Rank active)").formatted(Formatting.GREEN), x, y, 0xFFFFFF);
         }
         y += gap + 4;
 

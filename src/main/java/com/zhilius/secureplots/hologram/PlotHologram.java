@@ -213,12 +213,12 @@ public class PlotHologram {
         // Measure each visible line in Minecraft font pixels
         // § codes are stripped inside mcWidth()
         String raw_name    = " " + name;
-        String raw_dueno   = " Dueño:    " + data.getOwnerName();
+        String raw_dueno   = " Owner:    " + data.getOwnerName();
         String raw_nivel   = " Nivel:    " + data.getSize().getDisplayName();
-        String raw_tamano  = " Tamaño:   " + data.getSize().getRadius() + "x" + data.getSize().getRadius();
+        String raw_tamano  = " Size:     " + data.getSize().getRadius() + "x" + data.getSize().getRadius();
         String raw_members = " Miembros: " + data.getMembers().size();
         String raw_next    = next != null
-                ? " ⬡ Siguiente: " + next.getDisplayName()
+                ? " ⬡ Next: " + next.getDisplayName()
                 : " ★ Nivel Maximo ★";
 
         int maxPx = 0;
@@ -227,7 +227,7 @@ public class PlotHologram {
         }
 
         // '-' = 6px wide in Minecraft font — use it for both border and divider
-        int dashCount = maxPx / 6 + 4; // +2 dashes each side
+        int dashCount = maxPx / 6 + 6; // +3 dashes each side
         StringBuilder borderSB  = new StringBuilder();
         StringBuilder dividerSB = new StringBuilder();
         for (int i = 0; i < dashCount; i++) { borderSB.append("-"); dividerSB.append("-"); }

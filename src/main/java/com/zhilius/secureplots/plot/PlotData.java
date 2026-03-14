@@ -133,8 +133,18 @@ public class PlotData {
     private List<PermissionGroup> groups = new ArrayList<>();
 
     private String plotName;
-    private String enterMessage = "";   // mensaje al entrar a la parcela (vacío = sin mensaje)
-    private String exitMessage  = "";   // mensaje al salir de la parcela (vacío = sin mensaje)
+    private String enterMessage = "";   // custom message shown when entering (empty = default HUD)
+    private String exitMessage  = "";   // custom message shown when leaving (empty = none)
+
+    // ── Ambient effects ───────────────────────────────────────────────────────
+    /** Particle effect ID to spawn on enter (e.g. "minecraft:happy_villager"). Empty = none. */
+    private String particleEffect = "";
+    /** Weather to apply on enter: CLEAR, RAIN, THUNDER, or "" = no change. */
+    private String weatherType    = "";
+    /** World time to set on enter (0-23999), or -1 = no change. */
+    private long   plotTime       = -1L;
+    /** Sound ID to play as music on enter (e.g. "minecraft:music.game"). Empty = none. */
+    private String musicSound     = "";
 
     // ── Constructores ─────────────────────────────────────────────────────────
     public PlotData(UUID ownerId, String ownerName, BlockPos center, PlotSize size, long currentTick) {
@@ -166,6 +176,14 @@ public class PlotData {
     public void setEnterMessage(String msg)     { this.enterMessage = msg != null ? msg : ""; }
     public String getExitMessage()              { return exitMessage != null ? exitMessage : ""; }
     public void setExitMessage(String msg)      { this.exitMessage = msg != null ? msg : ""; }
+    public String getParticleEffect()           { return particleEffect != null ? particleEffect : ""; }
+    public void setParticleEffect(String p)     { this.particleEffect = p != null ? p : ""; }
+    public String getWeatherType()              { return weatherType != null ? weatherType : ""; }
+    public void setWeatherType(String w)        { this.weatherType = w != null ? w.toUpperCase() : ""; }
+    public long getPlotTime()                   { return plotTime; }
+    public void setPlotTime(long t)             { this.plotTime = t; }
+    public String getMusicSound()               { return musicSound != null ? musicSound : ""; }
+    public void setMusicSound(String s)         { this.musicSound = s != null ? s : ""; }
     public long getPlacedAtTick()               { return placedAtTick; }
     public long getLastOwnerSeenTick()          { return lastOwnerSeenTick; }
     public void setLastOwnerSeenTick(long tick) { this.lastOwnerSeenTick = tick; }
@@ -239,20 +257,66 @@ public class PlotData {
             case OWNER -> perms.addAll(Arrays.asList(Permission.values()));
             case ADMIN -> {
                 perms.add(Permission.BUILD);
+                perms.add(Permission.BREAK);
+                perms.add(Permission.PLACE);
                 perms.add(Permission.INTERACT);
                 perms.add(Permission.CONTAINERS);
+                perms.add(Permission.USE_BEDS);
+                perms.add(Permission.USE_CRAFTING);
+                perms.add(Permission.USE_ENCHANTING);
+                perms.add(Permission.USE_ANVIL);
+                perms.add(Permission.USE_FURNACE);
+                perms.add(Permission.USE_BREWING);
+                perms.add(Permission.ATTACK_MOBS);
+                perms.add(Permission.ATTACK_ANIMALS);
                 perms.add(Permission.PVP);
-                perms.add(Permission.MANAGE_MEMBERS);
-                perms.add(Permission.MANAGE_PERMS);
+                perms.add(Permission.RIDE_ENTITIES);
+                perms.add(Permission.INTERACT_MOBS);
+                perms.add(Permission.LEASH_MOBS);
+                perms.add(Permission.SHEAR_MOBS);
+                perms.add(Permission.MILK_MOBS);
+                perms.add(Permission.CROP_TRAMPLING);
+                perms.add(Permission.PICKUP_ITEMS);
+                perms.add(Permission.DROP_ITEMS);
+                perms.add(Permission.BREAK_CROPS);
+                perms.add(Permission.PLANT_SEEDS);
+                perms.add(Permission.USE_BONEMEAL);
+                perms.add(Permission.BREAK_DECOR);
+                perms.add(Permission.FLY);
                 perms.add(Permission.TP);
                 perms.add(Permission.ENTER);
+                perms.add(Permission.CHAT);
+                perms.add(Permission.MANAGE_MEMBERS);
+                perms.add(Permission.MANAGE_PERMS);
+                perms.add(Permission.MANAGE_FLAGS);
+                perms.add(Permission.MANAGE_GROUPS);
             }
             case MEMBER -> {
                 perms.add(Permission.BUILD);
+                perms.add(Permission.BREAK);
+                perms.add(Permission.PLACE);
                 perms.add(Permission.INTERACT);
                 perms.add(Permission.CONTAINERS);
+                perms.add(Permission.USE_BEDS);
+                perms.add(Permission.USE_CRAFTING);
+                perms.add(Permission.USE_ENCHANTING);
+                perms.add(Permission.USE_ANVIL);
+                perms.add(Permission.USE_FURNACE);
+                perms.add(Permission.USE_BREWING);
+                perms.add(Permission.ATTACK_MOBS);
+                perms.add(Permission.ATTACK_ANIMALS);
+                perms.add(Permission.RIDE_ENTITIES);
+                perms.add(Permission.INTERACT_MOBS);
+                perms.add(Permission.LEASH_MOBS);
+                perms.add(Permission.SHEAR_MOBS);
+                perms.add(Permission.MILK_MOBS);
+                perms.add(Permission.PICKUP_ITEMS);
+                perms.add(Permission.DROP_ITEMS);
+                perms.add(Permission.PLANT_SEEDS);
+                perms.add(Permission.USE_BONEMEAL);
                 perms.add(Permission.TP);
                 perms.add(Permission.ENTER);
+                perms.add(Permission.CHAT);
             }
             case VISITOR -> {
                 perms.add(Permission.INTERACT);
@@ -365,6 +429,10 @@ public class PlotData {
         nbt.putString("plotName", plotName);
         nbt.putString("enterMessage", enterMessage != null ? enterMessage : "");
         nbt.putString("exitMessage",  exitMessage  != null ? exitMessage  : "");
+        nbt.putString("particleEffect", particleEffect != null ? particleEffect : "");
+        nbt.putString("weatherType",    weatherType    != null ? weatherType    : "");
+        nbt.putLong("plotTime",         plotTime);
+        nbt.putString("musicSound",     musicSound     != null ? musicSound     : "");
 
         // Miembros
         NbtList membersList = new NbtList();
@@ -406,6 +474,10 @@ public class PlotData {
         data.plotName = nbt.getString("plotName");
         data.enterMessage = nbt.contains("enterMessage") ? nbt.getString("enterMessage") : "";
         data.exitMessage  = nbt.contains("exitMessage")  ? nbt.getString("exitMessage")  : "";
+        data.particleEffect = nbt.contains("particleEffect") ? nbt.getString("particleEffect") : "";
+        data.weatherType    = nbt.contains("weatherType")    ? nbt.getString("weatherType")    : "";
+        data.plotTime       = nbt.contains("plotTime")       ? nbt.getLong("plotTime")          : -1L;
+        data.musicSound     = nbt.contains("musicSound")     ? nbt.getString("musicSound")      : "";
 
         // Miembros
         NbtList membersList = nbt.getList("members", 10);

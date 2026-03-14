@@ -125,24 +125,24 @@ public class SignInputManager {
         PlotManager manager = PlotManager.getOrCreate(sw);
         PlotData data = manager.getPlot(plotPos);
         if (data == null) {
-            player.sendMessage(Text.literal("✗ Protección no encontrada.").formatted(Formatting.RED), false);
+            player.sendMessage(Text.literal("✗ Plot not found.").formatted(Formatting.RED), false);
             return;
         }
         boolean isAdmin = player.getCommandTags().contains(SecurePlotsConfig.INSTANCE != null ? SecurePlotsConfig.INSTANCE.adminTag : "plot_admin");
         if (!data.getOwnerId().equals(player.getUuid()) && !isAdmin) {
-            player.sendMessage(Text.literal("✗ Solo el dueño puede renombrar.").formatted(Formatting.RED), false);
+            player.sendMessage(Text.literal("✗ Only the owner can rename.").formatted(Formatting.RED), false);
             reopenMenu(player, plotPos, PlotMenuHandler.MenuPage.INFO);
             return;
         }
         newName = newName.trim();
         if (newName.isEmpty() || newName.length() > 32) {
-            player.sendMessage(Text.literal("✗ Nombre inválido (1-32 caracteres).").formatted(Formatting.RED), false);
+            player.sendMessage(Text.literal("✗ Invalid name (1-32 characters).").formatted(Formatting.RED), false);
             reopenMenu(player, plotPos, PlotMenuHandler.MenuPage.INFO);
             return;
         }
         for (PlotData p : manager.getPlayerPlots(data.getOwnerId())) {
             if (p != data && p.getPlotName().equalsIgnoreCase(newName)) {
-                player.sendMessage(Text.literal("✗ Ya existe una protección con ese nombre.").formatted(Formatting.RED), false);
+                player.sendMessage(Text.literal("✗ A plot with that name already exists.").formatted(Formatting.RED), false);
                 reopenMenu(player, plotPos, PlotMenuHandler.MenuPage.INFO);
                 return;
             }
@@ -168,7 +168,7 @@ public class SignInputManager {
         PlotManager manager = PlotManager.getOrCreate(sw);
         PlotData data = manager.getPlot(plotPos);
         if (data == null) {
-            player.sendMessage(Text.literal("✗ Protección no encontrada.").formatted(Formatting.RED), false);
+            player.sendMessage(Text.literal("✗ Plot not found.").formatted(Formatting.RED), false);
             return;
         }
         boolean isAdmin = player.getCommandTags().contains(SecurePlotsConfig.INSTANCE != null ? SecurePlotsConfig.INSTANCE.adminTag : "plot_admin");
@@ -178,12 +178,12 @@ public class SignInputManager {
         }
         ServerPlayerEntity target = player.getServer().getPlayerManager().getPlayer(targetName);
         if (target == null) {
-            player.sendMessage(Text.literal("✗ \"" + targetName + "\" no está online.").formatted(Formatting.RED), false);
+            player.sendMessage(Text.literal("✗ \"" + targetName + "\" is not online.").formatted(Formatting.RED), false);
             reopenMenu(player, plotPos, PlotMenuHandler.MenuPage.MEMBERS);
             return;
         }
         if (target.getUuid().equals(player.getUuid()) && !isAdmin) {
-            player.sendMessage(Text.literal("✗ No podés agregarte a vos mismo.").formatted(Formatting.RED), false);
+            player.sendMessage(Text.literal("✗ You cannot add yourself.").formatted(Formatting.RED), false);
             reopenMenu(player, plotPos, PlotMenuHandler.MenuPage.MEMBERS);
             return;
         }
@@ -208,18 +208,18 @@ public class SignInputManager {
         PlotManager manager = PlotManager.getOrCreate(sw);
         PlotData data = manager.getPlot(plotPos);
         if (data == null) {
-            player.sendMessage(Text.literal("✗ Protección no encontrada.").formatted(Formatting.RED), false);
+            player.sendMessage(Text.literal("✗ Plot not found.").formatted(Formatting.RED), false);
             return;
         }
         boolean isAdmin = player.getCommandTags().contains(SecurePlotsConfig.INSTANCE != null ? SecurePlotsConfig.INSTANCE.adminTag : "plot_admin");
         if (!data.hasPermission(player.getUuid(), PlotData.Permission.MANAGE_GROUPS) && !isAdmin) {
-            player.sendMessage(Text.literal("✗ No tenés permiso para crear grupos.").formatted(Formatting.RED), false);
+            player.sendMessage(Text.literal("✗ You do not have permission to create groups.").formatted(Formatting.RED), false);
             reopenMenu(player, plotPos, PlotMenuHandler.MenuPage.MEMBERS);
             return;
         }
         groupName = groupName.trim();
         if (groupName.isEmpty() || groupName.length() > 24) {
-            player.sendMessage(Text.literal("✗ Nombre de grupo inválido (1-24 caracteres).").formatted(Formatting.RED), false);
+            player.sendMessage(Text.literal("✗ Invalid group name (1-24 characters).").formatted(Formatting.RED), false);
             reopenMenu(player, plotPos, PlotMenuHandler.MenuPage.MEMBERS);
             return;
         }
@@ -240,11 +240,11 @@ public class SignInputManager {
         PlotManager manager = PlotManager.getOrCreate(sw);
         PlotData data = manager.getPlot(plotPos);
         if (data == null) {
-            player.sendMessage(Text.literal("✗ Protección no encontrada.").formatted(Formatting.RED), false);
+            player.sendMessage(Text.literal("✗ Plot not found.").formatted(Formatting.RED), false);
             return;
         }
         if (!data.getOwnerId().equals(player.getUuid())) {
-            player.sendMessage(Text.literal("✗ Solo el dueño puede cambiar los mensajes.").formatted(Formatting.RED), false);
+            player.sendMessage(Text.literal("✗ Only the owner can change messages.").formatted(Formatting.RED), false);
             reopenMenu(player, plotPos, PlotMenuHandler.MenuPage.INFO);
             return;
         }

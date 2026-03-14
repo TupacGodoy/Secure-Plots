@@ -88,7 +88,10 @@ public class PlotMenuHandler extends GenericContainerScreenHandler {
                 else if (viewingGroupName != null) buildGroupPage(viewingGroupName);
                 else buildMembersPage();
             }
-            case GLOBAL_PERMS -> buildGlobalPermsPage();
+            case GLOBAL_PERMS -> {
+                if (viewingGroupName != null) buildGroupPage(viewingGroupName);
+                else buildGlobalPermsPage();
+            }
             case UPGRADE -> buildUpgradePage();
         }
         menuInv.setStack(SLOT_CLOSE, named(Items.BARRIER, "§c✕ Cerrar"));
@@ -104,16 +107,16 @@ public class PlotMenuHandler extends GenericContainerScreenHandler {
     private void buildTabs() {
         menuInv.setStack(SLOT_TAB_INFO,
             namedLore(page == MenuPage.INFO ? Items.LIME_STAINED_GLASS_PANE : Items.WHITE_STAINED_GLASS_PANE,
-                "§e📋 Info", "§7Ver información de la parcela"));
+                "§e📋 Info", "§7View plot information"));
         menuInv.setStack(SLOT_TAB_MEMBERS,
             namedLore(page == MenuPage.MEMBERS ? Items.LIME_STAINED_GLASS_PANE : Items.WHITE_STAINED_GLASS_PANE,
-                "§e👥 Miembros", "§7Gestionar miembros y sus permisos"));
+                "§e👥 Members", "§7Manage members and permissions"));
         menuInv.setStack(SLOT_TAB_GLOBAL_PERMS,
             namedLore(page == MenuPage.GLOBAL_PERMS ? Items.LIME_STAINED_GLASS_PANE : Items.WHITE_STAINED_GLASS_PANE,
                 "§e🌐 Permisos Globales", "§7Permisos globales y grupos"));
         menuInv.setStack(SLOT_TAB_UPGRADE,
             namedLore(page == MenuPage.UPGRADE ? Items.LIME_STAINED_GLASS_PANE : Items.WHITE_STAINED_GLASS_PANE,
-                "§e⬆ Mejorar", "§7Subir el nivel de protección"));
+                "§e⬆ Upgrade", "§7Increase protection tier"));
     }
 
     // ── INFO PAGE ─────────────────────────────────────────────────────────────
@@ -125,11 +128,11 @@ public class PlotMenuHandler extends GenericContainerScreenHandler {
             "§6" + data.getPlotName(), "§7ID: §f#" + plotIndex));
 
         menuInv.setStack(20, makePlayerHeadFromServer(data.getOwnerId(), data.getOwnerName(),
-            "§eDueño", "§f" + data.getOwnerName()));
+            "§eOwner", "§f" + data.getOwnerName()));
 
         menuInv.setStack(21, namedLore(itemForSize(data.getSize()),
-            tierColor(data.getSize()) + "Nivel: " + data.getSize().getDisplayName(),
-            "§7Tamaño: §b" + data.getSize().getRadius() + "x" + data.getSize().getRadius() + " bloques"));
+            tierColor(data.getSize()) + "Tier: " + data.getSize().getDisplayName(),
+            "§7Size: §b" + data.getSize().getRadius() + "x" + data.getSize().getRadius() + " blocks"));
 
         menuInv.setStack(22, namedLore(Items.PAPER,
             "§eIntegrantes",
@@ -138,7 +141,7 @@ public class PlotMenuHandler extends GenericContainerScreenHandler {
 
         BlockPos c = data.getCenter();
         menuInv.setStack(23, namedLore(Items.COMPASS,
-            "§eUbicación",
+            "§eLocation",
             "§7X: §f" + c.getX() + "  §7Y: §f" + c.getY() + "  §7Z: §f" + c.getZ()));
 
         menuInv.setStack(24, namedLore(Items.SHIELD,
@@ -167,7 +170,7 @@ public class PlotMenuHandler extends GenericContainerScreenHandler {
         if (canTp) {
             menuInv.setStack(31, namedLore(Items.ENDER_PEARL,
                 "§b✈ Teleportarse",
-                tpEnabled ? "§7TP público habilitado" : "§7Solo para admins/owner",
+                tpEnabled ? "§7Public TP enabled" : "§7Admins/owner only",
                 "§eClic para tp a esta parcela"));
         }
 
@@ -181,12 +184,12 @@ public class PlotMenuHandler extends GenericContainerScreenHandler {
                 long daysLeft = Math.max(0, maxDays - daysInactive);
                 String statusColor = daysLeft > 7 ? "§a" : daysLeft > 0 ? "§e" : "§c";
                 String expiryLine = daysLeft > 0
-                    ? statusColor + daysLeft + " §7días para expirar"
-                    : "§c⚠ ¡Protección expirada!";
+                    ? statusColor + daysLeft + " §7days until expiry"
+                    : "§c⚠ Protection expired!";
                 menuInv.setStack(33, namedLore(Items.CLOCK,
-                    "§eInactividad del dueño",
-                    "§7Días inactivo: §f" + daysInactive,
-                    "§7Máx. días: §f" + maxDays,
+                    "§eOwner inactivity",
+                    "§7Days inactive: §f" + daysInactive,
+                    "§7Max days: §f" + maxDays,
                     expiryLine));
             }
         }
@@ -229,8 +232,8 @@ public class PlotMenuHandler extends GenericContainerScreenHandler {
 
         if (memberList.isEmpty()) {
             menuInv.setStack(22, namedLore(Items.BARRIER,
-                "§7Sin miembros todavía",
-                "§8Usá el botón verde para agregar"));
+                "§7No members yet",
+                "§8Use the green button to add"));
         }
     }
 
@@ -254,11 +257,11 @@ public class PlotMenuHandler extends GenericContainerScreenHandler {
 
         // Botones de navegación de página
         if (permPage > 0)
-            menuInv.setStack(14, namedLore(Items.SPECTRAL_ARROW, "§e← Página anterior", "§7Página " + permPage + "/" + totalPages));
+            menuInv.setStack(14, namedLore(Items.SPECTRAL_ARROW, "§e← Prev page", "§7Page " + permPage + "/" + totalPages));
         if (permPage < totalPages - 1)
-            menuInv.setStack(16, namedLore(Items.SPECTRAL_ARROW, "§ePágina siguiente →", "§7Página " + (permPage + 2) + "/" + totalPages));
+            menuInv.setStack(16, namedLore(Items.SPECTRAL_ARROW, "§eNext page →", "§7Page " + (permPage + 2) + "/" + totalPages));
 
-        menuInv.setStack(13, namedLore(Items.PAPER, "§7Página §e" + (permPage + 1) + "§7/§e" + totalPages,
+        menuInv.setStack(13, namedLore(Items.PAPER, "§7Page §e" + (permPage + 1) + "§7/§e" + totalPages,
             "§8" + allPerms.length + " permisos en total"));
 
         int[] slots = {19,20,21,22,23,24,25, 28,29,30,31,32,33,34};
@@ -271,7 +274,7 @@ public class PlotMenuHandler extends GenericContainerScreenHandler {
                 has ? Items.LIME_DYE : Items.GRAY_DYE,
                 (has ? "§a✔ " : "§c✗ ") + permLabel(perm),
                 "§7" + permDesc(perm),
-                canEdit ? (has ? "§cClic para desactivar" : "§aClic para activar") : "§8Sin permisos de edición"
+                canEdit ? (has ? "§cClick to disable" : "§aClick to enable") : "§8No edit permission"
             ));
         }
 
@@ -294,7 +297,7 @@ public class PlotMenuHandler extends GenericContainerScreenHandler {
                 boolean inGroup = g.members.contains(uuid);
                 menuInv.setStack(groupSlots[gi], namedLore(
                     inGroup ? Items.PURPLE_STAINED_GLASS_PANE : Items.GRAY_STAINED_GLASS_PANE,
-                    (inGroup ? "§d✔ " : "§8✗ ") + "Grupo: §d" + g.name,
+                    (inGroup ? "§d✔ " : "§8✗ ") + "Group: §d" + g.name,
                     inGroup ? "§7Miembro de este grupo" : "§8No pertenece a este grupo",
                     canManageGroups ? (inGroup ? "§cClic para quitar del grupo" : "§aClic para agregar al grupo") : "§8Sin permisos de grupos"
                 ));
@@ -329,7 +332,7 @@ public class PlotMenuHandler extends GenericContainerScreenHandler {
                 has ? Items.LIME_DYE : Items.GRAY_DYE,
                 (has ? "§a✔ " : "§c✗ ") + permLabel(perm),
                 "§7" + permDesc(perm),
-                canEdit ? (has ? "§cClic para desactivar" : "§aClic para activar") : "§8Sin permisos de edición"
+                canEdit ? (has ? "§cClick to disable" : "§aClick to enable") : "§8No edit permission"
             ));
         }
 
@@ -355,7 +358,7 @@ public class PlotMenuHandler extends GenericContainerScreenHandler {
         menuInv.setStack(10, namedLore(Items.ORANGE_BANNER,
             "§e🌐 Permisos Globales",
             "§7Afectan a TODOS los jugadores dentro de la parcela.",
-            canEditFlags ? "§eClic en cada uno para activar/desactivar" : "§8Solo el dueño/admin puede cambiar"));
+            canEditFlags ? "§eClick each to toggle" : "§8Only owner/admin can change"));
 
         // Flags — fila central
         PlotData.Flag[] flagValues = PlotData.Flag.values();
@@ -373,7 +376,7 @@ public class PlotMenuHandler extends GenericContainerScreenHandler {
 
         // Separador
         menuInv.setStack(27, namedLore(Items.PURPLE_STAINED_GLASS_PANE,
-            "§d━━━ Grupos de Permisos ━━━",
+            "§d━━━ Permission Groups ━━━",
             "§7Asignan permisos a varios miembros a la vez."));
 
         // Botón crear grupo
@@ -398,8 +401,8 @@ public class PlotMenuHandler extends GenericContainerScreenHandler {
 
         if (groups.isEmpty()) {
             menuInv.setStack(31, namedLore(Items.BARRIER,
-                "§7Sin grupos todavía",
-                "§8Usá el botón morado para crear uno"));
+                "§7No groups yet",
+                "§8Use the purple button to create one"));
         }
     }
 
@@ -409,19 +412,19 @@ public class PlotMenuHandler extends GenericContainerScreenHandler {
         PlotSize next = cur.next();
 
         menuInv.setStack(19, namedLore(itemForSize(cur),
-            tierColor(cur) + "Nivel actual: " + cur.getDisplayName(),
-            "§7Tamaño: §b" + cur.getRadius() + "x" + cur.getRadius() + " bloques"));
+            tierColor(cur) + "Current tier: " + cur.getDisplayName(),
+            "§7Size: §b" + cur.getRadius() + "x" + cur.getRadius() + " blocks"));
 
         if (next == null) {
             menuInv.setStack(22, namedLore(Items.NETHER_STAR,
-                "§6⭐ ¡Nivel máximo alcanzado!",
-                "§7Tu protección está al máximo"));
+                "§6⭐ Maximum tier reached!",
+                "§7Your plot is at max tier"));
             return;
         }
 
         menuInv.setStack(21, namedLore(itemForSize(next),
-            tierColor(next) + "Siguiente: " + next.getDisplayName(),
-            "§7Tamaño: §b" + next.getRadius() + "x" + next.getRadius() + " bloques"));
+            tierColor(next) + "Next tier: " + next.getDisplayName(),
+            "§7Size: §b" + next.getRadius() + "x" + next.getRadius() + " blocks"));
 
         SecurePlotsConfig cfg = SecurePlotsConfig.INSTANCE;
         SecurePlotsConfig.UpgradeCost cost = cfg != null ? cfg.getUpgradeCost(cur.tier) : null;
@@ -429,7 +432,7 @@ public class PlotMenuHandler extends GenericContainerScreenHandler {
         boolean canAfford = true;
         if (cost != null) {
             List<String> costLore = new ArrayList<>();
-            costLore.add("§eNecesitás:");
+            costLore.add("§eYou need:");
             for (SecurePlotsConfig.UpgradeCost.ItemCost itemCost : cost.items) {
                 net.minecraft.util.Identifier id = net.minecraft.util.Identifier.of(itemCost.itemId);
                 net.minecraft.item.Item mc = net.minecraft.registry.Registries.ITEM.get(id);
@@ -445,14 +448,14 @@ public class PlotMenuHandler extends GenericContainerScreenHandler {
 
         if (myRole == PlotData.Role.OWNER) {
             if (canAfford) {
-                ItemStack btn = namedLore(Items.ANVIL, "§a⬆ Mejorar a " + next.getDisplayName(), "§7Tenés todos los materiales");
+                ItemStack btn = namedLore(Items.ANVIL, "§a⬆ Upgrade to " + next.getDisplayName(), "§7You have all the materials");
                 btn.set(DataComponentTypes.ENCHANTMENT_GLINT_OVERRIDE, true);
                 menuInv.setStack(SLOT_UPGRADE_BTN, btn);
             } else {
-                menuInv.setStack(SLOT_UPGRADE_BTN, namedLore(Items.ANVIL, "§c✗ No podés mejorar todavía"));
+                menuInv.setStack(SLOT_UPGRADE_BTN, namedLore(Items.ANVIL, "§c✗ Cannot upgrade yet"));
             }
         } else {
-            menuInv.setStack(SLOT_UPGRADE_BTN, namedLore(Items.BARRIER, "§cSolo el dueño puede mejorar"));
+            menuInv.setStack(SLOT_UPGRADE_BTN, namedLore(Items.BARRIER, "§cOnly the owner can upgrade"));
         }
     }
 
@@ -601,7 +604,7 @@ public class PlotMenuHandler extends GenericContainerScreenHandler {
         if (clicked.getItem() == Items.SPECTRAL_ARROW) {
             Text nameText = clicked.get(DataComponentTypes.CUSTOM_NAME);
             String label = nameText != null ? nameText.getString() : "";
-            if (label.contains("anterior")) permPage = Math.max(0, permPage - 1);
+            if (label.contains("prev")) permPage = Math.max(0, permPage - 1);
             else permPage++;
             refreshMenu(); return;
         }
@@ -715,7 +718,7 @@ public class PlotMenuHandler extends GenericContainerScreenHandler {
         boolean tpEnabled = data.hasFlag(PlotData.Flag.ALLOW_TP);
         boolean canTp = tpEnabled || myRole == PlotData.Role.OWNER || myRole == PlotData.Role.ADMIN;
         if (!canTp) {
-            player.sendMessage(Text.literal("§c✗ El TP no está habilitado en esta parcela."), false);
+            player.sendMessage(Text.literal("§c✗ TP is not enabled in this plot."), false);
             return;
         }
         if (!(player.getWorld() instanceof ServerWorld sw)) return;
@@ -786,7 +789,7 @@ public class PlotMenuHandler extends GenericContainerScreenHandler {
 
         player.closeHandledScreen();
         com.zhilius.secureplots.network.ModPackets.sendShowPlotBorder(player, fresh);
-        player.sendMessage(Text.literal("§a✔ ¡Protección mejorada a §e" + next.getDisplayName() + "§a!"), false);
+        player.sendMessage(Text.literal("§a✔ Plot upgraded to §e" + next.getDisplayName() + "§a!"), false);
     }
 
     private void spawnUpgradeParticles(ServerWorld sw, BlockPos pos) {
@@ -853,109 +856,109 @@ public class PlotMenuHandler extends GenericContainerScreenHandler {
     // ── Labels de permisos / flags ────────────────────────────────────────────
     private static String permLabel(PlotData.Permission perm) {
         return switch (perm) {
-            case BUILD          -> "Construir";
-            case BREAK          -> "Romper";
-            case PLACE          -> "Colocar";
-            case INTERACT       -> "Interactuar";
-            case CONTAINERS     -> "Contenedores";
-            case USE_BEDS       -> "Usar Camas";
-            case USE_CRAFTING   -> "Mesa de Crafteo";
-            case USE_ENCHANTING -> "Mesa de Encantamiento";
-            case USE_ANVIL      -> "Yunque";
-            case USE_FURNACE    -> "Hornos";
-            case USE_BREWING    -> "Pociones";
-            case ATTACK_MOBS    -> "Atacar Mobs";
-            case ATTACK_ANIMALS -> "Atacar Animales";
+            case BUILD          -> "Build";
+            case BREAK          -> "Break";
+            case PLACE          -> "Place";
+            case INTERACT       -> "Interact";
+            case CONTAINERS     -> "Containers";
+            case USE_BEDS       -> "Beds";
+            case USE_CRAFTING   -> "Crafting";
+            case USE_ENCHANTING -> "Enchanting";
+            case USE_ANVIL      -> "Anvil";
+            case USE_FURNACE    -> "Furnace";
+            case USE_BREWING    -> "Brewing";
+            case ATTACK_MOBS    -> "Attack Mobs";
+            case ATTACK_ANIMALS -> "Attack Animals";
             case PVP            -> "PvP";
-            case RIDE_ENTITIES  -> "Montar Entidades";
-            case INTERACT_MOBS  -> "Interactuar Mobs";
-            case LEASH_MOBS     -> "Atar Mobs";
-            case SHEAR_MOBS     -> "Esquilar";
-            case MILK_MOBS      -> "Ordeñar";
-            case CROP_TRAMPLING -> "Pisotear Cultivos";
-            case PICKUP_ITEMS   -> "Recoger Ítems";
-            case DROP_ITEMS     -> "Tirar Ítems";
-            case BREAK_CROPS    -> "Romper Cultivos";
-            case PLANT_SEEDS    -> "Plantar Semillas";
-            case USE_BONEMEAL   -> "Hueso de Polvo";
-            case BREAK_DECOR    -> "Romper Decoración";
-            case DETONATE_TNT   -> "Detonar TNT";
+            case RIDE_ENTITIES  -> "Ride Entities";
+            case INTERACT_MOBS  -> "Interact Mobs";
+            case LEASH_MOBS     -> "Leash Mobs";
+            case SHEAR_MOBS     -> "Shear";
+            case MILK_MOBS      -> "Milk";
+            case CROP_TRAMPLING -> "Crop Trampling";
+            case PICKUP_ITEMS   -> "Pick Up Items";
+            case DROP_ITEMS     -> "Drop Items";
+            case BREAK_CROPS    -> "Break Crops";
+            case PLANT_SEEDS    -> "Plant Seeds";
+            case USE_BONEMEAL   -> "Bonemeal";
+            case BREAK_DECOR    -> "Break Decor";
+            case DETONATE_TNT   -> "Detonate TNT";
             case GRIEFING       -> "Griefing";
-            case TP             -> "Teleportar";
-            case FLY            -> "Volar";
-            case ENTER          -> "Entrar";
+            case TP             -> "Teleport";
+            case FLY            -> "Fly";
+            case ENTER          -> "Enter";
             case CHAT           -> "Chat";
-            case COMMAND_USE    -> "Comandos";
-            case MANAGE_MEMBERS -> "Gestionar Miembros";
-            case MANAGE_PERMS   -> "Gestionar Permisos";
-            case MANAGE_FLAGS   -> "Gestionar Flags";
-            case MANAGE_GROUPS  -> "Gestionar Grupos";
+            case COMMAND_USE    -> "Commands";
+            case MANAGE_MEMBERS -> "Manage Members";
+            case MANAGE_PERMS   -> "Manage Permissions";
+            case MANAGE_FLAGS   -> "Manage Flags";
+            case MANAGE_GROUPS  -> "Manage Groups";
         };
     }
 
     private static String permDesc(PlotData.Permission perm) {
         return switch (perm) {
-            case BUILD          -> "Colocar y romper bloques";
-            case BREAK          -> "Solo romper bloques";
-            case PLACE          -> "Solo colocar bloques";
-            case INTERACT       -> "Palancas, puertas, botones";
-            case CONTAINERS     -> "Abrir cofres e inventarios";
-            case USE_BEDS       -> "Usar camas para dormir";
-            case USE_CRAFTING   -> "Usar mesas de crafteo";
-            case USE_ENCHANTING -> "Usar mesas de encantamiento";
-            case USE_ANVIL      -> "Usar yunques";
-            case USE_FURNACE    -> "Usar hornos y ahumadores";
-            case USE_BREWING    -> "Usar soportes de pociones";
-            case ATTACK_MOBS    -> "Atacar mobs hostiles";
-            case ATTACK_ANIMALS -> "Atacar animales pasivos";
-            case PVP            -> "Atacar a otros jugadores";
-            case RIDE_ENTITIES  -> "Montar caballos, botes, etc.";
-            case INTERACT_MOBS  -> "Comerciar, nombrar mobs";
-            case LEASH_MOBS     -> "Atar y soltar mobs con correa";
-            case SHEAR_MOBS     -> "Esquilar ovejas";
-            case MILK_MOBS      -> "Ordeñar vacas y cabras";
-            case CROP_TRAMPLING -> "Pisar y destruir cultivos";
-            case PICKUP_ITEMS   -> "Recoger ítems del suelo";
-            case DROP_ITEMS     -> "Tirar ítems al suelo";
-            case BREAK_CROPS    -> "Romper plantas y cultivos";
-            case PLANT_SEEDS    -> "Plantar semillas y saplings";
-            case USE_BONEMEAL   -> "Usar hueso de polvo en plantas";
-            case BREAK_DECOR    -> "Romper flores y decoraciones";
-            case DETONATE_TNT   -> "Encender y detonar TNT";
-            case GRIEFING       -> "Daño por creepers/wither/etc.";
-            case TP             -> "Usar /sp tp para llegar aquí";
-            case FLY            -> "Volar dentro de la parcela";
-            case ENTER          -> "Entrar al área de la parcela";
-            case CHAT           -> "Chatear dentro de la parcela";
-            case COMMAND_USE    -> "Usar comandos en la parcela";
-            case MANAGE_MEMBERS -> "Agregar y remover miembros";
-            case MANAGE_PERMS   -> "Cambiar permisos de miembros";
-            case MANAGE_FLAGS   -> "Cambiar flags globales";
-            case MANAGE_GROUPS  -> "Crear y editar grupos";
+            case BUILD          -> "Place and break blocks";
+            case BREAK          -> "Break blocks only";
+            case PLACE          -> "Place blocks only";
+            case INTERACT       -> "Levers, doors, buttons";
+            case CONTAINERS     -> "Open chests and inventories";
+            case USE_BEDS       -> "Use beds to sleep";
+            case USE_CRAFTING   -> "Use crafting tables";
+            case USE_ENCHANTING -> "Use enchanting tables";
+            case USE_ANVIL      -> "Use anvils";
+            case USE_FURNACE    -> "Furnaces and smokers";
+            case USE_BREWING    -> "Brewing stands";
+            case ATTACK_MOBS    -> "Attack hostile mobs";
+            case ATTACK_ANIMALS -> "Attack passive animals";
+            case PVP            -> "Attack other players";
+            case RIDE_ENTITIES  -> "Ride horses, boats, etc.";
+            case INTERACT_MOBS  -> "Trade, name mobs";
+            case LEASH_MOBS     -> "Leash and unleash mobs";
+            case SHEAR_MOBS     -> "Shear sheep";
+            case MILK_MOBS      -> "Milk cows and goats";
+            case CROP_TRAMPLING -> "Trample and destroy crops";
+            case PICKUP_ITEMS   -> "Pick up items from ground";
+            case DROP_ITEMS     -> "Drop items on ground";
+            case BREAK_CROPS    -> "Break plants and crops";
+            case PLANT_SEEDS    -> "Plant seeds and saplings";
+            case USE_BONEMEAL   -> "Bonemeal on plants";
+            case BREAK_DECOR    -> "Break flowers and decor";
+            case DETONATE_TNT   -> "Light and detonate TNT";
+            case GRIEFING       -> "Creeper/wither/etc. damage";
+            case TP             -> "Use /sp tp to come here";
+            case FLY            -> "Fly inside the plot";
+            case ENTER          -> "Enter the plot area";
+            case CHAT           -> "Chat while in the plot";
+            case COMMAND_USE    -> "Use commands in the plot";
+            case MANAGE_MEMBERS -> "Add and remove members";
+            case MANAGE_PERMS   -> "Change member permissions";
+            case MANAGE_FLAGS   -> "Change global flags";
+            case MANAGE_GROUPS  -> "Create and edit groups";
         };
     }
 
     private static String flagLabel(PlotData.Flag flag) {
         return switch (flag) {
-            case ALLOW_VISITOR_BUILD      -> "Visitantes: Construir";
-            case ALLOW_VISITOR_INTERACT   -> "Visitantes: Interactuar";
-            case ALLOW_VISITOR_CONTAINERS -> "Visitantes: Contenedores";
-            case ALLOW_PVP                -> "PvP Global";
-            case ALLOW_FLY                -> "Volar Global";
-            case ALLOW_TP                 -> "TP Público";
-            case GREETINGS                -> "Mensajes de Bienvenida";
+            case ALLOW_VISITOR_BUILD      -> "Visitors: Build";
+            case ALLOW_VISITOR_INTERACT   -> "Visitors: Interact";
+            case ALLOW_VISITOR_CONTAINERS -> "Visitors: Containers";
+            case ALLOW_PVP                -> "Global PvP";
+            case ALLOW_FLY                -> "Global Fly";
+            case ALLOW_TP                 -> "Public TP";
+            case GREETINGS                -> "Welcome Messages";
         };
     }
 
     private static String flagDesc(PlotData.Flag flag) {
         return switch (flag) {
-            case ALLOW_VISITOR_BUILD      -> "Cualquiera puede construir aquí";
-            case ALLOW_VISITOR_INTERACT   -> "Cualquiera puede interactuar";
-            case ALLOW_VISITOR_CONTAINERS -> "Cualquiera puede abrir cofres";
-            case ALLOW_PVP                -> "PvP habilitado para todos";
-            case ALLOW_FLY                -> "Todos pueden volar aquí";
-            case ALLOW_TP                 -> "Todos pueden /sp tp a esta plot";
-            case GREETINGS                -> "Mostrar mensaje al entrar/salir";
+            case ALLOW_VISITOR_BUILD      -> "Anyone can build here";
+            case ALLOW_VISITOR_INTERACT   -> "Anyone can interact";
+            case ALLOW_VISITOR_CONTAINERS -> "Anyone can open chests";
+            case ALLOW_PVP                -> "PvP enabled for everyone";
+            case ALLOW_FLY                -> "Everyone can fly here";
+            case ALLOW_TP                 -> "Everyone can /sp tp here";
+            case GREETINGS                -> "Show message on enter/exit";
         };
     }
 

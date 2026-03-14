@@ -53,7 +53,7 @@ public class PlotblueprintItem extends Item {
                 if (atPos != null && (atPos.getRoleOf(player.getUuid()) != PlotData.Role.VISITOR || isAdmin)) {
                     ModPackets.sendShowPlotBorder(player, atPos);
                 } else {
-                    player.sendMessage(Text.literal("✗ No estás dentro de una protección tuya.").formatted(Formatting.RED), false);
+                    player.sendMessage(Text.literal("✗ You are not inside one of your plots.").formatted(Formatting.RED), false);
                 }
             } else {
                 // Click normal: si está dentro de una plot propia → abrir menú de la plot
@@ -68,7 +68,7 @@ public class PlotblueprintItem extends Item {
                     // Fuera de protección → siempre abrir lista (sin shift requerido)
                     List<PlotData> playerPlots = manager.getPlayerPlots(player.getUuid());
                     if (playerPlots.isEmpty()) {
-                        player.sendMessage(Text.literal("✗ No tenés protecciones colocadas.").formatted(Formatting.RED), false);
+                        player.sendMessage(Text.literal("✗ You have no plots placed.").formatted(Formatting.RED), false);
                     } else {
                         openPlotListMenu(player, playerPlots, manager);
                     }
@@ -91,9 +91,9 @@ public class PlotblueprintItem extends Item {
         // Header
         for (int i = 0; i < 9; i++)
             inv.setStack(i, named(Items.BLACK_STAINED_GLASS_PANE, " "));
-        inv.setStack(4, namedLore(Items.MAP, "§e🗺 Tus Parcelas",
+        inv.setStack(4, namedLore(Items.MAP, "§e🗺 Your Plots",
             "§7Clic: Teleportarte",
-            "§7Clic derecho: Abrir menú de la parcela"));
+            "§7Right-click: Open plot menu"));
         inv.setStack(8, named(Items.BARRIER, "§c✕ Cerrar"));
 
         // Plot entries
@@ -101,14 +101,14 @@ public class PlotblueprintItem extends Item {
             PlotData p = plots.get(i);
             BlockPos c = p.getCenter();
             boolean tpOn = p.hasFlag(PlotData.Flag.ALLOW_TP);
-            String tpStatus = tpOn ? "§aTP público: ON" : "§7TP público: OFF";
+            String tpStatus = tpOn ? "§aPublic TP: ON" : "§7Public TP: OFF";
 
             List<Text> lore = new ArrayList<>();
             lore.add(Text.literal("§7X: §f" + c.getX() + "  §7Z: §f" + c.getZ()).styled(s -> s.withItalic(false)));
             lore.add(Text.literal("§7Nivel: §b" + p.getSize().getDisplayName()).styled(s -> s.withItalic(false)));
             lore.add(Text.literal(tpStatus).styled(s -> s.withItalic(false)));
-            lore.add(Text.literal("§eClic: Teleportarte aquí").styled(s -> s.withItalic(false)));
-            lore.add(Text.literal("§7Clic derecho: Abrir menú").styled(s -> s.withItalic(false)));
+            lore.add(Text.literal("§eClick: Teleport here").styled(s -> s.withItalic(false)));
+            lore.add(Text.literal("§7Right-click: Open menu").styled(s -> s.withItalic(false)));
 
             ItemStack plotItem = new ItemStack(itemForTier(p.getSize().tier));
             plotItem.set(DataComponentTypes.CUSTOM_NAME,
@@ -120,7 +120,7 @@ public class PlotblueprintItem extends Item {
         final int invRows = rows;
         player.openHandledScreen(new SimpleNamedScreenHandlerFactory(
             (syncId, playerInv, p) -> new PlotListMenuHandler(syncId, playerInv, inv, plots, manager, invRows),
-            Text.literal("§e🗺 Mis Parcelas")
+            Text.literal("§e🗺 My Plots")
         ));
     }
 
@@ -228,7 +228,7 @@ public class PlotblueprintItem extends Item {
 
     @Override
     public void appendTooltip(ItemStack stack, TooltipContext context, List<Text> tooltip, TooltipType type) {
-        tooltip.add(Text.literal("Clic: abre el menú / lista de parcelas").formatted(Formatting.GRAY));
-        tooltip.add(Text.literal("Shift+Clic: muestra los límites de la protección").formatted(Formatting.DARK_GRAY));
+        tooltip.add(Text.literal("Click: open menu / plot list").formatted(Formatting.GRAY));
+        tooltip.add(Text.literal("Shift+Click: show plot borders").formatted(Formatting.DARK_GRAY));
     }
 }

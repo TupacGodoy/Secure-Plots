@@ -93,7 +93,7 @@ public class SecurePlots implements ModInitializer {
             if (plot == null) return ActionResult.PASS;
             // Has direct permission → always allow break
             if (plot.canBuild(player.getUuid())) return ActionResult.PASS;
-            player.sendMessage(Text.literal("✗ Esta zona está protegida.").formatted(Formatting.RED), true);
+            player.sendMessage(Text.literal("✗ This area is protected.").formatted(Formatting.RED), true);
             return ActionResult.FAIL;
         });
 
@@ -125,7 +125,7 @@ public class SecurePlots implements ModInitializer {
                 }
             }
 
-            player.sendMessage(Text.literal("✗ Esta zona está protegida.").formatted(Formatting.RED), true);
+            player.sendMessage(Text.literal("✗ This area is protected.").formatted(Formatting.RED), true);
             return ActionResult.FAIL;
         });
     }

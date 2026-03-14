@@ -17,7 +17,7 @@ public class HologramTestCommand {
                     // Ahora los hologramas son server-side (TextDisplayEntity)
                     // Este comando ya no es necesario — el holograma aparece al colocar o clic derecho
                     client.player.sendMessage(
-                        Text.literal("§eEl holograma ahora es una entidad del servidor. Poné un bloque o hacé clic derecho en uno existente."),
+                        Text.literal("§eThe hologram is now a server entity. Place a block or right-click an existing one."),
                         false
                     );
                     return 1;

@@ -43,17 +43,17 @@ public class PlotChatListener {
         PlotManager manager = PlotManager.getOrCreate(sw);
         PlotData data = manager.getPlot(plotPos);
         if (data == null || !data.getOwnerId().equals(player.getUuid())) {
-            player.sendMessage(Text.literal("✗ Protección no encontrada.").formatted(Formatting.RED), false);
+            player.sendMessage(Text.literal("✗ Plot not found.").formatted(Formatting.RED), false);
             return;
         }
         newName = newName.trim();
         if (newName.isEmpty() || newName.length() > 32) {
-            player.sendMessage(Text.literal("✗ Nombre inválido (1-32 caracteres).").formatted(Formatting.RED), false);
+            player.sendMessage(Text.literal("✗ Invalid name (1-32 characters).").formatted(Formatting.RED), false);
             return;
         }
         for (PlotData p : manager.getPlayerPlots(player.getUuid())) {
             if (p != data && p.getPlotName().equalsIgnoreCase(newName)) {
-                player.sendMessage(Text.literal("✗ Ya tenés una protección con ese nombre.").formatted(Formatting.RED), false);
+                player.sendMessage(Text.literal("✗ You already have a plot with that name.").formatted(Formatting.RED), false);
                 return;
             }
         }
@@ -75,7 +75,7 @@ public class PlotChatListener {
         PlotManager manager = PlotManager.getOrCreate(sw);
         PlotData data = manager.getPlot(plotPos);
         if (data == null) {
-            player.sendMessage(Text.literal("✗ Protección no encontrada.").formatted(Formatting.RED), false);
+            player.sendMessage(Text.literal("✗ Plot not found.").formatted(Formatting.RED), false);
             return;
         }
         PlotData.Role myRole = data.getRoleOf(player.getUuid());
@@ -83,12 +83,12 @@ public class PlotChatListener {
 
         ServerPlayerEntity target = player.getServer().getPlayerManager().getPlayer(targetName);
         if (target == null) {
-            player.sendMessage(Text.literal("✗ \"" + targetName + "\" no está online.").formatted(Formatting.RED), false);
+            player.sendMessage(Text.literal("✗ \"" + targetName + "\" is not online.").formatted(Formatting.RED), false);
             reopenMenu(player, plotPos, manager);
             return;
         }
         if (target.getUuid().equals(player.getUuid())) {
-            player.sendMessage(Text.literal("✗ No podés agregarte a vos mismo.").formatted(Formatting.RED), false);
+            player.sendMessage(Text.literal("✗ You cannot add yourself.").formatted(Formatting.RED), false);
             reopenMenu(player, plotPos, manager);
             return;
         }
