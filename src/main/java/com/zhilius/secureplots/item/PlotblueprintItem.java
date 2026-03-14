@@ -43,6 +43,17 @@ public class PlotblueprintItem extends Item {
 
     @Override
     public TypedActionResult<ItemStack> use(World world, PlayerEntity user, Hand hand) {
+        // Funciona desde ambas manos igual que el mapa de vanilla.
+        // Si el blueprint está en la mano principal Y también en la secundaria,
+        // evitamos doble acción ignorando la mano secundaria en ese caso.
+        if (hand == Hand.OFF_HAND) {
+            ItemStack mainStack = user.getMainHandStack();
+            // Si la mano principal tiene blueprint o cualquier ítem que ya dispara use(),
+            // dejamos que la mano principal maneje la acción.
+            if (!mainStack.isEmpty() && mainStack.getItem() instanceof PlotblueprintItem) {
+                return TypedActionResult.pass(user.getStackInHand(hand));
+            }
+        }
         if (!world.isClient && user instanceof ServerPlayerEntity player) {
             PlotManager manager = PlotManager.getOrCreate((ServerWorld) world);
             PlotData atPos = manager.getPlotAt(player.getBlockPos());

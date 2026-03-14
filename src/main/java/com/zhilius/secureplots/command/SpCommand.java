@@ -5,11 +5,15 @@ import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.BoolArgumentType;
 import com.mojang.brigadier.arguments.LongArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
+import com.mojang.brigadier.suggestion.SuggestionProvider;
+import com.mojang.brigadier.suggestion.Suggestions;
+import com.mojang.brigadier.suggestion.SuggestionsBuilder;
 import com.zhilius.secureplots.network.ModPackets;
 import com.zhilius.secureplots.config.SecurePlotsConfig;
 import com.zhilius.secureplots.plot.PlotData;
 import com.zhilius.secureplots.plot.PlotManager;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
+import net.minecraft.registry.Registries;
 import net.minecraft.server.command.CommandManager;
 import net.minecraft.server.command.ServerCommandSource;
 import net.minecraft.server.network.ServerPlayerEntity;
@@ -180,7 +184,9 @@ public class SpCommand {
                 // /sp plot music <sound_id|clear>
                 .then(CommandManager.literal("plot")
                         .then(CommandManager.literal("particle")
+                                .executes(ctx -> executeParticleHelp(ctx.getSource()))
                                 .then(CommandManager.argument("type", StringArgumentType.word())
+                                        .suggests((ctx, builder) -> suggestParticles(builder))
                                         .executes(ctx -> executeSetParticle(
                                                 ctx.getSource(),
                                                 StringArgumentType.getString(ctx, "type")))))
@@ -195,12 +201,117 @@ public class SpCommand {
                                                 ctx.getSource(),
                                                 StringArgumentType.getString(ctx, "value")))))
                         .then(CommandManager.literal("music")
+                                .executes(ctx -> executeMusicHelp(ctx.getSource()))
                                 .then(CommandManager.argument("sound", StringArgumentType.greedyString())
+                                        .suggests((ctx, builder) -> suggestMusic(builder))
                                         .executes(ctx -> executeSetMusic(
                                                 ctx.getSource(),
                                                 StringArgumentType.getString(ctx, "sound"))))))
             );
         }
+    }
+
+
+
+
+
+
+
+    // ── /sp plot particle (no args) → list options ────────────────────────────
+    private static int executeParticleHelp(ServerCommandSource source) {
+        ServerPlayerEntity player = source.getPlayer();
+        if (player == null) return 0;
+        player.sendMessage(Text.literal("§e══ Particle options ══"), false);
+        player.sendMessage(Text.literal("§7Usage: §e/sp plot particle <type|clear>"), false);
+        player.sendMessage(Text.literal("§7Type §eclear§7 to remove particles."), false);
+        player.sendMessage(Text.literal("§7Common options (Tab autocompletes all):"), false);
+        for (String p : COMMON_PARTICLES) {
+            if (!p.equals("clear")) player.sendMessage(Text.literal("  §a" + p), false);
+        }
+        return 1;
+    }
+
+    // ── /sp plot music (no args) → list options ────────────────────────────
+    private static int executeMusicHelp(ServerCommandSource source) {
+        ServerPlayerEntity player = source.getPlayer();
+        if (player == null) return 0;
+        player.sendMessage(Text.literal("§e══ Music options ══"), false);
+        player.sendMessage(Text.literal("§7Usage: §e/sp plot music <sound_id|clear>"), false);
+        player.sendMessage(Text.literal("§7Type §eclear§7 to remove music."), false);
+        player.sendMessage(Text.literal("§7Music disc options:"), false);
+        for (String s : COMMON_MUSIC) {
+            if (s.contains("music_disc")) player.sendMessage(Text.literal("  §b" + s), false);
+        }
+        player.sendMessage(Text.literal("§7Background music options:"), false);
+        for (String s : COMMON_MUSIC) {
+            if (s.contains("music.") && !s.equals("clear")) player.sendMessage(Text.literal("  §b" + s), false);
+        }
+        return 1;
+    }
+
+    // ── Suggestion providers ───────────────────────────────────────────────────
+
+    private static final String[] COMMON_PARTICLES = {
+        "clear",
+        "minecraft:happy_villager", "minecraft:angry_villager",
+        "minecraft:heart", "minecraft:crit", "minecraft:enchanted_hit",
+        "minecraft:flame", "minecraft:smoke", "minecraft:large_smoke",
+        "minecraft:soul_fire_flame", "minecraft:soul",
+        "minecraft:snowflake", "minecraft:snow", "minecraft:rain",
+        "minecraft:bubble", "minecraft:bubble_pop", "minecraft:dripping_water",
+        "minecraft:dripping_lava", "minecraft:falling_water", "minecraft:falling_lava",
+        "minecraft:portal", "minecraft:end_rod", "minecraft:witch",
+        "minecraft:totem_of_undying", "minecraft:explosion", "minecraft:poof",
+        "minecraft:firework", "minecraft:flash", "minecraft:glow",
+        "minecraft:electric_spark", "minecraft:scrape", "minecraft:spore_blossom_air",
+        "minecraft:cherry_leaves", "minecraft:dripping_honey", "minecraft:falling_honey",
+        "minecraft:mycelium", "minecraft:enchant", "minecraft:nautilus",
+        "minecraft:note", "minecraft:dragon_breath", "minecraft:suspended",
+        "minecraft:crimson_spore", "minecraft:warped_spore"
+    };
+
+    private static final String[] COMMON_MUSIC = {
+        "clear",
+        "minecraft:music.game", "minecraft:music.creative", "minecraft:music.end",
+        "minecraft:music.nether.basalt_deltas", "minecraft:music.nether.crimson_forest",
+        "minecraft:music.nether.nether_wastes", "minecraft:music.nether.soul_sand_valley",
+        "minecraft:music.nether.warped_forest",
+        "minecraft:music.under_water",
+        "minecraft:music_disc.13", "minecraft:music_disc.cat", "minecraft:music_disc.blocks",
+        "minecraft:music_disc.chirp", "minecraft:music_disc.far", "minecraft:music_disc.mall",
+        "minecraft:music_disc.mellohi", "minecraft:music_disc.stal", "minecraft:music_disc.strad",
+        "minecraft:music_disc.ward", "minecraft:music_disc.11", "minecraft:music_disc.wait",
+        "minecraft:music_disc.otherside", "minecraft:music_disc.5",
+        "minecraft:music_disc.pigstep", "minecraft:music_disc.relic",
+        "minecraft:music_disc.creator", "minecraft:music_disc.creator_music_box",
+        "minecraft:music_disc.precipice"
+    };
+
+    private static java.util.concurrent.CompletableFuture<Suggestions> suggestParticles(SuggestionsBuilder builder) {
+        String remaining = builder.getRemaining().toLowerCase();
+        for (String s : COMMON_PARTICLES) {
+            if (s.startsWith(remaining) || s.contains(remaining)) builder.suggest(s);
+        }
+        // Also suggest from the live registry
+        for (net.minecraft.util.Identifier id : Registries.PARTICLE_TYPE.getIds()) {
+            String full = id.toString();
+            if (full.startsWith(remaining) || full.contains(remaining)) builder.suggest(full);
+        }
+        return builder.buildFuture();
+    }
+
+    private static java.util.concurrent.CompletableFuture<Suggestions> suggestMusic(SuggestionsBuilder builder) {
+        String remaining = builder.getRemaining().toLowerCase();
+        for (String s : COMMON_MUSIC) {
+            if (s.startsWith(remaining) || s.contains(remaining)) builder.suggest(s);
+        }
+        // Also suggest from the live registry
+        for (net.minecraft.util.Identifier id : Registries.SOUND_EVENT.getIds()) {
+            String full = id.toString();
+            if ((full.contains("music") || full.contains("disc")) &&
+                    (full.startsWith(remaining) || full.contains(remaining))) builder.suggest(full);
+        }
+        return builder.buildFuture();
     }
 
     // ── /sp help ──────────────────────────────────────────────────────────────
@@ -835,7 +946,13 @@ public class SpCommand {
         PlotData plot = getOwnedPlotAt(player);
         if (plot == null) return 0;
 
-        String value = type.equalsIgnoreCase("clear") || type.equalsIgnoreCase("none") ? "" : type;
+        String value;
+        if (type.equalsIgnoreCase("clear") || type.equalsIgnoreCase("none")) {
+            value = "";
+        } else {
+            // Accept both "happy_villager" and "minecraft:happy_villager"
+            value = type.contains(":") ? type : "minecraft:" + type;
+        }
         plot.setParticleEffect(value);
         PlotManager.getOrCreate(player.getServerWorld()).markDirty();
         if (value.isEmpty())

@@ -30,8 +30,6 @@ public class PlotScreen extends Screen {
 
     private TextFieldWidget nameField;
     private TextFieldWidget addPlayerField;
-    private TextFieldWidget particleField;
-    private TextFieldWidget musicField;
 
     private UUID selectedMember = null;
 
@@ -176,80 +174,43 @@ public class PlotScreen extends Screen {
         boolean canEdit = myRole == PlotData.Role.OWNER || myRole == PlotData.Role.ADMIN;
         if (!canEdit) return;
 
-        int labelW = 60;
-        int fieldW = PW - labelW - 78;
-        int btnW   = 56;
-        int gap    = 26;
+        int gap = 28;
 
-        // Particles
-        particleField = new TextFieldWidget(textRenderer, px + labelW + 4, cy, fieldW, 16, Text.empty());
-        particleField.setText(data.getParticleEffect());
-        particleField.setMaxLength(128);
-        particleField.setPlaceholder(Text.literal("minecraft:happy_villager").formatted(Formatting.DARK_GRAY));
-        addDrawableChild(particleField);
-        addDrawableChild(ButtonWidget.builder(Text.literal("Set"), b -> {
-            data.setParticleEffect(particleField.getText().trim());
-            ClientPlayNetworking.send(new ModPackets.UpdatePlotPayload(plotPos, data.toNbt()));
-            assert this.client != null;
-            this.client.player.sendMessage(Text.literal("\u2713 Particles saved").formatted(Formatting.GREEN), true);
-        }).dimensions(px + labelW + 4 + fieldW + 4, cy, btnW, 16).build());
-        cy += gap;
-
-        // Music
-        musicField = new TextFieldWidget(textRenderer, px + labelW + 4, cy, fieldW, 16, Text.empty());
-        musicField.setText(data.getMusicSound());
-        musicField.setMaxLength(128);
-        musicField.setPlaceholder(Text.literal("minecraft:music.game").formatted(Formatting.DARK_GRAY));
-        addDrawableChild(musicField);
-        addDrawableChild(ButtonWidget.builder(Text.literal("Set"), b -> {
-            data.setMusicSound(musicField.getText().trim());
-            ClientPlayNetworking.send(new ModPackets.UpdatePlotPayload(plotPos, data.toNbt()));
-            assert this.client != null;
-            this.client.player.sendMessage(Text.literal("\u2713 Music saved").formatted(Formatting.GREEN), true);
-        }).dimensions(px + labelW + 4 + fieldW + 4, cy, btnW, 16).build());
-        cy += gap;
-
-        // Weather buttons
-        int wBtnW = (PW - 20) / 4 - 2;
-        String[] weatherLabels = { "Clear", "Rain", "Thunder", "None" };
-        String[] weatherValues = { "CLEAR", "RAIN",  "THUNDER", "" };
-        for (int i = 0; i < weatherLabels.length; i++) {
-            final String wv = weatherValues[i];
-            boolean active = data.getWeatherType().equalsIgnoreCase(wv);
-            String lbl = (active ? "\u00a7a" : "\u00a77") + weatherLabels[i];
-            addDrawableChild(ButtonWidget.builder(Text.literal(lbl), b -> {
-                data.setWeatherType(wv);
+        // Particles — opens chat with /sp plot particle  (autocomplete list)
+        String pCurrent = data.getParticleEffect();
+        String pLabel = pCurrent.isEmpty() ? "\u00a77None" : "\u00a7f" + pCurrent;
+        addDrawableChild(ButtonWidget.builder(
+            Text.literal("\u2728 Set Particles  \u00a78(" + (pCurrent.isEmpty() ? "none" : pCurrent) + ")"), b -> {
+                assert this.client != null;
+                this.client.setScreen(new net.minecraft.client.gui.screen.ChatScreen("/sp plot particle "));
+        }).dimensions(px + 10, cy, PW - 70, 20).build());
+        if (!pCurrent.isEmpty()) {
+            addDrawableChild(ButtonWidget.builder(Text.literal("\u00a7c\u2715 Clear"), b -> {
+                data.setParticleEffect("");
                 ClientPlayNetworking.send(new ModPackets.UpdatePlotPayload(plotPos, data.toNbt()));
                 clearAndInit();
-            }).dimensions(px + 10 + i * (wBtnW + 2), cy, wBtnW, 16).build());
+            }).dimensions(px + PW - 56, cy, 46, 20).build());
         }
         cy += gap;
 
-        // Time buttons
-        String[] timeLabels = { "Day", "Noon", "Dusk", "Night", "None" };
-        long[]   timeValues = { 1000L, 6000L, 12500L, 18000L, -1L };
-        int tBtnW = (PW - 20) / 5 - 2;
-        for (int i = 0; i < timeLabels.length; i++) {
-            final long tv = timeValues[i];
-            boolean active = data.getPlotTime() == tv;
-            String lbl = (active ? "\u00a7a" : "\u00a77") + timeLabels[i];
-            addDrawableChild(ButtonWidget.builder(Text.literal(lbl), b -> {
-                data.setPlotTime(tv);
+        // Music — opens chat with /sp plot music  (autocomplete list)
+        String mCurrent = data.getMusicSound();
+        addDrawableChild(ButtonWidget.builder(
+            Text.literal("\uD83C\uDFB5 Set Music  \u00a78(" + (mCurrent.isEmpty() ? "none" : mCurrent) + ")"), b -> {
+                assert this.client != null;
+                this.client.setScreen(new net.minecraft.client.gui.screen.ChatScreen("/sp plot music "));
+        }).dimensions(px + 10, cy, PW - 70, 20).build());
+        if (!mCurrent.isEmpty()) {
+            addDrawableChild(ButtonWidget.builder(Text.literal("\u00a7c\u2715 Clear"), b -> {
+                data.setMusicSound("");
                 ClientPlayNetworking.send(new ModPackets.UpdatePlotPayload(plotPos, data.toNbt()));
                 clearAndInit();
-            }).dimensions(px + 10 + i * (tBtnW + 2), cy, tBtnW, 16).build());
+            }).dimensions(px + PW - 56, cy, 46, 20).build());
         }
-        cy += gap;
+        cy += gap + 16;
 
-        // Clear All
-        addDrawableChild(ButtonWidget.builder(Text.literal("\u00a7cClear All Ambient"), b -> {
-            data.setParticleEffect("");
-            data.setMusicSound("");
-            data.setWeatherType("");
-            data.setPlotTime(-1L);
-            ClientPlayNetworking.send(new ModPackets.UpdatePlotPayload(plotPos, data.toNbt()));
-            clearAndInit();
-        }).dimensions(px + 10, cy, PW - 20, 16).build());
+        // Info line
+        // (render method draws the hint text)
     }
 
     // ── CREATIVE ─────────────────────────────────────────────────────────────
@@ -446,22 +407,21 @@ public class PlotScreen extends Screen {
     // ── Render Ambient ───────────────────────────────────────────────────────
     private void renderAmbient(DrawContext ctx, int x, int y) {
         boolean canEdit = myRole == PlotData.Role.OWNER || myRole == PlotData.Role.ADMIN;
-        int gap = 26;
-        int labelW = 60;
+        int gap = 28;
 
-        ctx.drawTextWithShadow(textRenderer, Text.literal("Particles:").formatted(Formatting.DARK_GRAY), x, y + 4, 0x333333);
-        y += gap;
-        ctx.drawTextWithShadow(textRenderer, Text.literal("Music:").formatted(Formatting.DARK_GRAY), x, y + 4, 0x333333);
-        y += gap;
-        ctx.drawTextWithShadow(textRenderer, Text.literal("Weather:").formatted(Formatting.DARK_GRAY), x, y + 4, 0x333333);
-        y += gap;
-        ctx.drawTextWithShadow(textRenderer, Text.literal("Time:").formatted(Formatting.DARK_GRAY), x, y + 4, 0x333333);
-        y += gap;
+        y += gap * 2 + 16;
+        ctx.drawTextWithShadow(textRenderer,
+            Text.literal("\u00a77Click a button to open chat and type the value."),
+            x, y, 0x555555);
+        y += 12;
+        ctx.drawTextWithShadow(textRenderer,
+            Text.literal("\u00a77Autocomplete (Tab) shows all available options."),
+            x, y, 0x555555);
 
         if (!canEdit) {
             ctx.drawTextWithShadow(textRenderer,
                     Text.literal("Only the owner or admin can edit these.").formatted(Formatting.RED),
-                    x, y + 4, 0xAA0000);
+                    x, y + 24, 0xAA0000);
         }
     }
 

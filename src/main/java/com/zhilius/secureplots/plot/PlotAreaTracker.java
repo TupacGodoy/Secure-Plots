@@ -36,16 +36,24 @@ public class PlotAreaTracker {
     private static final Map<UUID, Long>     savedTime    = new ConcurrentHashMap<>();
     private static final Map<UUID, String>   savedWeather = new ConcurrentHashMap<>();
 
-    private static int tick = 0;
-    private static final int CHECK_INTERVAL = 10;
+    private static int tick        = 0;
+    private static int ambientTick = 0;
 
     public static void register() {
         ServerTickEvents.END_SERVER_TICK.register(PlotAreaTracker::onTick);
     }
 
     private static void onTick(MinecraftServer server) {
-        if (++tick < CHECK_INTERVAL) return;
-        tick = 0;
+        com.zhilius.secureplots.config.SecurePlotsConfig cfgTick = com.zhilius.secureplots.config.SecurePlotsConfig.INSTANCE;
+        int checkInt   = (cfgTick != null && cfgTick.checkInterval   > 0) ? cfgTick.checkInterval   : 10;
+        int ambientInt = (cfgTick != null && cfgTick.ambientInterval > 0) ? cfgTick.ambientInterval : 20;
+
+        boolean doCheck   = (++tick >= checkInt);
+        boolean doAmbient = (++ambientTick >= ambientInt);
+        if (doCheck)   tick = 0;
+        if (doAmbient) ambientTick = 0;
+
+        if (!doCheck && !doAmbient) return;
 
         for (ServerPlayerEntity player : server.getPlayerManager().getPlayerList()) {
             if (!(player.getWorld() instanceof ServerWorld sw)) continue;
@@ -59,18 +67,32 @@ public class PlotAreaTracker {
             boolean same = (prevCenter == null && curCenter == null)
                     || (prevCenter != null && prevCenter.equals(curCenter));
 
-            updateFly(player, current);
-            if (same) continue;
+            if (doCheck) updateFly(player, current);
+            if (same) {
+                // Partículas continuas: solo cada AMBIENT_INTERVAL ticks (cada segundo)
+                if (doAmbient && current != null) {
+                    com.zhilius.secureplots.config.SecurePlotsConfig cfgP = com.zhilius.secureplots.config.SecurePlotsConfig.INSTANCE;
+                    String pId = current.getParticleEffect();
+                    if (!pId.isBlank() && (cfgP == null || cfgP.enablePlotParticles))
+                        spawnAmbientParticles(sw, player, pId);
+                }
+                continue;
+            }
+            // Si no es un cambio de plot, no procesar entrada/salida
+            if (!doCheck) continue;
 
             if (curCenter != null) {
                 // ── Entered a plot ──────────────────────────────────────────
 
-                // Action bar: plot name + owner (always shown)
-                player.sendMessage(
-                    Text.translatable("sp.hud.entering",
-                        Text.literal(current.getPlotName()).formatted(Formatting.YELLOW, Formatting.BOLD),
-                        Text.literal(current.getOwnerName()).formatted(Formatting.WHITE)),
-                    true);
+                // Action bar: plot name + owner
+                com.zhilius.secureplots.config.SecurePlotsConfig cfg0 = com.zhilius.secureplots.config.SecurePlotsConfig.INSTANCE;
+                if (cfg0 == null || cfg0.enableEnterHud) {
+                    player.sendMessage(
+                        Text.translatable("sp.hud.entering",
+                            Text.literal(current.getPlotName()).formatted(Formatting.YELLOW, Formatting.BOLD),
+                            Text.literal(current.getOwnerName()).formatted(Formatting.WHITE)),
+                        true);
+                }
 
                 // Custom enter message as title overlay (center screen, distinct from action bar)
                 if (current.hasFlag(PlotData.Flag.GREETINGS)) {
@@ -104,27 +126,31 @@ public class PlotAreaTracker {
 
     private static void applyAmbientEnter(ServerPlayerEntity player, ServerWorld sw,
                                           PlotData plot, UUID id) {
+        com.zhilius.secureplots.config.SecurePlotsConfig cfg = com.zhilius.secureplots.config.SecurePlotsConfig.INSTANCE;
+
         // Particles
         String particleId = plot.getParticleEffect();
-        if (!particleId.isBlank()) spawnEnterParticles(sw, player, particleId);
+        if (!particleId.isBlank() && (cfg == null || cfg.enablePlotParticles))
+            spawnEnterParticles(sw, player, particleId);
 
         // Weather
         String weather = plot.getWeatherType();
-        if (!weather.isBlank()) {
+        if (!weather.isBlank() && (cfg == null || cfg.enablePlotWeather)) {
             savedWeather.put(id, getCurrentWeather(sw));
             applyWeather(sw, weather);
         }
 
         // Time
         long time = plot.getPlotTime();
-        if (time >= 0) {
+        if (time >= 0 && (cfg == null || cfg.enablePlotTime)) {
             savedTime.put(id, sw.getTimeOfDay() % 24000L);
             sw.setTimeOfDay(time);
         }
 
         // Music
         String music = plot.getMusicSound();
-        if (!music.isBlank()) playMusic(player, sw, music);
+        if (!music.isBlank() && (cfg == null || cfg.enablePlotMusic))
+            playMusic(player, sw, music);
     }
 
     // ── Ambient: Exit ─────────────────────────────────────────────────────────
@@ -147,16 +173,54 @@ public class PlotAreaTracker {
     @SuppressWarnings("unchecked")
     private static void spawnEnterParticles(ServerWorld sw, ServerPlayerEntity player, String particleId) {
         try {
-            Identifier rid = Identifier.tryParse(particleId);
+            // Accept both "minecraft:happy_villager" and "happy_villager"
+            String normalized = particleId.contains(":") ? particleId : "minecraft:" + particleId;
+            Identifier rid = Identifier.tryParse(normalized);
             if (rid == null) return;
             ParticleType<?> type = Registries.PARTICLE_TYPE.get(rid);
             if (!(type instanceof ParticleEffect effect)) return;
+            com.zhilius.secureplots.config.SecurePlotsConfig cfgC = com.zhilius.secureplots.config.SecurePlotsConfig.INSTANCE;
+            // Burst de entrada: usa particleCount del config, máximo 5 para no saturar
+            int count = (cfgC != null) ? Math.max(1, Math.min(cfgC.particleCount, 5)) : 3;
             Vec3d pos = player.getPos();
+            // Outer ring (radius 3)
+            for (int i = 0; i < 24; i++) {
+                double angle = (2 * Math.PI / 24) * i;
+                double x = pos.x + Math.cos(angle) * 3.0;
+                double z = pos.z + Math.sin(angle) * 3.0;
+                sw.spawnParticles(effect, x, pos.y + 0.3, z, count, 0, 0.2, 0, 0.05);
+            }
+            // Inner ring (radius 1.2)
             for (int i = 0; i < 12; i++) {
                 double angle = (2 * Math.PI / 12) * i;
-                double x = pos.x + Math.cos(angle) * 1.5;
-                double z = pos.z + Math.sin(angle) * 1.5;
-                sw.spawnParticles(effect, x, pos.y + 1.0, z, 1, 0, 0.1, 0, 0.05);
+                double x = pos.x + Math.cos(angle) * 1.2;
+                double z = pos.z + Math.sin(angle) * 1.2;
+                sw.spawnParticles(effect, x, pos.y + 1.2, z, count + 1, 0, 0.15, 0, 0.04);
+            }
+            // Column burst above player
+            sw.spawnParticles(effect, pos.x, pos.y + 0.5, pos.z, count * 5, 0.4, 0.8, 0.4, 0.06);
+        } catch (Exception ignored) {}
+    }
+
+    // Llamado cada ambientInterval ticks mientras el jugador está dentro de la plot
+    private static void spawnAmbientParticles(ServerWorld sw, ServerPlayerEntity player, String particleId) {
+        try {
+            String normalized = particleId.contains(":") ? particleId : "minecraft:" + particleId;
+            Identifier rid = Identifier.tryParse(normalized);
+            if (rid == null) return;
+            ParticleType<?> type = Registries.PARTICLE_TYPE.get(rid);
+            if (!(type instanceof ParticleEffect effect)) return;
+            com.zhilius.secureplots.config.SecurePlotsConfig cfgC = com.zhilius.secureplots.config.SecurePlotsConfig.INSTANCE;
+            int count = (cfgC != null) ? Math.max(1, Math.min(cfgC.ambientParticleCount, 5)) : 2;
+            Vec3d pos = player.getPos();
+            for (int i = 0; i < count; i++) {
+                double angle = Math.random() * 2 * Math.PI;
+                double r = 0.5 + Math.random() * 1.5;
+                sw.spawnParticles(effect,
+                    pos.x + Math.cos(angle) * r,
+                    pos.y + Math.random() * 2.0,
+                    pos.z + Math.sin(angle) * r,
+                    1, 0, 0, 0, 0.01);
             }
         } catch (Exception ignored) {}
     }
@@ -181,8 +245,10 @@ public class PlotAreaTracker {
             if (rid == null) return;
             net.minecraft.sound.SoundEvent event = net.minecraft.registry.Registries.SOUND_EVENT.get(rid);
             if (event == null) return;
+            com.zhilius.secureplots.config.SecurePlotsConfig cfgM = com.zhilius.secureplots.config.SecurePlotsConfig.INSTANCE;
+            float vol = (cfgM != null) ? Math.max(0.1f, Math.min(cfgM.musicVolume, 4.0f)) : 4.0f;
             sw.playSound(null, player.getX(), player.getY(), player.getZ(),
-                event, SoundCategory.RECORDS, 4.0f, 1.0f);
+                event, SoundCategory.RECORDS, vol, 1.0f);
         } catch (Exception ignored) {}
     }
 
@@ -191,6 +257,8 @@ public class PlotAreaTracker {
     private static void updateFly(ServerPlayerEntity player, PlotData plot) {
         UUID id = player.getUuid();
         if (player.isCreative() || player.isSpectator()) return;
+        com.zhilius.secureplots.config.SecurePlotsConfig cfgFly = com.zhilius.secureplots.config.SecurePlotsConfig.INSTANCE;
+        if (cfgFly != null && !cfgFly.enableFlyInPlots) return;
 
         boolean shouldHaveFly     = plot != null && plot.hasPermission(id, PlotData.Permission.FLY);
         boolean grantedByUs       = flyGranted.getOrDefault(id, false);

@@ -9,10 +9,13 @@ import com.zhilius.secureplots.network.ModPackets;
 import com.zhilius.secureplots.hologram.PlotHologram;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.event.player.AttackBlockCallback;
+import net.fabricmc.fabric.api.event.player.UseItemCallback;
 import net.fabricmc.fabric.api.event.player.UseBlockCallback;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.minecraft.text.Text;
 import net.minecraft.util.ActionResult;
+import net.minecraft.util.Hand;
+import net.minecraft.util.TypedActionResult;
 import net.minecraft.util.Formatting;
 import net.minecraft.util.Identifier;
 import org.slf4j.Logger;
@@ -53,6 +56,9 @@ public class SecurePlots implements ModInitializer {
         // Register protection events
         registerProtectionEvents();
 
+        // Blueprint works from both hands
+        registerBlueprintOffhand();
+
         // Track owner activity for inactivity expiry
         registerActivityTracking();
 
@@ -79,6 +85,19 @@ public class SecurePlots implements ModInitializer {
                 .updateOwnerSeen(player.getUuid(), tick);
             // Revoke any fly granted by SecurePlots
             com.zhilius.secureplots.plot.PlotAreaTracker.onPlayerLeave(player);
+        });
+    }
+
+    private void registerBlueprintOffhand() {
+        UseItemCallback.EVENT.register((player, world, hand) -> {
+            if (world.isClient) return TypedActionResult.pass(player.getStackInHand(hand));
+            // Only handle off-hand; main-hand is already handled by Item.use()
+            if (hand != Hand.OFF_HAND) return TypedActionResult.pass(player.getStackInHand(hand));
+            net.minecraft.item.ItemStack offStack = player.getStackInHand(Hand.OFF_HAND);
+            if (!(offStack.getItem() instanceof com.zhilius.secureplots.item.PlotblueprintItem blueprint))
+                return TypedActionResult.pass(offStack);
+            // Delegate to the item's use() method
+            return blueprint.use(world, player, Hand.OFF_HAND);
         });
     }
 

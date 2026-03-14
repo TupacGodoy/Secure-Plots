@@ -102,7 +102,7 @@ public class PlotChatListener {
         sw.playSound(null, player.getBlockPos(),
             net.minecraft.sound.SoundEvents.ENTITY_EXPERIENCE_ORB_PICKUP,
             net.minecraft.sound.SoundCategory.PLAYERS, 1f, 1.5f);
-        player.sendMessage(Text.literal("✔ " + targetName + " agregado como miembro.").formatted(Formatting.GREEN), false);
+        player.sendMessage(Text.literal("✔ " + targetName + " added as a member.").formatted(Formatting.GREEN), false);
         target.sendMessage(Text.literal("✔ Fuiste agregado a \"" + data.getPlotName() + "\" de " + player.getName().getString()).formatted(Formatting.GREEN), false);
         reopenMenu(player, plotPos, manager);
     }

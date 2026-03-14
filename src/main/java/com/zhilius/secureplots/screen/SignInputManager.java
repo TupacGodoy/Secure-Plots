@@ -23,7 +23,8 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class SignInputManager {
 
-    public enum InputType { RENAME, ADD_MEMBER, CREATE_GROUP, SET_ENTER_MESSAGE, SET_EXIT_MESSAGE }
+    public enum InputType { RENAME, ADD_MEMBER, CREATE_GROUP, SET_ENTER_MESSAGE, SET_EXIT_MESSAGE,
+                            SET_PARTICLE, SET_MUSIC }
 
     public record PendingInput(BlockPos fakePos, BlockPos plotPos, InputType type) {}
 
@@ -47,6 +48,14 @@ public class SignInputManager {
 
     public static void openForExitMessage(ServerPlayerEntity player, BlockPos plotPos) {
         open(player, plotPos, InputType.SET_EXIT_MESSAGE);
+    }
+
+    public static void openForParticle(ServerPlayerEntity player, BlockPos plotPos) {
+        open(player, plotPos, InputType.SET_PARTICLE);
+    }
+
+    public static void openForMusic(ServerPlayerEntity player, BlockPos plotPos) {
+        open(player, plotPos, InputType.SET_MUSIC);
     }
 
     private static void open(ServerPlayerEntity player, BlockPos plotPos, InputType type) {
@@ -116,6 +125,8 @@ public class SignInputManager {
             case CREATE_GROUP       -> handleCreateGroup(player, input.plotPos(), text);
             case SET_ENTER_MESSAGE  -> handleSetMessage(player, input.plotPos(), text, true);
             case SET_EXIT_MESSAGE   -> handleSetMessage(player, input.plotPos(), text, false);
+            case SET_PARTICLE       -> handleSetParticle(player, input.plotPos(), text);
+            case SET_MUSIC          -> handleSetMusic(player, input.plotPos(), text);
         }
     }
 
@@ -188,7 +199,7 @@ public class SignInputManager {
             return;
         }
         if (data.getRoleOf(target.getUuid()) != PlotData.Role.VISITOR) {
-            player.sendMessage(Text.literal("✗ " + targetName + " ya tiene acceso.").formatted(Formatting.YELLOW), false);
+            player.sendMessage(Text.literal("✗ " + targetName + " already has access.").formatted(Formatting.YELLOW), false);
             reopenMenu(player, plotPos, PlotMenuHandler.MenuPage.MEMBERS);
             return;
         }
@@ -197,8 +208,8 @@ public class SignInputManager {
         sw.playSound(null, player.getBlockPos(),
             SoundEvents.ENTITY_EXPERIENCE_ORB_PICKUP,
             SoundCategory.PLAYERS, 1f, 1.5f);
-        player.sendMessage(Text.literal("✔ " + targetName + " agregado como miembro.").formatted(Formatting.GREEN), false);
-        target.sendMessage(Text.literal("✔ Fuiste agregado a \"" + data.getPlotName() + "\" de " + player.getName().getString()).formatted(Formatting.GREEN), false);
+        player.sendMessage(Text.literal("✔ " + targetName + " added as a member.").formatted(Formatting.GREEN), false);
+        target.sendMessage(Text.literal("✔ You were added to \"" + data.getPlotName() + "\" by " + player.getName().getString()).formatted(Formatting.GREEN), false);
         reopenMenu(player, plotPos, PlotMenuHandler.MenuPage.MEMBERS);
     }
 
@@ -230,7 +241,7 @@ public class SignInputManager {
         }
         data.getOrCreateGroup(groupName);
         manager.markDirty();
-        player.sendMessage(Text.literal("§a✔ Grupo §d\"" + groupName + "\" §acreado."), false);
+        player.sendMessage(Text.literal("§a✔ Group §d\"" + groupName + "\" §acreated."), false);
         reopenMenu(player, plotPos, PlotMenuHandler.MenuPage.GLOBAL_PERMS);
     }
 
@@ -252,9 +263,44 @@ public class SignInputManager {
         if (isEnter) data.setEnterMessage(msg);
         else         data.setExitMessage(msg);
         manager.markDirty();
-        String tipo = isEnter ? "entrada" : "salida";
-        player.sendMessage(Text.literal("§a✔ Mensaje de " + tipo + " actualizado: §f" + msg), false);
-        reopenMenu(player, plotPos, PlotMenuHandler.MenuPage.INFO);
+        player.sendMessage(Text.literal("§a✔ Message updated: §f" + msg), false);
+        reopenMenu(player, plotPos, PlotMenuHandler.MenuPage.AMBIENT);
+    }
+
+    // ── Set Particle ──────────────────────────────────────────────────────────
+    private static void handleSetParticle(ServerPlayerEntity player, BlockPos plotPos, String value) {
+        if (!(player.getWorld() instanceof ServerWorld sw)) return;
+        PlotManager manager = PlotManager.getOrCreate(sw);
+        PlotData data = manager.getPlot(plotPos);
+        if (data == null) { player.sendMessage(Text.literal("✗ Plot not found.").formatted(Formatting.RED), false); return; }
+        boolean isAdmin = player.getCommandTags().contains(
+            com.zhilius.secureplots.config.SecurePlotsConfig.INSTANCE != null
+            ? com.zhilius.secureplots.config.SecurePlotsConfig.INSTANCE.adminTag : "plot_admin");
+        boolean canEdit = data.getOwnerId().equals(player.getUuid())
+            || data.getRoleOf(player.getUuid()) == PlotData.Role.ADMIN || isAdmin;
+        if (!canEdit) { player.sendMessage(Text.literal("✗ Only the owner or admin can change this.").formatted(Formatting.RED), false); return; }
+        data.setParticleEffect(value.trim());
+        manager.markDirty();
+        player.sendMessage(Text.literal("§a✔ Particle set to: §f" + value.trim()), false);
+        reopenMenu(player, plotPos, PlotMenuHandler.MenuPage.AMBIENT);
+    }
+
+    // ── Set Music ─────────────────────────────────────────────────────────────
+    private static void handleSetMusic(ServerPlayerEntity player, BlockPos plotPos, String value) {
+        if (!(player.getWorld() instanceof ServerWorld sw)) return;
+        PlotManager manager = PlotManager.getOrCreate(sw);
+        PlotData data = manager.getPlot(plotPos);
+        if (data == null) { player.sendMessage(Text.literal("✗ Plot not found.").formatted(Formatting.RED), false); return; }
+        boolean isAdmin = player.getCommandTags().contains(
+            com.zhilius.secureplots.config.SecurePlotsConfig.INSTANCE != null
+            ? com.zhilius.secureplots.config.SecurePlotsConfig.INSTANCE.adminTag : "plot_admin");
+        boolean canEdit = data.getOwnerId().equals(player.getUuid())
+            || data.getRoleOf(player.getUuid()) == PlotData.Role.ADMIN || isAdmin;
+        if (!canEdit) { player.sendMessage(Text.literal("✗ Only the owner or admin can change this.").formatted(Formatting.RED), false); return; }
+        data.setMusicSound(value.trim());
+        manager.markDirty();
+        player.sendMessage(Text.literal("§a✔ Music set to: §f" + value.trim()), false);
+        reopenMenu(player, plotPos, PlotMenuHandler.MenuPage.AMBIENT);
     }
 
     private static void reopenMenu(ServerPlayerEntity player, BlockPos plotPos, PlotMenuHandler.MenuPage targetPage) {

@@ -14,6 +14,88 @@ public class SecurePlotsConfig {
 
     public static SecurePlotsConfig INSTANCE;
 
+    // ── Feature toggles ───────────────────────────────────────────────────────
+
+    /** Master switch: enable/disable the entire plot protection system. */
+    public boolean enableProtection = true;
+
+    /** Allow players to fly inside plots that have FLY flag/permission. */
+    public boolean enableFlyInPlots = true;
+
+    /** Show plot name + owner in the action bar when entering a plot. */
+    public boolean enableEnterHud = true;
+
+    /** Show enter/exit messages (GREETINGS flag) as title overlays. */
+    public boolean enableGreetingMessages = true;
+
+    /** Apply ambient particles when entering a plot. */
+    public boolean enablePlotParticles = true;
+
+    /**
+     * Cantidad de partículas del burst de ENTRADA a la plot (1–5).
+     * Máximo: 5
+     */
+    public int particleCount = 3;
+
+    /**
+     * Partículas continuas fijas mientras el jugador está DENTRO de la plot (1–5).
+     * Se spawnean cada ambientInterval ticks. Mantenerlo bajo para no afectar TPS.
+     */
+    public int ambientParticleCount = 2;
+
+    /**
+     * Cada cuántos ticks se chequea si un jugador entró/salió de una plot.
+     * 10 = cada medio segundo. Bajar esto aumenta la precisión pero consume más CPU.
+     */
+    public int checkInterval = 10;
+
+    /**
+     * Cada cuántos ticks se spawnean las partículas continuas dentro de la plot.
+     * 20 = una vez por segundo. Subirlo reduce el impacto en TPS.
+     */
+    public int ambientInterval = 20;
+
+    /** Play ambient music when entering a plot. */
+    public boolean enablePlotMusic = true;
+
+    /**
+     * Volumen de la música de la plot (0.1 – 4.0). Por defecto: 4.0
+     */
+    public float musicVolume = 4.0f;
+
+    /** Apply weather override when entering a plot. */
+    public boolean enablePlotWeather = true;
+
+    /** Apply time override when entering a plot. */
+    public boolean enablePlotTime = true;
+
+    /** Allow /sp tp teleportation to plots. */
+    public boolean enablePlotTeleport = true;
+
+    /** Show hologram over plot blocks. */
+    public boolean enableHologram = true;
+
+    /** Enable PvP control per-plot (ALLOW_PVP flag). */
+    public boolean enablePvpControl = true;
+
+    /** Allow plot upgrades (players can upgrade tier). */
+    public boolean enableUpgrades = true;
+
+    /** Allow custom permission groups inside plots. */
+    public boolean enablePermissionGroups = true;
+
+    /** Enable inactivity expiry system (separate from inactivityExpiry.enabled). */
+    public boolean enableInactivityExpiry = false;
+
+    /** If true, plot blocks are unbreakable by non-owners (ignores hardness). */
+    public boolean plotBlocksUnbreakable = true;
+
+    /** Allow players to place plots inside other plots (override area check). */
+    public boolean allowNestedPlots = false;
+
+    /** Minimum OP level required to use /sp admin commands (0-4). */
+    public int adminOpLevel = 2;
+
     // ── General ────────────────────────────────────────────────────────────────
 
     /** Máximo de parcelas por jugador (0 = ilimitado). */
@@ -172,6 +254,19 @@ public class SecurePlotsConfig {
                 if (INSTANCE.adminTag == null || INSTANCE.adminTag.isEmpty()) {
                     INSTANCE.adminTag = "plot_admin";
                 }
+                // Nuevos campos — valores por defecto si el JSON antiguo no los tiene
+                if (INSTANCE.particleCount <= 0) INSTANCE.particleCount = 3;
+                if (INSTANCE.particleCount > 5)  INSTANCE.particleCount = 5;
+                if (INSTANCE.musicVolume <= 0f)  INSTANCE.musicVolume  = 4.0f;
+                if (INSTANCE.musicVolume > 4.0f) INSTANCE.musicVolume  = 4.0f;
+                if (INSTANCE.ambientParticleCount <= 0) INSTANCE.ambientParticleCount = 2;
+                if (INSTANCE.ambientParticleCount > 5)  INSTANCE.ambientParticleCount = 5;
+                if (INSTANCE.checkInterval  <= 0) INSTANCE.checkInterval  = 10;
+                if (INSTANCE.ambientInterval <= 0) INSTANCE.ambientInterval = 20;
+                // Feature toggles: set defaults if null (backwards compat)
+                // All booleans default to true/false via Java field initializers when GSON
+                // reads an older config that doesn't have them yet.
+
             } catch (IOException e) {
                 e.printStackTrace();
                 INSTANCE = createDefault();

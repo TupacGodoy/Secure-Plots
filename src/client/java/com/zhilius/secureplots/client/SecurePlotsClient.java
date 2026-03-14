@@ -140,6 +140,14 @@ public class SecurePlotsClient implements ClientModInitializer {
                     });
                 });
 
+        // Open chat pre-filled with a command
+        ClientPlayNetworking.registerGlobalReceiver(ModPackets.OpenChatPayload.ID,
+                (payload, context) -> {
+                    String prefill = payload.prefill();
+                    context.client().execute(() ->
+                        context.client().setScreen(new net.minecraft.client.gui.screen.ChatScreen(prefill)));
+                });
+
         ClientPlayConnectionEvents.JOIN.register((handler, sender, client) ->
                 client.execute(() -> { activeBorders.clear(); PlotHologramClient.clear(); }));
         ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {

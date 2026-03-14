@@ -2,6 +2,7 @@ package com.zhilius.secureplots.screen;
 
 import com.mojang.authlib.GameProfile;
 import com.zhilius.secureplots.config.SecurePlotsConfig;
+import com.zhilius.secureplots.network.ModPackets;
 import com.zhilius.secureplots.plot.PlotData;
 import com.zhilius.secureplots.plot.PlotManager;
 import com.zhilius.secureplots.plot.PlotSize;
@@ -18,6 +19,7 @@ import net.minecraft.screen.GenericContainerScreenHandler;
 import net.minecraft.screen.ScreenHandlerType;
 import net.minecraft.screen.SimpleNamedScreenHandlerFactory;
 import net.minecraft.screen.slot.SlotActionType;
+import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.sound.SoundCategory;
@@ -30,8 +32,9 @@ import java.util.*;
 
 public class PlotMenuHandler extends GenericContainerScreenHandler {
 
-    public enum MenuPage { INFO, MEMBERS, GLOBAL_PERMS, UPGRADE }
-    public enum PendingAction { NONE, RENAME, ADD_MEMBER, CREATE_GROUP, SET_ENTER_MESSAGE, SET_EXIT_MESSAGE }
+    public enum MenuPage { INFO, MEMBERS, GLOBAL_PERMS, UPGRADE, AMBIENT }
+    public enum PendingAction { NONE, RENAME, ADD_MEMBER, CREATE_GROUP, SET_ENTER_MESSAGE, SET_EXIT_MESSAGE,
+                                SET_PARTICLE, SET_MUSIC }
 
     private final BlockPos plotPos;
     private PlotData data;
@@ -46,7 +49,7 @@ public class PlotMenuHandler extends GenericContainerScreenHandler {
     private String viewingGroupName = null;
     // Paginación de permisos de miembro
     private int permPage = 0;
-    private static final int PERMS_PER_PAGE = 14;
+    private static final int PERMS_PER_PAGE = 21;
 
     private static final int ROWS = 6;
     private static final int SIZE = ROWS * 9;
@@ -56,6 +59,7 @@ public class PlotMenuHandler extends GenericContainerScreenHandler {
     private static final int SLOT_TAB_MEMBERS      = 1;
     private static final int SLOT_TAB_GLOBAL_PERMS = 2;
     private static final int SLOT_TAB_UPGRADE      = 3;
+    private static final int SLOT_TAB_AMBIENT      = 4;
     private static final int SLOT_CLOSE       = 8;
     private static final int SLOT_UPGRADE_BTN = 49;
 
@@ -93,8 +97,9 @@ public class PlotMenuHandler extends GenericContainerScreenHandler {
                 else buildGlobalPermsPage();
             }
             case UPGRADE -> buildUpgradePage();
+            case AMBIENT -> buildAmbientPage();
         }
-        menuInv.setStack(SLOT_CLOSE, named(Items.BARRIER, "§c✕ Cerrar"));
+        menuInv.setStack(SLOT_CLOSE, named(Items.BARRIER, "§c✕ Close"));
     }
 
     private void fillBorder() {
@@ -113,13 +118,14 @@ public class PlotMenuHandler extends GenericContainerScreenHandler {
                 "§e👥 Members", "§7Manage members and permissions"));
         menuInv.setStack(SLOT_TAB_GLOBAL_PERMS,
             namedLore(page == MenuPage.GLOBAL_PERMS ? Items.LIME_STAINED_GLASS_PANE : Items.WHITE_STAINED_GLASS_PANE,
-                "§e🌐 Permisos Globales", "§7Permisos globales y grupos"));
+                "§e🌐 Global Perms", "§7Global permissions and groups"));
         menuInv.setStack(SLOT_TAB_UPGRADE,
             namedLore(page == MenuPage.UPGRADE ? Items.LIME_STAINED_GLASS_PANE : Items.WHITE_STAINED_GLASS_PANE,
                 "§e⬆ Upgrade", "§7Increase protection tier"));
+        menuInv.setStack(SLOT_TAB_AMBIENT,
+            namedLore(page == MenuPage.AMBIENT ? Items.LIME_STAINED_GLASS_PANE : Items.WHITE_STAINED_GLASS_PANE,
+                "§e✨ Ambient", "§7Particles, music, weather, time"));
     }
-
-    // ── INFO PAGE ─────────────────────────────────────────────────────────────
     private void buildInfoPage() {
         List<PlotData> owned = getOwnedPlots();
         int plotIndex = owned.indexOf(data) + 1;
@@ -135,8 +141,8 @@ public class PlotMenuHandler extends GenericContainerScreenHandler {
             "§7Size: §b" + data.getSize().getRadius() + "x" + data.getSize().getRadius() + " blocks"));
 
         menuInv.setStack(22, namedLore(Items.PAPER,
-            "§eIntegrantes",
-            "§f" + data.getMembers().size() + " §7miembro(s)",
+            "§eMembers",
+            "§f" + data.getMembers().size() + " §7member(s)",
             "§f" + data.getGroups().size() + " §7grupo(s)"));
 
         BlockPos c = data.getCenter();
@@ -145,23 +151,12 @@ public class PlotMenuHandler extends GenericContainerScreenHandler {
             "§7X: §f" + c.getX() + "  §7Y: §f" + c.getY() + "  §7Z: §f" + c.getZ()));
 
         menuInv.setStack(24, namedLore(Items.SHIELD,
-            "§eTu rol", roleColor(myRole) + myRole.name()));
+            "§eYour role", roleColor(myRole) + myRole.name()));
 
-        // Renombrar (owner)
+        // Rename (owner)
         if (myRole == PlotData.Role.OWNER) {
             menuInv.setStack(29, namedLore(Items.ANVIL,
-                "§6✏ Renombrar parcela", "§7Clic para cambiar el nombre"));
-
-            String em = data.getEnterMessage();
-            String xm = data.getExitMessage();
-            menuInv.setStack(37, namedLore(Items.GREEN_DYE,
-                "§a💬 Mensaje al entrar",
-                em.isEmpty() ? "§8Sin mensaje" : "§f" + em,
-                "§7Clic para editar"));
-            menuInv.setStack(38, namedLore(Items.RED_DYE,
-                "§c💬 Mensaje al salir",
-                xm.isEmpty() ? "§8Sin mensaje" : "§f" + xm,
-                "§7Clic para editar"));
+                "§6✏ Rename plot", "§7Click to change the name"));
         }
 
         // TP a la plot (si el flag está activo o es owner/admin)
@@ -171,7 +166,7 @@ public class PlotMenuHandler extends GenericContainerScreenHandler {
             menuInv.setStack(31, namedLore(Items.ENDER_PEARL,
                 "§b✈ Teleportarse",
                 tpEnabled ? "§7Public TP enabled" : "§7Admins/owner only",
-                "§eClic para tp a esta parcela"));
+                "§eClick to TP to this plot"));
         }
 
         // Inactividad (si está habilitado)
@@ -201,7 +196,7 @@ public class PlotMenuHandler extends GenericContainerScreenHandler {
 
         if (canManage) {
             menuInv.setStack(10, namedLore(Items.EMERALD,
-                "§a+ Agregar miembro",
+                "§a+ Add member",
                 "§7Clic para agregar un jugador",
                 "§8El jugador debe estar online"));
         }
@@ -264,7 +259,7 @@ public class PlotMenuHandler extends GenericContainerScreenHandler {
         menuInv.setStack(13, namedLore(Items.PAPER, "§7Page §e" + (permPage + 1) + "§7/§e" + totalPages,
             "§8" + allPerms.length + " permisos en total"));
 
-        int[] slots = {19,20,21,22,23,24,25, 28,29,30,31,32,33,34};
+        int[] slots = {19,20,21,22,23,24,25, 28,29,30,31,32,33,34, 37,38,39,40,41,42,43};
         Set<PlotData.Permission> current = data.getPermsOf(uuid);
         int si = 0;
         for (int i = start; i < end && si < slots.length; i++, si++) {
@@ -314,7 +309,7 @@ public class PlotMenuHandler extends GenericContainerScreenHandler {
         boolean canEdit = data.hasPermission(player.getUuid(), PlotData.Permission.MANAGE_GROUPS);
 
         menuInv.setStack(10, namedLore(Items.WRITABLE_BOOK, "§d[Grupo] " + group.name,
-            "§7" + group.members.size() + " miembro(s)",
+            "§7" + group.members.size() + " member(s)",
             "§7" + group.permissions.size() + " permiso(s)"));
         menuInv.setStack(12, namedLore(Items.ARROW, "§7← Volver", "§8Clic para regresar"));
 
@@ -322,13 +317,26 @@ public class PlotMenuHandler extends GenericContainerScreenHandler {
             menuInv.setStack(14, namedLore(Items.TNT, "§cEliminar grupo", "§7Clic para borrar este grupo"));
         }
 
-        // Permisos del grupo
+        // Permisos del grupo — paginated, all permissions shown
         PlotData.Permission[] perms = PlotData.Permission.values();
-        int[] permSlots = {19,20,21,22,23,24,25};
-        for (int i = 0; i < perms.length && i < permSlots.length; i++) {
+        int totalGroupPages = (int) Math.ceil((double) perms.length / PERMS_PER_PAGE);
+        permPage = Math.max(0, Math.min(permPage, totalGroupPages - 1));
+        int gStart = permPage * PERMS_PER_PAGE;
+        int gEnd   = Math.min(gStart + PERMS_PER_PAGE, perms.length);
+
+        if (permPage > 0)
+            menuInv.setStack(15, namedLore(Items.SPECTRAL_ARROW, "§e← Prev page", "§7Page " + permPage + "/" + totalGroupPages));
+        if (permPage < totalGroupPages - 1)
+            menuInv.setStack(17, namedLore(Items.SPECTRAL_ARROW, "§eNext page →", "§7Page " + (permPage + 2) + "/" + totalGroupPages));
+        menuInv.setStack(13, namedLore(Items.PAPER, "§7Page §e" + (permPage + 1) + "§7/§e" + totalGroupPages,
+            "§8" + perms.length + " permissions total"));
+
+        int[] gPermSlots = {19,20,21,22,23,24,25, 28,29,30,31,32,33,34};
+        int si = 0;
+        for (int i = gStart; i < gEnd && si < gPermSlots.length; i++, si++) {
             PlotData.Permission perm = perms[i];
             boolean has = group.permissions.contains(perm);
-            menuInv.setStack(permSlots[i], namedLore(
+            menuInv.setStack(gPermSlots[si], namedLore(
                 has ? Items.LIME_DYE : Items.GRAY_DYE,
                 (has ? "§a✔ " : "§c✗ ") + permLabel(perm),
                 "§7" + permDesc(perm),
@@ -336,8 +344,8 @@ public class PlotMenuHandler extends GenericContainerScreenHandler {
             ));
         }
 
-        // Miembros del grupo
-        int[] memberSlots = {28,29,30,31,32,33,34};
+        // Miembros del grupo (fila 4: slots 37-43, siempre visibles)
+        int[] memberSlots = new int[]{37,38,39,40,41,42,43};
         int idx = 0;
         for (UUID uuid : group.members) {
             if (idx >= memberSlots.length) break;
@@ -356,7 +364,7 @@ public class PlotMenuHandler extends GenericContainerScreenHandler {
 
         // Header
         menuInv.setStack(10, namedLore(Items.ORANGE_BANNER,
-            "§e🌐 Permisos Globales",
+            "§e🌐 Global Perms",
             "§7Afectan a TODOS los jugadores dentro de la parcela.",
             canEditFlags ? "§eClick each to toggle" : "§8Only owner/admin can change"));
 
@@ -377,7 +385,7 @@ public class PlotMenuHandler extends GenericContainerScreenHandler {
         // Separador
         menuInv.setStack(27, namedLore(Items.PURPLE_STAINED_GLASS_PANE,
             "§d━━━ Permission Groups ━━━",
-            "§7Asignan permisos a varios miembros a la vez."));
+            "§7Assign permissions to multiple members at once."));
 
         // Botón crear grupo
         if (canEditGroups) {
@@ -394,9 +402,9 @@ public class PlotMenuHandler extends GenericContainerScreenHandler {
             PlotData.PermissionGroup g = groups.get(i);
             menuInv.setStack(groupSlots[i], namedLore(Items.WRITABLE_BOOK,
                 "§d[G] " + g.name,
-                "§7" + g.members.size() + " miembro(s)",
-                "§7" + g.permissions.size() + " permiso(s)",
-                canEditGroups ? "§eClic para editar" : "§8Solo lectura"));
+                "§7" + g.members.size() + " member(s)",
+                "§7" + g.permissions.size() + " permission(s)",
+                canEditGroups ? "§eClick to edit" : "§8Read only"));
         }
 
         if (groups.isEmpty()) {
@@ -443,7 +451,7 @@ public class PlotMenuHandler extends GenericContainerScreenHandler {
                 String itemName = Character.toUpperCase(raw.charAt(0)) + raw.substring(1).replace("_", " ");
                 costLore.add((ok ? "§a✔" : "§c✗") + " §7" + itemName + ": " + (ok ? "§a" : "§c") + has + "§7/" + itemCost.amount);
             }
-            menuInv.setStack(23, namedLoreDynamic(Items.PAPER, "§eMateriales requeridos", costLore));
+            menuInv.setStack(23, namedLoreDynamic(Items.PAPER, "§eRequired materials", costLore));
         }
 
         if (myRole == PlotData.Role.OWNER) {
@@ -459,6 +467,102 @@ public class PlotMenuHandler extends GenericContainerScreenHandler {
         }
     }
 
+    // ── AMBIENT PAGE ──────────────────────────────────────────────────────────
+    private void buildAmbientPage() {
+        boolean canEdit = myRole == PlotData.Role.OWNER || myRole == PlotData.Role.ADMIN;
+        com.zhilius.secureplots.config.SecurePlotsConfig cfg = com.zhilius.secureplots.config.SecurePlotsConfig.INSTANCE;
+        int curParticleCount = (cfg != null) ? Math.max(1, Math.min(cfg.particleCount, 5)) : 3;
+        float curMusicVol    = (cfg != null) ? Math.max(0.1f, Math.min(cfg.musicVolume, 4.0f)) : 4.0f;
+
+        // ── Particles (slot 19) ───────────────────────────────────────────────
+        String particle = data.getParticleEffect();
+        menuInv.setStack(19, namedLore(Items.FIREWORK_STAR,
+            "§e✨ Particles",
+            particle.isEmpty() ? "§8None" : "§f" + particle,
+            canEdit ? "§7Click to set (e.g. happy_villager)" : "§8Owner/admin only",
+            canEdit && !particle.isEmpty() ? "§cRight-click to clear" : ""));
+
+        // ── Particle count controls (slots 20-22) — solo si hay partícula activa ─
+        boolean hasParticle = !particle.isEmpty();
+        if (hasParticle) {
+            // Decrease
+            menuInv.setStack(20, namedLore(Items.RED_STAINED_GLASS_PANE,
+                "§c◀ Menos partículas",
+                "§7Actual: §e" + curParticleCount + " §7(mín 1)",
+                canEdit ? "§7Click para reducir" : "§8Solo owner/admin"));
+            // Current count display
+            menuInv.setStack(21, namedLore(Items.PAPER,
+                "§e🌟 Burst entrada: §f" + curParticleCount + "§7/5",
+                "§7Partículas al ENTRAR a la plot",
+                "§8Continuas: §7" + ((cfg != null) ? cfg.ambientParticleCount : 2) + "§8/seg (config: ambientParticleCount)",
+                "§8Máximo burst: 5"));
+            // Increase
+            menuInv.setStack(22, namedLore(Items.LIME_STAINED_GLASS_PANE,
+                "§a▶ Más partículas",
+                "§7Actual: §e" + curParticleCount + " §7(máx 5)",
+                canEdit ? "§7Click para aumentar" : "§8Solo owner/admin"));
+        }
+
+        // ── Music (slot 23) ───────────────────────────────────────────────────
+        String music = data.getMusicSound();
+        menuInv.setStack(23, namedLore(Items.MUSIC_DISC_CAT,
+            "§e🎵 Music",
+            music.isEmpty() ? "§8None" : "§f" + music,
+            canEdit ? "§7Click to set (e.g. minecraft:music.game)" : "§8Owner/admin only",
+            canEdit && !music.isEmpty() ? "§cRight-click to clear" : ""));
+
+        // ── Music volume controls (slots 24-26) — solo si hay música activa ───
+        boolean hasMusic = !music.isEmpty();
+        if (hasMusic) {
+            int volPct = Math.round((curMusicVol / 4.0f) * 100);
+            // Decrease volume
+            menuInv.setStack(24, namedLore(Items.ORANGE_STAINED_GLASS_PANE,
+                "§6◀ Bajar volumen",
+                "§7Actual: §e" + volPct + "%",
+                canEdit ? "§7Click para bajar (-10%)" : "§8Solo owner/admin"));
+            // Volume display
+            menuInv.setStack(25, namedLore(Items.JUKEBOX,
+                "§e🔊 Volumen: §f" + volPct + "%",
+                "§7Volumen de la música de la plot",
+                "§8Rango: 10% – 100%"));
+            // Increase volume
+            menuInv.setStack(26, namedLore(Items.LIME_STAINED_GLASS_PANE,
+                "§a▶ Subir volumen",
+                "§7Actual: §e" + volPct + "%",
+                canEdit ? "§7Click para subir (+10%)" : "§8Solo owner/admin"));
+        }
+
+
+        // ── Enter/Exit message colors (slots 37-38) ─────────────────────────────
+        String em = data.getEnterMessage();
+        String xm = data.getExitMessage();
+        menuInv.setStack(37, namedLore(Items.GREEN_DYE,
+            "§a💬 Enter message",
+            em.isEmpty() ? "§8No message" : "§f" + em,
+            canEdit ? "§7Click to edit  §8(use & for colors)" : "§8Owner/admin only",
+            canEdit && !em.isEmpty() ? "§cRight-click to clear" : ""));
+        menuInv.setStack(38, namedLore(Items.RED_DYE,
+            "§c💬 Exit message",
+            xm.isEmpty() ? "§8No message" : "§f" + xm,
+            canEdit ? "§7Click to edit  §8(use & for colors)" : "§8Owner/admin only",
+            canEdit && !xm.isEmpty() ? "§cRight-click to clear" : ""));
+
+        // Color code reference book (slot 39)
+        menuInv.setStack(39, namedLore(Items.BOOK,
+            "§e📖 Color & Format Codes",
+            "§0&0 §fBlack  §8&8 §fDark Gray",
+            "§1&1 §fDark Blue  §9&9 §fBlue",
+            "§2&2 §fDark Green  §a&a §fGreen",
+            "§3&3 §fDark Aqua  §b&b §fAqua",
+            "§4&4 §fDark Red  §c&c §fRed",
+            "§5&5 §fPurple  §d&d §fPink",
+            "§6&6 §fGold  §e&e §fYellow",
+            "§7&7 §fGray  §f&f §fWhite",
+            "§l&l Bold  §o&o Italic  §n&n Underline  §r&r Reset",
+            "§8Example: §r&6Hello &cWorld!"));
+
+    }
+
     // ── Click Handler ─────────────────────────────────────────────────────────
     @Override
     public void onSlotClick(int slotIndex, int button, SlotActionType actionType, PlayerEntity actor) {
@@ -471,6 +575,7 @@ public class PlotMenuHandler extends GenericContainerScreenHandler {
         if (slotIndex == SLOT_TAB_MEMBERS)      { page = MenuPage.MEMBERS;      viewingMemberUuid = null; viewingGroupName = null; refreshMenu(); return; }
         if (slotIndex == SLOT_TAB_GLOBAL_PERMS) { page = MenuPage.GLOBAL_PERMS; viewingMemberUuid = null; viewingGroupName = null; refreshMenu(); return; }
         if (slotIndex == SLOT_TAB_UPGRADE)      { page = MenuPage.UPGRADE;      viewingMemberUuid = null; viewingGroupName = null; refreshMenu(); return; }
+        if (slotIndex == SLOT_TAB_AMBIENT)      { page = MenuPage.AMBIENT;      viewingMemberUuid = null; viewingGroupName = null; refreshMenu(); return; }
         if (slotIndex == SLOT_CLOSE) { player.closeHandledScreen(); return; }
 
         // Botón upgrade
@@ -481,14 +586,6 @@ public class PlotMenuHandler extends GenericContainerScreenHandler {
             // Renombrar
             if (clicked.getItem() == Items.ANVIL && myRole == PlotData.Role.OWNER) {
                 openSignForInput(PendingAction.RENAME); return;
-            }
-            // Mensaje al entrar
-            if (clicked.getItem() == Items.GREEN_DYE && myRole == PlotData.Role.OWNER) {
-                openSignForInput(PendingAction.SET_ENTER_MESSAGE); return;
-            }
-            // Mensaje al salir
-            if (clicked.getItem() == Items.RED_DYE && myRole == PlotData.Role.OWNER) {
-                openSignForInput(PendingAction.SET_EXIT_MESSAGE); return;
             }
             // TP
             if (clicked.getItem() == Items.ENDER_PEARL) {
@@ -594,6 +691,98 @@ public class PlotMenuHandler extends GenericContainerScreenHandler {
                 }
             }
         }
+
+        // ── AMBIENT page ──────────────────────────────────────────────────────
+        if (page == MenuPage.AMBIENT) {
+            boolean canEdit = myRole == PlotData.Role.OWNER || myRole == PlotData.Role.ADMIN;
+            if (!canEdit) return;
+            if (!(player.getWorld() instanceof ServerWorld sw)) return;
+            PlotManager manager = PlotManager.getOrCreate(sw);
+            PlotData fresh = manager.getPlot(plotPos);
+            if (fresh == null) return;
+            com.zhilius.secureplots.config.SecurePlotsConfig cfgA = com.zhilius.secureplots.config.SecurePlotsConfig.INSTANCE;
+
+            // Particles - left click = open chat, right = clear
+            if (slotIndex == 19) {
+                if (button == 1 && !fresh.getParticleEffect().isEmpty()) {
+                    fresh.setParticleEffect(""); manager.markDirty(); this.data = fresh;
+                    playSound(SoundEvents.UI_BUTTON_CLICK.value(), 0.4f, 1.0f);
+                    refreshMenu();
+                } else {
+                    player.closeHandledScreen();
+                    ServerPlayNetworking.send(player, new ModPackets.OpenChatPayload("/sp plot particle "));
+                }
+                return;
+            }
+
+            // Particle count — decrease
+            if (slotIndex == 20 && !fresh.getParticleEffect().isEmpty() && cfgA != null) {
+                cfgA.particleCount = Math.max(1, cfgA.particleCount - 1);
+                com.zhilius.secureplots.config.SecurePlotsConfig.save();
+                playSound(SoundEvents.UI_BUTTON_CLICK.value(), 0.4f, 0.9f);
+                refreshMenu(); return;
+            }
+            // Particle count — increase
+            if (slotIndex == 22 && !fresh.getParticleEffect().isEmpty() && cfgA != null) {
+                cfgA.particleCount = Math.min(5, cfgA.particleCount + 1);
+                com.zhilius.secureplots.config.SecurePlotsConfig.save();
+                playSound(SoundEvents.UI_BUTTON_CLICK.value(), 0.4f, 1.1f);
+                refreshMenu(); return;
+            }
+
+            // Music - left click = open chat, right = clear
+            if (slotIndex == 23) {
+                if (button == 1 && !fresh.getMusicSound().isEmpty()) {
+                    fresh.setMusicSound(""); manager.markDirty(); this.data = fresh;
+                    playSound(SoundEvents.UI_BUTTON_CLICK.value(), 0.4f, 1.0f);
+                    refreshMenu();
+                } else {
+                    player.closeHandledScreen();
+                    ServerPlayNetworking.send(player, new ModPackets.OpenChatPayload("/sp plot music "));
+                }
+                return;
+            }
+
+            // Music volume — decrease
+            if (slotIndex == 24 && !fresh.getMusicSound().isEmpty() && cfgA != null) {
+                cfgA.musicVolume = Math.max(0.1f, Math.round((cfgA.musicVolume - 0.4f) * 10f) / 10f);
+                com.zhilius.secureplots.config.SecurePlotsConfig.save();
+                playSound(SoundEvents.UI_BUTTON_CLICK.value(), 0.4f, 0.9f);
+                refreshMenu(); return;
+            }
+            // Music volume — increase
+            if (slotIndex == 26 && !fresh.getMusicSound().isEmpty() && cfgA != null) {
+                cfgA.musicVolume = Math.min(4.0f, Math.round((cfgA.musicVolume + 0.4f) * 10f) / 10f);
+                com.zhilius.secureplots.config.SecurePlotsConfig.save();
+                playSound(SoundEvents.UI_BUTTON_CLICK.value(), 0.4f, 1.1f);
+                refreshMenu(); return;
+            }
+
+
+            // Enter message - left = edit, right = clear
+            if (slotIndex == 37) {
+                if (button == 1 && !fresh.getEnterMessage().isEmpty()) {
+                    fresh.setEnterMessage(""); manager.markDirty(); this.data = fresh;
+                    playSound(SoundEvents.UI_BUTTON_CLICK.value(), 0.4f, 1.0f);
+                    refreshMenu();
+                } else {
+                    openSignForInput(PendingAction.SET_ENTER_MESSAGE);
+                }
+                return;
+            }
+
+            // Exit message - left = edit, right = clear
+            if (slotIndex == 38) {
+                if (button == 1 && !fresh.getExitMessage().isEmpty()) {
+                    fresh.setExitMessage(""); manager.markDirty(); this.data = fresh;
+                    playSound(SoundEvents.UI_BUTTON_CLICK.value(), 0.4f, 1.0f);
+                    refreshMenu();
+                } else {
+                    openSignForInput(PendingAction.SET_EXIT_MESSAGE);
+                }
+                return;
+            }
+        }
     }
 
     private void handleMemberPermsClick(int slotIndex, int button, ItemStack clicked) {
@@ -604,8 +793,9 @@ public class PlotMenuHandler extends GenericContainerScreenHandler {
         if (clicked.getItem() == Items.SPECTRAL_ARROW) {
             Text nameText = clicked.get(DataComponentTypes.CUSTOM_NAME);
             String label = nameText != null ? nameText.getString() : "";
-            if (label.contains("prev")) permPage = Math.max(0, permPage - 1);
+            if (label.contains("Prev") || label.contains("prev")) permPage = Math.max(0, permPage - 1);
             else permPage++;
+            playSound(SoundEvents.UI_BUTTON_CLICK.value(), 0.6f, label.contains("Prev") ? 0.8f : 1.2f);
             refreshMenu(); return;
         }
 
@@ -645,7 +835,7 @@ public class PlotMenuHandler extends GenericContainerScreenHandler {
         PlotData.Permission[] allPerms = PlotData.Permission.values();
         int start = permPage * PERMS_PER_PAGE;
         int end   = Math.min(start + PERMS_PER_PAGE, allPerms.length);
-        int[] slots = {19,20,21,22,23,24,25, 28,29,30,31,32,33,34};
+        int[] slots = {19,20,21,22,23,24,25, 28,29,30,31,32,33,34, 37,38,39,40,41,42,43};
         int si = 0;
         for (int i = start; i < end && si < slots.length; i++, si++) {
             if (slotIndex == slots[si]) {
@@ -688,13 +878,26 @@ public class PlotMenuHandler extends GenericContainerScreenHandler {
             refreshMenu(); return;
         }
 
-        // Toggle perm del grupo
+        // Pagination for group perms
+        if (clicked.getItem() == Items.SPECTRAL_ARROW) {
+            Text lbl = clicked.get(DataComponentTypes.CUSTOM_NAME);
+            String s = lbl != null ? lbl.getString() : "";
+            if (s.contains("Prev")) permPage = Math.max(0, permPage - 1);
+            else permPage++;
+            playSound(SoundEvents.UI_BUTTON_CLICK.value(), 0.6f, s.contains("Prev") ? 0.8f : 1.2f);
+            refreshMenu(); return;
+        }
+
+        // Toggle perm del grupo (paginated, 14 per page)
         PlotData.Permission[] perms = PlotData.Permission.values();
-        int[] permSlots = {19,20,21,22,23,24,25};
-        for (int i = 0; i < perms.length && i < permSlots.length; i++) {
-            if (slotIndex == permSlots[i]) {
-                boolean has = group.permissions.contains(perms[i]);
-                if (has) group.permissions.remove(perms[i]); else group.permissions.add(perms[i]);
+        int[] permSlots = {19,20,21,22,23,24,25, 28,29,30,31,32,33,34};
+        int gStart = permPage * PERMS_PER_PAGE;
+        for (int si = 0; si < permSlots.length; si++) {
+            int pi = gStart + si;
+            if (pi >= perms.length) break;
+            if (slotIndex == permSlots[si]) {
+                boolean has = group.permissions.contains(perms[pi]);
+                if (has) group.permissions.remove(perms[pi]); else group.permissions.add(perms[pi]);
                 manager.markDirty();
                 this.data = fresh;
                 playSound(SoundEvents.UI_BUTTON_CLICK.value(), 0.4f, 1.2f);
@@ -744,6 +947,8 @@ public class PlotMenuHandler extends GenericContainerScreenHandler {
                 case CREATE_GROUP       -> SignInputManager.openForCreateGroup(player, plotPos);
                 case SET_ENTER_MESSAGE  -> SignInputManager.openForEnterMessage(player, plotPos);
                 case SET_EXIT_MESSAGE   -> SignInputManager.openForExitMessage(player, plotPos);
+                case SET_PARTICLE       -> SignInputManager.openForParticle(player, plotPos);
+                case SET_MUSIC          -> SignInputManager.openForMusic(player, plotPos);
                 default                 -> {}
             }
         });

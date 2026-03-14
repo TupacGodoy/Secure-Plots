@@ -130,11 +130,21 @@ public class ModPackets {
         @Override public Id<? extends CustomPayload> getId() { return ID; }
     }
 
+    /** Sent server→client: close current screen and open chat pre-filled with a command. */
+    public record OpenChatPayload(String prefill) implements CustomPayload {
+        public static final Id<OpenChatPayload> ID = new Id<>(Identifier.of(SecurePlots.MOD_ID, "open_chat"));
+        public static final PacketCodec<PacketByteBuf, OpenChatPayload> CODEC = PacketCodec.of(
+                (value, buf) -> buf.writeString(value.prefill()),
+                buf -> new OpenChatPayload(buf.readString()));
+        @Override public Id<? extends CustomPayload> getId() { return ID; }
+    }
+
     public static void registerPayloads() {
         PayloadTypeRegistry.playS2C().register(OpenPlotScreenPayload.ID, OpenPlotScreenPayload.CODEC);
         PayloadTypeRegistry.playS2C().register(ShowPlotBorderPayload.ID, ShowPlotBorderPayload.CODEC);
         PayloadTypeRegistry.playS2C().register(HidePlotBorderPayload.ID, HidePlotBorderPayload.CODEC);
         PayloadTypeRegistry.playS2C().register(ShowPlotInfoPayload.ID, ShowPlotInfoPayload.CODEC);
+        PayloadTypeRegistry.playS2C().register(OpenChatPayload.ID, OpenChatPayload.CODEC);
         PayloadTypeRegistry.playC2S().register(UpdatePlotPayload.ID, UpdatePlotPayload.CODEC);
         PayloadTypeRegistry.playC2S().register(UpgradePlotPayload.ID, UpgradePlotPayload.CODEC);
         PayloadTypeRegistry.playC2S().register(AddMemberPayload.ID, AddMemberPayload.CODEC);

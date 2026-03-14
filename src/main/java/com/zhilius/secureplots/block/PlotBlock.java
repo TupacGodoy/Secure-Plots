@@ -101,8 +101,8 @@ public class PlotBlock extends BlockWithEntity {
             player.sendMessage(Text.literal("  🛡 Plot created!").formatted(Formatting.YELLOW, Formatting.BOLD), false);
             player.sendMessage(Text.literal("═══════════════════════════").formatted(Formatting.GOLD), false);
             player.sendMessage(Text.literal("  Size: ").formatted(Formatting.GRAY)
-                    .append(Text.literal(plotSize.getRadius() + "x" + plotSize.getRadius() + " bloques").formatted(Formatting.AQUA)), false);
-            player.sendMessage(Text.literal("  Nivel: ").formatted(Formatting.GRAY)
+                    .append(Text.literal(plotSize.getRadius() + "x" + plotSize.getRadius() + " blocks").formatted(Formatting.AQUA)), false);
+            player.sendMessage(Text.literal("  Tier: ").formatted(Formatting.GRAY)
                     .append(Text.literal(plotSize.getDisplayName()).formatted(Formatting.AQUA)), false);
             player.sendMessage(Text.literal("  Use the §6Plot Blueprint §7to manage it.").formatted(Formatting.GRAY), false);
             player.sendMessage(Text.literal("═══════════════════════════").formatted(Formatting.GOLD), false);
@@ -114,7 +114,7 @@ public class PlotBlock extends BlockWithEntity {
 
     private void sendInfoToChat(ServerPlayerEntity player, com.zhilius.secureplots.plot.PlotData data) {
         String name = (data.getPlotName() != null && !data.getPlotName().isBlank())
-                ? data.getPlotName() : "Parcela Protegida";
+                ? data.getPlotName() : "Protected Plot";
         int size = data.getSize().getRadius();
         String membersStr = data.getMembers().isEmpty() ? "Ninguno" : String.valueOf(data.getMembers().size());
 
@@ -123,15 +123,15 @@ public class PlotBlock extends BlockWithEntity {
         player.sendMessage(Text.literal("═══════════════════════════").formatted(Formatting.GOLD), false);
         player.sendMessage(Text.literal("  Owner: ").formatted(Formatting.GRAY)
                 .append(Text.literal(data.getOwnerName()).formatted(Formatting.WHITE)), false);
-        player.sendMessage(Text.literal("  Nivel: ").formatted(Formatting.GRAY)
+        player.sendMessage(Text.literal("  Tier: ").formatted(Formatting.GRAY)
                 .append(Text.literal(data.getSize().getDisplayName()).formatted(Formatting.AQUA)), false);
         player.sendMessage(Text.literal("  Size: ").formatted(Formatting.GRAY)
-                .append(Text.literal(size + "x" + size + " bloques").formatted(Formatting.AQUA)), false);
-        player.sendMessage(Text.literal("  Miembros: ").formatted(Formatting.GRAY)
+                .append(Text.literal(size + "x" + size + " blocks").formatted(Formatting.AQUA)), false);
+        player.sendMessage(Text.literal("  Members: ").formatted(Formatting.GRAY)
                 .append(Text.literal(membersStr).formatted(Formatting.GREEN)), false);
         player.sendMessage(Text.literal("  ⚠ Use the ").formatted(Formatting.YELLOW)
                 .append(Text.literal("Plot Blueprint").formatted(Formatting.GOLD))
-                .append(Text.literal(" para gestionar.").formatted(Formatting.YELLOW)), false);
+                .append(Text.literal(" to manage.").formatted(Formatting.YELLOW)), false);
         player.sendMessage(Text.literal("═══════════════════════════").formatted(Formatting.GOLD), false);
     }
 
@@ -159,7 +159,7 @@ public class PlotBlock extends BlockWithEntity {
     public void appendTooltip(ItemStack stack, TooltipContext context, List<Text> tooltip, TooltipType options) {
         PlotSize plotSize = PlotSize.fromTier(this.tier);
         int size = plotSize.getRadius();
-        tooltip.add(Text.literal("Protege: " + size + "x" + size + " bloques").formatted(Formatting.AQUA));
+        tooltip.add(Text.literal("Protege: " + size + "x" + size + " blocks").formatted(Formatting.AQUA));
         tooltip.add(Text.literal("Tier " + (this.tier + 1) + " — " + plotSize.getDisplayName()).formatted(Formatting.GRAY));
         tooltip.add(Text.literal("Coloca para reclamar tu parcela.").formatted(Formatting.DARK_GRAY));
     }
