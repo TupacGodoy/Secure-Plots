@@ -20,7 +20,6 @@ package com.zhilius.secureplots.client;
 import com.zhilius.secureplots.network.ModPackets;
 import com.zhilius.secureplots.plot.PlotData;
 import net.fabricmc.api.ClientModInitializer;
-import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderEvents;
@@ -57,12 +56,12 @@ public class SecurePlotsClient implements ClientModInitializer {
         }
 
         public void upgrade(PlotData newData) {
-            this.prevRadius      = this.data.getSize().getRadius();
-            this.prevTier        = this.data.getSize().tier;
-            this.transitionStart = System.currentTimeMillis();
+            this.prevRadius       = this.data.getSize().getRadius();
+            this.prevTier         = this.data.getSize().tier;
+            this.transitionStart  = System.currentTimeMillis();
             this.expandPulseStart = System.currentTimeMillis();
-            this.data            = newData;
-            this.expiresAt       = System.currentTimeMillis() + 10000;
+            this.data             = newData;
+            this.expiresAt        = System.currentTimeMillis() + 10000;
         }
 
         /** 0.0 = fully old, 1.0 = fully new. Returns 1.0 if no transition. */
@@ -74,15 +73,14 @@ public class SecurePlotsClient implements ClientModInitializer {
         }
 
         /**
-         * Extra radius to add beyond the lerped radius — creates the "energy pulse
-         * expanding outward" effect on upgrade.  Peaks at ~+8 blocks then decays.
+         * Extra radius beyond the lerped radius — creates the "energy pulse
+         * expanding outward" effect on upgrade. Peaks at ~+8 blocks then decays.
          */
         public float expandPulseRadius() {
             if (expandPulseStart < 0) return 0f;
             long elapsed = System.currentTimeMillis() - expandPulseStart;
             if (elapsed > EXPAND_PULSE_MS) { expandPulseStart = -1; return 0f; }
             float p = (float) elapsed / EXPAND_PULSE_MS;
-            // rises fast then falls: sin curve clamped to first half
             return 8f * (float) Math.sin(p * Math.PI);
         }
 
@@ -100,7 +98,7 @@ public class SecurePlotsClient implements ClientModInitializer {
             return base + expandPulseRadius();
         }
 
-        /** Effective tier — switches at midpoint. */
+        /** Effective tier — switches at midpoint of transition. */
         public int effectiveTier() {
             if (prevTier < 0) return data.getSize().tier;
             return transitionProgress() >= 0.5f ? data.getSize().tier : prevTier;
@@ -111,6 +109,7 @@ public class SecurePlotsClient implements ClientModInitializer {
     public void onInitializeClient() {
         PlotHologramClient.register();
 
+        // Server → client: open plot management screen
         ClientPlayNetworking.registerGlobalReceiver(ModPackets.OpenPlotScreenPayload.ID,
                 (payload, context) -> {
                     BlockPos pos = payload.pos();
@@ -118,20 +117,22 @@ public class SecurePlotsClient implements ClientModInitializer {
                     context.client().execute(() -> context.client().setScreen(new PlotScreen(pos, data)));
                 });
 
+        // Server → client: show plot border + hologram
         ClientPlayNetworking.registerGlobalReceiver(ModPackets.ShowPlotBorderPayload.ID,
                 (payload, context) -> {
                     PlotData data = PlotData.fromNbt(payload.nbt());
                     context.client().execute(() -> {
                         MinecraftClient mc = context.client();
+                        if (mc.player == null) return;
 
-                        PlotHologramClient.show(data, data.getCenter(), 10_000);
+                        // Show hologram above the block, facing the player
+                        PlotHologramClient.show(data, data.getCenter(), 10_000, mc.player.getYaw());
 
                         for (BorderDisplay bd : activeBorders) {
                             if (bd.data.getCenter().equals(data.getCenter())) {
                                 if (bd.data.getSize().tier != data.getSize().tier) {
-                                    // Upgrade — play upgrade sound + start transition
                                     bd.upgrade(data);
-                                    playUpgradeSound(mc, data.getCenter());
+                                    playUpgradeSound(mc);
                                 } else {
                                     bd.data = data;
                                     bd.expiresAt = System.currentTimeMillis() + 10000;
@@ -139,12 +140,23 @@ public class SecurePlotsClient implements ClientModInitializer {
                                 return;
                             }
                         }
-                        // New border shown — play appear sound
                         activeBorders.add(new BorderDisplay(data));
-                        playAppearSound(mc, data.getCenter());
+                        playAppearSound(mc);
                     });
                 });
 
+        // Server → client: show hologram only (no border, e.g. on place)
+        ClientPlayNetworking.registerGlobalReceiver(ModPackets.ShowPlotInfoPayload.ID,
+                (payload, context) -> {
+                    PlotData data = PlotData.fromNbt(payload.nbt());
+                    context.client().execute(() -> {
+                        MinecraftClient mc = context.client();
+                        float yaw = mc.player != null ? mc.player.getYaw() : 0f;
+                        PlotHologramClient.show(data, payload.pos(), 10_000, yaw);
+                    });
+                });
+
+        // Server → client: hide border + hologram
         ClientPlayNetworking.registerGlobalReceiver(ModPackets.HidePlotBorderPayload.ID,
                 (payload, context) -> {
                     BlockPos pos = payload.pos();
@@ -154,12 +166,13 @@ public class SecurePlotsClient implements ClientModInitializer {
                     });
                 });
 
-        // Open chat pre-filled with a command
+        // Server → client: open chat pre-filled with a command
         ClientPlayNetworking.registerGlobalReceiver(ModPackets.OpenChatPayload.ID,
                 (payload, context) -> {
                     String prefill = payload.prefill();
                     context.client().execute(() ->
-                        context.client().setScreen(new net.minecraft.client.gui.screen.ChatScreen(prefill)));
+                        context.client().setScreen(
+                            new net.minecraft.client.gui.screen.ChatScreen(prefill)));
                 });
 
         ClientPlayConnectionEvents.JOIN.register((handler, sender, client) ->
@@ -179,19 +192,17 @@ public class SecurePlotsClient implements ClientModInitializer {
     }
 
     /** Soft "whoosh" when border first appears */
-    private static void playAppearSound(MinecraftClient mc, BlockPos center) {
+    private static void playAppearSound(MinecraftClient mc) {
         if (mc.world == null || mc.player == null) return;
         mc.getSoundManager().play(PositionedSoundInstance.master(
             SoundEvents.BLOCK_BEACON_ACTIVATE, 0.9f, 0.7f));
     }
 
     /** Epic sound on upgrade */
-    private static void playUpgradeSound(MinecraftClient mc, BlockPos center) {
+    private static void playUpgradeSound(MinecraftClient mc) {
         if (mc.world == null || mc.player == null) return;
         mc.getSoundManager().play(PositionedSoundInstance.master(
             SoundEvents.UI_TOAST_CHALLENGE_COMPLETE, 0.85f, 1.1f));
-        // Second layer — delayed pulse sound to match the expanding ring
-        // We can't delay easily without a thread, so just play two at once
         mc.getSoundManager().play(PositionedSoundInstance.master(
             SoundEvents.ENTITY_ELDER_GUARDIAN_CURSE, 0.3f, 1.8f));
     }

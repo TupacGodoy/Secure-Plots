@@ -18,7 +18,6 @@
 package com.zhilius.secureplots.block;
 
 import com.mojang.serialization.MapCodec;
-import com.zhilius.secureplots.hologram.PlotHologram;
 import com.zhilius.secureplots.blockentity.PlotBlockEntity;
 import com.zhilius.secureplots.plot.PlotData;
 import com.zhilius.secureplots.plot.PlotManager;
@@ -85,7 +84,7 @@ public class PlotBlock extends BlockWithEntity {
             com.zhilius.secureplots.plot.PlotData data = manager.getPlot(pos);
             if (data != null) {
                 com.zhilius.secureplots.network.ModPackets.sendShowPlotBorder((ServerPlayerEntity) player, data);
-                PlotHologram.spawn((net.minecraft.server.world.ServerWorld) world, pos, data, 200, player.getYaw(), (net.minecraft.server.network.ServerPlayerEntity) player);
+                com.zhilius.secureplots.network.ModPackets.sendShowPlotInfo((ServerPlayerEntity) player, pos, data);
             }
         }
         return ActionResult.SUCCESS;
@@ -124,7 +123,7 @@ public class PlotBlock extends BlockWithEntity {
             player.sendMessage(Text.literal("  Use the §6Plot Blueprint §7to manage it.").formatted(Formatting.GRAY), false);
             player.sendMessage(Text.literal("═══════════════════════════").formatted(Formatting.GOLD), false);
 
-            PlotHologram.spawn((net.minecraft.server.world.ServerWorld) world, pos, data, 200, placer.getYaw(), player);
+            com.zhilius.secureplots.network.ModPackets.sendShowPlotInfo(player, pos, data);
             com.zhilius.secureplots.network.ModPackets.sendShowPlotBorder(player, data);
         }
     }
@@ -164,7 +163,7 @@ public class PlotBlock extends BlockWithEntity {
                     return state;
                 }
                 manager.removePlot(pos);
-                PlotHologram.remove((net.minecraft.server.world.ServerWorld) world, pos);
+                
                 com.zhilius.secureplots.network.ModPackets.sendHidePlotBorder((net.minecraft.server.network.ServerPlayerEntity) player, pos);
                 player.sendMessage(Text.literal("✗ Plot removed.").formatted(Formatting.RED), false);
             }
