@@ -19,7 +19,6 @@ package com.zhilius.secureplots.client;
 
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.zhilius.secureplots.plot.PlotData;
-import com.zhilius.secureplots.plot.PlotSize;
 import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderContext;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.render.*;
@@ -43,6 +42,12 @@ public class PlotBorderRenderer {
         { 0.45f, 0.20f, 0.60f,   0.22f, 0.05f, 0.32f,   0.78f, 0.58f, 0.90f }, // netherite
     };
 
+    // Line thickness constants
+    private static final float W  = 0.06f;  // core edge thickness
+    private static final float WG = 0.13f;  // glow halo thickness
+    private static final float SW = 0.025f; // scanline thickness
+    private static final float SCANLINE_SPACING = 1.5f;
+
     public static void render(WorldRenderContext context, SecurePlotsClient.BorderDisplay display) {
         PlotData data = display.data;
         MinecraftClient client = MinecraftClient.getInstance();
@@ -55,7 +60,6 @@ public class PlotBorderRenderer {
         float transP = display.transitionProgress();
         int fromTier = display.prevTier < 0 ? data.getSize().tier : display.prevTier;
         int toTier   = data.getSize().tier;
-        // Clamp tiers
         fromTier = Math.max(0, Math.min(fromTier, TIER_COLORS.length - 1));
         toTier   = Math.max(0, Math.min(toTier,   TIER_COLORS.length - 1));
 
@@ -73,6 +77,7 @@ public class PlotBorderRenderer {
 
         float[] cf = TIER_COLORS[fromTier];
         float[] ct = TIER_COLORS[toTier];
+
         // Lerp all 9 color channels
         float r  = cf[0] + transP * (ct[0] - cf[0]);
         float g  = cf[1] + transP * (ct[1] - cf[1]);
@@ -88,6 +93,13 @@ public class PlotBorderRenderer {
         float t     = (time % 2000) / 2000.0f;
         float pulse = 0.6f + 0.4f * (float) Math.sin(t * Math.PI * 2);
 
+        // Pre-calculate alpha and width values for this frame
+        float ga = 0.22f * pulse;
+        float ea = 0.82f * pulse;
+        float wa = 0.95f * pulse;
+        float WW = W * 0.4f;
+        float RW = W * 0.7f;
+
         MatrixStack matrices = context.matrixStack();
         matrices.push();
 
@@ -100,40 +112,30 @@ public class PlotBorderRenderer {
         Matrix4f mx = matrices.peek().getPositionMatrix();
         Tessellator tess = Tessellator.getInstance();
 
-        // Grosor de cada "línea" como quad
-        float W  = 0.06f;  // grosor core
-        float WG = 0.13f;  // grosor glow
-
-        // ── 1. HALO EXTERIOR (quads anchos, color glow) ───────────────────
+        // ── PASS 1: GLOW HALO + CORE EDGES + WHITE CORE + SCANLINES + TRAVELING RINGS ──
+        // All batched into a single BufferBuilder to minimize GPU draw calls
         {
             BufferBuilder buf = tess.begin(VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_COLOR);
-            float ga = 0.22f * pulse;
-            // Pilares esquinas – quad en X y en Z
-            quadPillarX(buf, mx, minX, minZ, baseY, topY, WG, gr, gg, gb, ga);
-            quadPillarZ(buf, mx, minX, minZ, baseY, topY, WG, gr, gg, gb, ga);
-            quadPillarX(buf, mx, maxX, minZ, baseY, topY, WG, gr, gg, gb, ga);
-            quadPillarZ(buf, mx, maxX, minZ, baseY, topY, WG, gr, gg, gb, ga);
-            quadPillarX(buf, mx, minX, maxZ, baseY, topY, WG, gr, gg, gb, ga);
-            quadPillarZ(buf, mx, minX, maxZ, baseY, topY, WG, gr, gg, gb, ga);
-            quadPillarX(buf, mx, maxX, maxZ, baseY, topY, WG, gr, gg, gb, ga);
-            quadPillarZ(buf, mx, maxX, maxZ, baseY, topY, WG, gr, gg, gb, ga);
-            BufferRenderer.drawWithGlobalProgram(buf.end());
-        }
 
-        // ── 2. ARISTAS CORE (quads medianos, color principal) ─────────────
-        {
-            BufferBuilder buf = tess.begin(VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_COLOR);
-            float ea = 0.82f * pulse;
-            // Pilares
-            quadPillarX(buf, mx, minX, minZ, baseY, topY, W, r, g, b, ea);
-            quadPillarZ(buf, mx, minX, minZ, baseY, topY, W, r, g, b, ea);
-            quadPillarX(buf, mx, maxX, minZ, baseY, topY, W, r, g, b, ea);
-            quadPillarZ(buf, mx, maxX, minZ, baseY, topY, W, r, g, b, ea);
-            quadPillarX(buf, mx, minX, maxZ, baseY, topY, W, r, g, b, ea);
-            quadPillarZ(buf, mx, minX, maxZ, baseY, topY, W, r, g, b, ea);
-            quadPillarX(buf, mx, maxX, maxZ, baseY, topY, W, r, g, b, ea);
-            quadPillarZ(buf, mx, maxX, maxZ, baseY, topY, W, r, g, b, ea);
-            // Aros horizontal base y top
+            // 1. Outer glow halo (wide quads at each corner)
+            for (int i = 0; i < 4; i++) {
+                double cx = (i == 0 || i == 2) ? minX : maxX;
+                double cz = (i == 0 || i == 1) ? minZ : maxZ;
+                quadPillarX(buf, mx, cx, cz, baseY, topY, WG, gr, gg, gb, ga);
+                quadPillarZ(buf, mx, cx, cz, baseY, topY, WG, gr, gg, gb, ga);
+            }
+
+            // 2. Core edges + white core overlay (corner pillars)
+            for (int i = 0; i < 4; i++) {
+                double cx = (i == 0 || i == 2) ? minX : maxX;
+                double cz = (i == 0 || i == 1) ? minZ : maxZ;
+                quadPillarX(buf, mx, cx, cz, baseY, topY, W,  r,  g,  b,  ea);
+                quadPillarZ(buf, mx, cx, cz, baseY, topY, W,  r,  g,  b,  ea);
+                quadPillarX(buf, mx, cx, cz, baseY, topY, WW, wr, wg, wb, wa);
+                quadPillarZ(buf, mx, cx, cz, baseY, topY, WW, wr, wg, wb, wa);
+            }
+
+            // 3. Horizontal rings at bottom and top
             quadBeamZ(buf, mx, minX, maxX, baseY, minZ, W, r, g, b, ea);
             quadBeamZ(buf, mx, minX, maxX, baseY, maxZ, W, r, g, b, ea);
             quadBeamX(buf, mx, minX, baseY, minZ, maxZ, W, r, g, b, ea);
@@ -142,113 +144,85 @@ public class PlotBorderRenderer {
             quadBeamZ(buf, mx, minX, maxX, topY,  maxZ, W, r, g, b, ea);
             quadBeamX(buf, mx, minX, topY,  minZ, maxZ, W, r, g, b, ea);
             quadBeamX(buf, mx, maxX, topY,  minZ, maxZ, W, r, g, b, ea);
-            BufferRenderer.drawWithGlobalProgram(buf.end());
-        }
 
-        // ── 3. NÚCLEO BLANCO (quads finos encima) ─────────────────────────
-        {
-            BufferBuilder buf = tess.begin(VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_COLOR);
-            float wa = 0.95f * pulse;
-            float WW = W * 0.4f;
-            quadPillarX(buf, mx, minX, minZ, baseY, topY, WW, wr, wg, wb, wa);
-            quadPillarZ(buf, mx, minX, minZ, baseY, topY, WW, wr, wg, wb, wa);
-            quadPillarX(buf, mx, maxX, minZ, baseY, topY, WW, wr, wg, wb, wa);
-            quadPillarZ(buf, mx, maxX, minZ, baseY, topY, WW, wr, wg, wb, wa);
-            quadPillarX(buf, mx, minX, maxZ, baseY, topY, WW, wr, wg, wb, wa);
-            quadPillarZ(buf, mx, minX, maxZ, baseY, topY, WW, wr, wg, wb, wa);
-            quadPillarX(buf, mx, maxX, maxZ, baseY, topY, WW, wr, wg, wb, wa);
-            quadPillarZ(buf, mx, maxX, maxZ, baseY, topY, WW, wr, wg, wb, wa);
-            BufferRenderer.drawWithGlobalProgram(buf.end());
-        }
-
-        // ── 4. SCANLINES VERTICALES en las 4 caras ────────────────────────
-        {
-            BufferBuilder buf = tess.begin(VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_COLOR);
-            float SW = 0.025f;
-            for (double x = minX + 1.5; x < maxX; x += 1.5) {
+            // 4. Vertical scanlines across all 4 faces
+            for (double x = minX + SCANLINE_SPACING; x < maxX; x += SCANLINE_SPACING) {
                 float flick = 0.45f + 0.55f * (float) Math.sin(time * 0.004f + (float) x * 2.1f);
                 float fa = 0.28f * pulse * flick;
                 quadPillarX(buf, mx, x, minZ, baseY, topY, SW, r, g, b, fa);
                 quadPillarX(buf, mx, x, maxZ, baseY, topY, SW, r, g, b, fa);
             }
-            for (double z = minZ + 1.5; z < maxZ; z += 1.5) {
+            for (double z = minZ + SCANLINE_SPACING; z < maxZ; z += SCANLINE_SPACING) {
                 float flick = 0.45f + 0.55f * (float) Math.sin(time * 0.004f + (float) z * 1.8f + 1.5f);
                 float fa = 0.28f * pulse * flick;
                 quadPillarZ(buf, mx, minX, z, baseY, topY, SW, r, g, b, fa);
                 quadPillarZ(buf, mx, maxX, z, baseY, topY, SW, r, g, b, fa);
             }
+
+            // 5. Double traveling rings (looping top to bottom, offset by half cycle)
+            double ringY  = baseY + (topY - baseY) * t;
+            double ring2Y = baseY + (topY - baseY) * ((t + 0.5f) % 1.0f);
+            for (int i = 0; i < 2; i++) {
+                double ry    = (i == 0) ? ringY : ring2Y;
+                float  alpha = (i == 0) ? 0.95f * pulse : 0.55f * pulse;
+                quadBeamZ(buf, mx, minX, maxX, ry, minZ, RW,        r,  g,  b,  alpha);
+                quadBeamZ(buf, mx, minX, maxX, ry, maxZ, RW,        r,  g,  b,  alpha);
+                quadBeamX(buf, mx, minX, ry, minZ, maxZ, RW,        r,  g,  b,  alpha);
+                quadBeamX(buf, mx, maxX, ry, minZ, maxZ, RW,        r,  g,  b,  alpha);
+                // White core of the traveling ring
+                quadBeamZ(buf, mx, minX, maxX, ry, minZ, RW * 0.4f, wr, wg, wb, alpha * 0.6f);
+                quadBeamZ(buf, mx, minX, maxX, ry, maxZ, RW * 0.4f, wr, wg, wb, alpha * 0.6f);
+                quadBeamX(buf, mx, minX, ry, minZ, maxZ, RW * 0.4f, wr, wg, wb, alpha * 0.6f);
+                quadBeamX(buf, mx, maxX, ry, minZ, maxZ, RW * 0.4f, wr, wg, wb, alpha * 0.6f);
+            }
+
             BufferRenderer.drawWithGlobalProgram(buf.end());
         }
 
-        // ── 5. RAYOS EN ESQUINAS ──────────────────────────────────────────
-        long boltSlot = time / 120;
+        // ── PASS 2: CORNER LIGHTNING BOLTS (separate due to seeded RNG per segment) ──
         {
+            long boltSlot = time / 120;
             BufferBuilder buf = tess.begin(VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_COLOR);
             for (int i = 0; i < 4; i++) {
                 double cx = (i == 0 || i == 2) ? minX : maxX;
                 double cz = (i == 0 || i == 1) ? minZ : maxZ;
-                boltQuad(buf, mx, cx, cz, baseY, topY, gr, gg, gb, 0.50f, boltSlot*11L+(i*3+1), 0.48, 0.05f);
-                boltQuad(buf, mx, cx, cz, baseY, topY, r,  g,  b,  0.90f, boltSlot*11L+(i*3+2), 0.26, 0.035f);
-                boltQuad(buf, mx, cx, cz, baseY, topY, wr, wg, wb, 0.60f, boltSlot*11L+(i*3+3), 0.10, 0.015f);
+                boltQuad(buf, mx, cx, cz, baseY, topY, gr, gg, gb, 0.50f, boltSlot * 11L + (i * 3 + 1), 0.48, 0.05f);
+                boltQuad(buf, mx, cx, cz, baseY, topY, r,  g,  b,  0.90f, boltSlot * 11L + (i * 3 + 2), 0.26, 0.035f);
+                boltQuad(buf, mx, cx, cz, baseY, topY, wr, wg, wb, 0.60f, boltSlot * 11L + (i * 3 + 3), 0.10, 0.015f);
             }
             BufferRenderer.drawWithGlobalProgram(buf.end());
         }
 
-        // ── 6. ANILLO VIAJERO DOBLE ───────────────────────────────────────
-        {
-            BufferBuilder buf = tess.begin(VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_COLOR);
-            double ringY  = baseY + (topY - baseY) * t;
-            double ring2Y = baseY + (topY - baseY) * ((t + 0.5f) % 1.0f);
-            float  RW = W * 0.7f;
-            for (int i = 0; i < 2; i++) {
-                double ry    = (i == 0) ? ringY : ring2Y;
-                float  alpha = (i == 0) ? 0.95f * pulse : 0.55f * pulse;
-                quadBeamZ(buf, mx, minX, maxX, ry, minZ, RW, r, g, b, alpha);
-                quadBeamZ(buf, mx, minX, maxX, ry, maxZ, RW, r, g, b, alpha);
-                quadBeamX(buf, mx, minX, ry, minZ, maxZ, RW, r, g, b, alpha);
-                quadBeamX(buf, mx, maxX, ry, minZ, maxZ, RW, r, g, b, alpha);
-                // núcleo blanco del anillo
-                quadBeamZ(buf, mx, minX, maxX, ry, minZ, RW*0.4f, wr, wg, wb, alpha * 0.6f);
-                quadBeamZ(buf, mx, minX, maxX, ry, maxZ, RW*0.4f, wr, wg, wb, alpha * 0.6f);
-                quadBeamX(buf, mx, minX, ry, minZ, maxZ, RW*0.4f, wr, wg, wb, alpha * 0.6f);
-                quadBeamX(buf, mx, maxX, ry, minZ, maxZ, RW*0.4f, wr, wg, wb, alpha * 0.6f);
-            }
-            BufferRenderer.drawWithGlobalProgram(buf.end());
-        }
-
-        // ── 7. ANILLO DE EXPANSIÓN (solo durante upgrade) ─────────────────
+        // ── PASS 3: EXPANSION RING (only active during tier upgrade) ──
         float expandExtra = display.expandPulseRadius();
         if (expandExtra > 0.1f) {
             float[] ct2 = TIER_COLORS[toTier];
-            float ep = expandExtra / 8f; // 0..1 normalized
+            float ep = expandExtra / 8f;
             float pulseAlpha = ep * (1.0f - ep) * 2.8f; // peaks at midpoint
-            float eMinX = (float)((center.getX() + 0.5) - halfF + expandExtra - camX);
-            float eMaxX = (float)((center.getX() + 0.5) + halfF - expandExtra + camX * 0 - camX);
-            // Recalc: the pulse ring is at halfF position (new border) expanding outward
             double pMinX = (center.getX() + 0.5) - halfF - camX;
             double pMaxX = (center.getX() + 0.5) + halfF - camX;
             double pMinZ = (center.getZ() + 0.5) - halfF - camZ;
             double pMaxZ = (center.getZ() + 0.5) + halfF - camZ;
-            float PW = 0.18f + expandExtra * 0.04f;
+            float PW   = 0.18f + expandExtra * 0.04f;
+            float pa70 = pulseAlpha * 0.7f;
+
             BufferBuilder buf = tess.begin(VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_COLOR);
-            // Full glowing ring at current border position
-            quadBeamZ(buf, mx, pMinX, pMaxX, baseY + 2,  pMinZ, PW, ct2[0], ct2[1], ct2[2], pulseAlpha);
-            quadBeamZ(buf, mx, pMinX, pMaxX, baseY + 2,  pMaxZ, PW, ct2[0], ct2[1], ct2[2], pulseAlpha);
+            // Glowing ring at bottom and top of border
+            quadBeamZ(buf, mx, pMinX, pMaxX, baseY + 2, pMinZ, PW, ct2[0], ct2[1], ct2[2], pulseAlpha);
+            quadBeamZ(buf, mx, pMinX, pMaxX, baseY + 2, pMaxZ, PW, ct2[0], ct2[1], ct2[2], pulseAlpha);
             quadBeamX(buf, mx, pMinX, baseY + 2, pMinZ, pMaxZ, PW, ct2[0], ct2[1], ct2[2], pulseAlpha);
             quadBeamX(buf, mx, pMaxX, baseY + 2, pMinZ, pMaxZ, PW, ct2[0], ct2[1], ct2[2], pulseAlpha);
-            quadBeamZ(buf, mx, pMinX, pMaxX, topY - 2,  pMinZ, PW, ct2[6], ct2[7], ct2[8], pulseAlpha * 0.7f);
-            quadBeamZ(buf, mx, pMinX, pMaxX, topY - 2,  pMaxZ, PW, ct2[6], ct2[7], ct2[8], pulseAlpha * 0.7f);
-            quadBeamX(buf, mx, pMinX, topY - 2, pMinZ, pMaxZ, PW, ct2[6], ct2[7], ct2[8], pulseAlpha * 0.7f);
-            quadBeamX(buf, mx, pMaxX, topY - 2, pMinZ, pMaxZ, PW, ct2[6], ct2[7], ct2[8], pulseAlpha * 0.7f);
-            // Vertical pillars at corners flashing
-            quadPillarX(buf, mx, pMinX, pMinZ, baseY, topY, PW, ct2[0], ct2[1], ct2[2], pulseAlpha);
-            quadPillarZ(buf, mx, pMinX, pMinZ, baseY, topY, PW, ct2[0], ct2[1], ct2[2], pulseAlpha);
-            quadPillarX(buf, mx, pMaxX, pMinZ, baseY, topY, PW, ct2[0], ct2[1], ct2[2], pulseAlpha);
-            quadPillarZ(buf, mx, pMaxX, pMinZ, baseY, topY, PW, ct2[0], ct2[1], ct2[2], pulseAlpha);
-            quadPillarX(buf, mx, pMinX, pMaxZ, baseY, topY, PW, ct2[0], ct2[1], ct2[2], pulseAlpha);
-            quadPillarZ(buf, mx, pMinX, pMaxZ, baseY, topY, PW, ct2[0], ct2[1], ct2[2], pulseAlpha);
-            quadPillarX(buf, mx, pMaxX, pMaxZ, baseY, topY, PW, ct2[0], ct2[1], ct2[2], pulseAlpha);
-            quadPillarZ(buf, mx, pMaxX, pMaxZ, baseY, topY, PW, ct2[0], ct2[1], ct2[2], pulseAlpha);
+            quadBeamZ(buf, mx, pMinX, pMaxX, topY - 2, pMinZ, PW, ct2[6], ct2[7], ct2[8], pa70);
+            quadBeamZ(buf, mx, pMinX, pMaxX, topY - 2, pMaxZ, PW, ct2[6], ct2[7], ct2[8], pa70);
+            quadBeamX(buf, mx, pMinX, topY - 2, pMinZ, pMaxZ, PW, ct2[6], ct2[7], ct2[8], pa70);
+            quadBeamX(buf, mx, pMaxX, topY - 2, pMinZ, pMaxZ, PW, ct2[6], ct2[7], ct2[8], pa70);
+            // Flashing corner pillars
+            for (int i = 0; i < 4; i++) {
+                double cx = (i == 0 || i == 2) ? pMinX : pMaxX;
+                double cz = (i == 0 || i == 1) ? pMinZ : pMaxZ;
+                quadPillarX(buf, mx, cx, cz, baseY, topY, PW, ct2[0], ct2[1], ct2[2], pulseAlpha);
+                quadPillarZ(buf, mx, cx, cz, baseY, topY, PW, ct2[0], ct2[1], ct2[2], pulseAlpha);
+            }
             BufferRenderer.drawWithGlobalProgram(buf.end());
         }
 
@@ -258,7 +232,7 @@ public class PlotBorderRenderer {
         matrices.pop();
     }
 
-    // Pilar vertical en X (cara hacia Z)
+    /** Vertical quad pillar facing Z axis */
     private static void quadPillarX(BufferBuilder buf, Matrix4f m,
                                      double x, double z, double y1, double y2,
                                      float w, float r, float g, float b, float a) {
@@ -268,7 +242,7 @@ public class PlotBorderRenderer {
         buf.vertex(m, (float)(x-w), (float)y2, (float)z).color(r,g,b,a);
     }
 
-    // Pilar vertical en Z (cara hacia X)
+    /** Vertical quad pillar facing X axis */
     private static void quadPillarZ(BufferBuilder buf, Matrix4f m,
                                      double x, double z, double y1, double y2,
                                      float w, float r, float g, float b, float a) {
@@ -278,7 +252,7 @@ public class PlotBorderRenderer {
         buf.vertex(m, (float)x, (float)y2, (float)(z-w)).color(r,g,b,a);
     }
 
-    // Viga horizontal a lo largo de Z (aro superior/inferior)
+    /** Horizontal beam along Z axis (top/bottom rings) */
     private static void quadBeamZ(BufferBuilder buf, Matrix4f m,
                                    double x1, double x2, double y, double z,
                                    float w, float r, float g, float b, float a) {
@@ -288,7 +262,7 @@ public class PlotBorderRenderer {
         buf.vertex(m, (float)x1, (float)(y+w), (float)z).color(r,g,b,a);
     }
 
-    // Viga horizontal a lo largo de X
+    /** Horizontal beam along X axis */
     private static void quadBeamX(BufferBuilder buf, Matrix4f m,
                                    double x, double y, double z1, double z2,
                                    float w, float r, float g, float b, float a) {
@@ -298,7 +272,7 @@ public class PlotBorderRenderer {
         buf.vertex(m, (float)x, (float)(y+w), (float)z1).color(r,g,b,a);
     }
 
-    // Rayo zigzagueante como serie de quads
+    /** Zigzag lightning bolt rendered as a series of quads with a fixed random seed */
     private static void boltQuad(BufferBuilder buf, Matrix4f m,
                                   double cx, double cz, double baseY, double topY,
                                   float r, float g, float b, float a,
@@ -312,7 +286,6 @@ public class PlotBorderRenderer {
             double ny = py + segH;
             double nz = cz + (RAND.nextDouble() * 2 - 1) * spread;
             if (i == segs - 1) { nx = cx; nz = cz; ny = topY; }
-            // quad perpendicular al segmento
             buf.vertex(m, (float)(px-w), (float)py, (float)pz).color(r,g,b,a);
             buf.vertex(m, (float)(px+w), (float)py, (float)pz).color(r,g,b,a);
             buf.vertex(m, (float)(nx+w), (float)ny, (float)nz).color(r,g,b,a);
