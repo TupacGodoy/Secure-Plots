@@ -109,6 +109,28 @@ public class BorderConfig {
     /** Float cycle duration in milliseconds. */
     public int hologramFloatCycleMs = 3000;
 
+    // ── Plot screen UI ───────────────────────────────────────────────────────────
+
+    /** Width of the plot management screen panel in pixels. */
+    public int screenPanelWidth = 320;
+
+    /** Height of the plot management screen panel in pixels. */
+    public int screenPanelHeight = 240;
+
+    /** Row spacing between info lines in pixels. */
+    public int screenRowSpacing = 16;
+
+    /** Maximum length of a plot name. */
+    public int screenMaxNameLength = 32;
+
+    // Panel colors (ARGB hex)
+    public int screenColorBorderOuter  = 0xFF373737;
+    public int screenColorBackground   = 0xFFC6C6C6;
+    public int screenColorTitleBar     = 0xFF555555;
+    public int screenColorTitleBarTop  = 0xFF666666;
+    public int screenColorShadowDark   = 0xFF8B8B8B;
+    public int screenColorShadowLight  = 0xFFFFFFFF;
+
     // ── Hologram text labels ─────────────────────────────────────────────────────
 
     /** Label shown when the plot has no name. */
@@ -229,6 +251,10 @@ public class BorderConfig {
         if (hologramFadeOutMs   <= 0) hologramFadeOutMs   = 600;
         if (hologramFloatAmplitude < 0) hologramFloatAmplitude = 0.1f;
         if (hologramFloatCycleMs   <= 0) hologramFloatCycleMs  = 3000;
+        if (screenPanelWidth    <= 0)   screenPanelWidth    = 320;
+        if (screenPanelHeight   <= 0)   screenPanelHeight   = 240;
+        if (screenRowSpacing    <= 0)   screenRowSpacing    = 16;
+        if (screenMaxNameLength <= 0)   screenMaxNameLength = 32;
         if (hologramDefaultName == null || hologramDefaultName.isBlank()) hologramDefaultName = "PROTECTED PLOT";
         if (hologramLabelOwner   == null) hologramLabelOwner   = "Owner:   ";
         if (hologramLabelTier    == null) hologramLabelTier    = "Tier:    ";
