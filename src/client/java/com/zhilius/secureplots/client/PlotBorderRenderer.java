@@ -71,7 +71,6 @@ public class PlotBorderRenderer {
         double baseY = center.getY() - camY;
         double topY  = baseY + 25;
 
-        int tier = toTier; // keep for reference
         float[] cf = TIER_COLORS[fromTier];
         float[] ct = TIER_COLORS[toTier];
         // Lerp all 9 color channels

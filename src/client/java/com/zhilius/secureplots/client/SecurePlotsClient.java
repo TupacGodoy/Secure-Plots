@@ -45,11 +45,11 @@ public class SecurePlotsClient implements ClientModInitializer {
         public int prevRadius   = -1;   // -1 = no transition
         public int prevTier     = -1;
         public long transitionStart = 0;
-        public static final long TRANSITION_MS = 1400;
+        public static final long TRANSITION_MS = 5600;
 
         // Expand-pulse: brief extra radius burst on upgrade arrival
         public long expandPulseStart = -1;
-        public static final long EXPAND_PULSE_MS = 600;
+        public static final long EXPAND_PULSE_MS = 2400;
 
         public BorderDisplay(PlotData data) {
             this.data = data;
@@ -109,9 +109,6 @@ public class SecurePlotsClient implements ClientModInitializer {
 
     @Override
     public void onInitializeClient() {
-        ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) ->
-                HologramTestCommand.register(dispatcher));
-
         PlotHologramClient.register();
 
         ClientPlayNetworking.registerGlobalReceiver(ModPackets.OpenPlotScreenPayload.ID,
