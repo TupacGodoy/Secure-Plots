@@ -265,7 +265,7 @@ public class PlotHologram {
             " " + nextLine + NL +
             border;
 
-        text = text.replace("\"", "\\"");
+        text = text.replace("\"", "\\");
         return "{\"text\":\"" + text + "\"}";
     }
 }
