@@ -18,6 +18,7 @@
 package com.zhilius.secureplots.client;
 
 import com.mojang.blaze3d.systems.RenderSystem;
+import com.zhilius.secureplots.config.BorderConfig;
 import com.zhilius.secureplots.plot.PlotData;
 import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderContext;
 import net.minecraft.client.MinecraftClient;
@@ -28,26 +29,7 @@ import org.joml.Matrix4f;
 
 public class PlotBorderRenderer {
 
-    // { r_core, g_core, b_core,  r_glow, g_glow, b_glow,  r_white, g_white, b_white }
-    // tier 0=bronze  1=gold  2=emerald  3=diamond  4=netherite
-    private static final float[][] TIER_COLORS = {
-        { 1.00f, 0.55f, 0.05f,   0.70f, 0.28f, 0.00f,   1.00f, 0.88f, 0.55f }, // bronze
-        { 1.00f, 0.85f, 0.00f,   0.80f, 0.50f, 0.00f,   1.00f, 0.97f, 0.65f }, // gold
-        { 0.10f, 0.90f, 0.20f,   0.00f, 0.55f, 0.10f,   0.70f, 1.00f, 0.75f }, // emerald
-        { 0.15f, 0.95f, 1.00f,   0.00f, 0.50f, 0.80f,   0.75f, 1.00f, 1.00f }, // diamond
-        { 0.45f, 0.20f, 0.60f,   0.22f, 0.05f, 0.32f,   0.78f, 0.58f, 0.90f }, // netherite
-    };
-
-    // Line thickness constants
-    private static final float W  = 0.06f;  // core edge thickness
-    private static final float WG = 0.13f;  // glow halo thickness
-    private static final float SW = 0.025f; // scanline thickness
-    private static final float SCANLINE_SPACING = 1.5f;
-
-    /**
-     * Fast deterministic pseudo-random in [-1, 1] — no Random instance needed.
-     * Replaces RAND.setSeed(seed) + nextDouble() calls in the bolt loop.
-     */
+    /** Fast deterministic pseudo-random in [-1, 1] — no Random instance needed. */
     private static double fastRand(long seed, int index) {
         long n = seed + index * 12345L;
         n = (n << 13) ^ n;
@@ -60,6 +42,9 @@ public class PlotBorderRenderer {
         MinecraftClient client = MinecraftClient.getInstance();
         if (client.player == null) return;
 
+        // Use live config from server
+        BorderConfig cfg = PlotBorderRendererConfig.current;
+
         float halfF = display.effectiveRadiusF() / 2f;
         BlockPos center = data.getCenter();
 
@@ -67,8 +52,9 @@ public class PlotBorderRenderer {
         float transP = display.transitionProgress();
         int fromTier = display.prevTier < 0 ? data.getSize().tier : display.prevTier;
         int toTier   = data.getSize().tier;
-        fromTier = Math.max(0, Math.min(fromTier, TIER_COLORS.length - 1));
-        toTier   = Math.max(0, Math.min(toTier,   TIER_COLORS.length - 1));
+        int maxTier  = cfg.tierColors.size() - 1;
+        fromTier = Math.max(0, Math.min(fromTier, maxTier));
+        toTier   = Math.max(0, Math.min(toTier,   maxTier));
 
         double camX = context.camera().getPos().x;
         double camY = context.camera().getPos().y;
@@ -80,10 +66,10 @@ public class PlotBorderRenderer {
         double maxZ = (center.getZ() + 0.5) + halfF - camZ;
 
         double baseY = center.getY() - camY;
-        double topY  = baseY + 25;
+        double topY  = baseY + cfg.borderHeight;
 
-        float[] cf = TIER_COLORS[fromTier];
-        float[] ct = TIER_COLORS[toTier];
+        float[] cf = cfg.getTierColors(fromTier);
+        float[] ct = cfg.getTierColors(toTier);
 
         // Lerp all 9 color channels
         float r  = cf[0] + transP * (ct[0] - cf[0]);
@@ -97,10 +83,13 @@ public class PlotBorderRenderer {
         float wb = cf[8] + transP * (ct[8] - cf[8]);
 
         long  time  = System.currentTimeMillis();
-        float t     = (time % 2000) / 2000.0f;
-        float pulse = 0.6f + 0.4f * (float) Math.sin(t * Math.PI * 2);
+        float t     = (time % cfg.pulseCycleMs) / (float) cfg.pulseCycleMs;
+        float pulse = cfg.pulseMin + cfg.pulseRange * (float) Math.sin(t * Math.PI * 2);
 
         // Pre-calculate alpha and width values for this frame
+        float W  = cfg.edgeThickness;
+        float WG = cfg.glowThickness;
+        float SW = cfg.scanlineThickness;
         float ga = 0.22f * pulse;
         float ea = 0.82f * pulse;
         float wa = 0.95f * pulse;
@@ -113,8 +102,6 @@ public class PlotBorderRenderer {
         RenderSystem.enableBlend();
         RenderSystem.defaultBlendFunc();
         RenderSystem.disableCull();
-        // Use depthMask(false) instead of disableDepthTest() so the border
-        // doesn't interfere with other transparent renders (water, etc.)
         RenderSystem.enableDepthTest();
         RenderSystem.depthMask(false);
         RenderSystem.setShader(GameRenderer::getPositionColorProgram);
@@ -123,11 +110,10 @@ public class PlotBorderRenderer {
         Tessellator tess = Tessellator.getInstance();
 
         // ── PASS 1: GLOW HALO + CORE EDGES + WHITE CORE + SCANLINES + TRAVELING RINGS ──
-        // All batched into a single BufferBuilder to minimize GPU draw calls
         {
             BufferBuilder buf = tess.begin(VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_COLOR);
 
-            // 1. Outer glow halo (wide quads at each corner)
+            // 1. Outer glow halo
             for (int i = 0; i < 4; i++) {
                 double cx = (i == 0 || i == 2) ? minX : maxX;
                 double cz = (i == 0 || i == 1) ? minZ : maxZ;
@@ -135,7 +121,7 @@ public class PlotBorderRenderer {
                 quadPillarZ(buf, mx, cx, cz, baseY, topY, WG, gr, gg, gb, ga);
             }
 
-            // 2. Core edges + white core overlay (corner pillars)
+            // 2. Core edges + white core overlay
             for (int i = 0; i < 4; i++) {
                 double cx = (i == 0 || i == 2) ? minX : maxX;
                 double cz = (i == 0 || i == 1) ? minZ : maxZ;
@@ -155,21 +141,22 @@ public class PlotBorderRenderer {
             quadBeamX(buf, mx, minX, topY,  minZ, maxZ, W, r, g, b, ea);
             quadBeamX(buf, mx, maxX, topY,  minZ, maxZ, W, r, g, b, ea);
 
-            // 4. Vertical scanlines across all 4 faces
-            for (double x = minX + SCANLINE_SPACING; x < maxX; x += SCANLINE_SPACING) {
+            // 4. Vertical scanlines
+            float sp = cfg.scanlineSpacing;
+            for (double x = minX + sp; x < maxX; x += sp) {
                 float flick = 0.45f + 0.55f * (float) Math.sin(time * 0.004f + (float) x * 2.1f);
                 float fa = 0.28f * pulse * flick;
                 quadPillarX(buf, mx, x, minZ, baseY, topY, SW, r, g, b, fa);
                 quadPillarX(buf, mx, x, maxZ, baseY, topY, SW, r, g, b, fa);
             }
-            for (double z = minZ + SCANLINE_SPACING; z < maxZ; z += SCANLINE_SPACING) {
+            for (double z = minZ + sp; z < maxZ; z += sp) {
                 float flick = 0.45f + 0.55f * (float) Math.sin(time * 0.004f + (float) z * 1.8f + 1.5f);
                 float fa = 0.28f * pulse * flick;
                 quadPillarZ(buf, mx, minX, z, baseY, topY, SW, r, g, b, fa);
                 quadPillarZ(buf, mx, maxX, z, baseY, topY, SW, r, g, b, fa);
             }
 
-            // 5. Double traveling rings (looping top to bottom, offset by half cycle)
+            // 5. Double traveling rings
             double ringY  = baseY + (topY - baseY) * t;
             double ring2Y = baseY + (topY - baseY) * ((t + 0.5f) % 1.0f);
             for (int i = 0; i < 2; i++) {
@@ -179,7 +166,6 @@ public class PlotBorderRenderer {
                 quadBeamZ(buf, mx, minX, maxX, ry, maxZ, RW,        r,  g,  b,  alpha);
                 quadBeamX(buf, mx, minX, ry, minZ, maxZ, RW,        r,  g,  b,  alpha);
                 quadBeamX(buf, mx, maxX, ry, minZ, maxZ, RW,        r,  g,  b,  alpha);
-                // White core of the traveling ring
                 quadBeamZ(buf, mx, minX, maxX, ry, minZ, RW * 0.4f, wr, wg, wb, alpha * 0.6f);
                 quadBeamZ(buf, mx, minX, maxX, ry, maxZ, RW * 0.4f, wr, wg, wb, alpha * 0.6f);
                 quadBeamX(buf, mx, minX, ry, minZ, maxZ, RW * 0.4f, wr, wg, wb, alpha * 0.6f);
@@ -189,10 +175,9 @@ public class PlotBorderRenderer {
             BufferRenderer.drawWithGlobalProgram(buf.end());
         }
 
-        // ── PASS 2: CORNER LIGHTNING BOLTS (uses fastRand — no Random instance) ──
+        // ── PASS 2: CORNER LIGHTNING BOLTS ──
         {
-            // Change slot every 120ms so bolts visually flicker
-            long boltSlot = time / 120;
+            long boltSlot = time / cfg.boltFlickerMs;
             BufferBuilder buf = tess.begin(VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_COLOR);
             for (int i = 0; i < 4; i++) {
                 double cx = (i == 0 || i == 2) ? minX : maxX;
@@ -204,12 +189,12 @@ public class PlotBorderRenderer {
             BufferRenderer.drawWithGlobalProgram(buf.end());
         }
 
-        // ── PASS 3: EXPANSION RING (only active during tier upgrade) ──
+        // ── PASS 3: EXPANSION RING (only during upgrade) ──
         float expandExtra = display.expandPulseRadius();
         if (expandExtra > 0.1f) {
-            float[] ct2 = TIER_COLORS[toTier];
+            float[] ct2 = cfg.getTierColors(toTier);
             float ep = expandExtra / 8f;
-            float pulseAlpha = ep * (1.0f - ep) * 2.8f; // peaks at midpoint
+            float pulseAlpha = ep * (1.0f - ep) * 2.8f;
             double pMinX = (center.getX() + 0.5) - halfF - camX;
             double pMaxX = (center.getX() + 0.5) + halfF - camX;
             double pMinZ = (center.getZ() + 0.5) - halfF - camZ;
@@ -218,7 +203,6 @@ public class PlotBorderRenderer {
             float pa70 = pulseAlpha * 0.7f;
 
             BufferBuilder buf = tess.begin(VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_COLOR);
-            // Glowing ring at bottom and top of border
             quadBeamZ(buf, mx, pMinX, pMaxX, baseY + 2, pMinZ, PW, ct2[0], ct2[1], ct2[2], pulseAlpha);
             quadBeamZ(buf, mx, pMinX, pMaxX, baseY + 2, pMaxZ, PW, ct2[0], ct2[1], ct2[2], pulseAlpha);
             quadBeamX(buf, mx, pMinX, baseY + 2, pMinZ, pMaxZ, PW, ct2[0], ct2[1], ct2[2], pulseAlpha);
@@ -227,7 +211,6 @@ public class PlotBorderRenderer {
             quadBeamZ(buf, mx, pMinX, pMaxX, topY - 2, pMaxZ, PW, ct2[6], ct2[7], ct2[8], pa70);
             quadBeamX(buf, mx, pMinX, topY - 2, pMinZ, pMaxZ, PW, ct2[6], ct2[7], ct2[8], pa70);
             quadBeamX(buf, mx, pMaxX, topY - 2, pMinZ, pMaxZ, PW, ct2[6], ct2[7], ct2[8], pa70);
-            // Flashing corner pillars
             for (int i = 0; i < 4; i++) {
                 double cx = (i == 0 || i == 2) ? pMinX : pMaxX;
                 double cz = (i == 0 || i == 1) ? pMinZ : pMaxZ;
@@ -263,7 +246,7 @@ public class PlotBorderRenderer {
         buf.vertex(m, (float)x, (float)y2, (float)(z-w)).color(r,g,b,a);
     }
 
-    /** Horizontal beam along Z axis (top/bottom rings) */
+    /** Horizontal beam along Z axis */
     private static void quadBeamZ(BufferBuilder buf, Matrix4f m,
                                    double x1, double x2, double y, double z,
                                    float w, float r, float g, float b, float a) {
@@ -283,11 +266,7 @@ public class PlotBorderRenderer {
         buf.vertex(m, (float)x, (float)(y+w), (float)z1).color(r,g,b,a);
     }
 
-    /**
-     * Zigzag lightning bolt rendered as a series of quads.
-     * Uses fastRand() instead of java.util.Random — no object state, no setSeed().
-     * Reduced to 8 segments (was 14) for lower geometry overhead with minimal visual difference.
-     */
+    /** Zigzag lightning bolt — 8 segments, deterministic random. */
     private static void boltQuad(BufferBuilder buf, Matrix4f m,
                                   double cx, double cz, double baseY, double topY,
                                   float r, float g, float b, float a,

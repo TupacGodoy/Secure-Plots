@@ -23,6 +23,7 @@ import com.zhilius.secureplots.command.SpCommand;
 import com.zhilius.secureplots.config.SecurePlotsConfig;
 import com.zhilius.secureplots.item.ModItems;
 import com.zhilius.secureplots.network.ModPackets;
+import com.zhilius.secureplots.hologram.PlotHologram;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.event.player.AttackBlockCallback;
 import net.fabricmc.fabric.api.event.player.UseItemCallback;
@@ -48,6 +49,7 @@ public class SecurePlots implements ModInitializer {
 
         // Load config
         SecurePlotsConfig.load();
+        com.zhilius.secureplots.config.BorderConfig.load();
 
         // Register content
         ModBlocks.initialize();
@@ -61,6 +63,7 @@ public class SecurePlots implements ModInitializer {
         SpCommand.register();
 
         // Register hologram ticker
+        PlotHologram.registerTicker();
 
         // Register chat listener for pending rename/add
         com.zhilius.secureplots.screen.PlotChatListener.register();
@@ -91,6 +94,8 @@ public class SecurePlots implements ModInitializer {
             long tick = world.getTime();
             com.zhilius.secureplots.plot.PlotManager.getOrCreate(world)
                 .updateOwnerSeen(player.getUuid(), tick);
+            // Sync border visual config to the joining client
+            com.zhilius.secureplots.network.ModPackets.sendSyncBorderConfig(player);
         });
         ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> {
             var player = handler.player;

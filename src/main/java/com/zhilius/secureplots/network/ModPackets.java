@@ -18,7 +18,9 @@
 package com.zhilius.secureplots.network;
 import com.zhilius.secureplots.config.SecurePlotsConfig;
 
+import com.google.gson.Gson;
 import com.zhilius.secureplots.SecurePlots;
+import com.zhilius.secureplots.config.BorderConfig;
 import com.zhilius.secureplots.network.ModPackets.OpenPlotScreenPayload;
 import com.zhilius.secureplots.network.ModPackets.ShowPlotBorderPayload;
 import com.zhilius.secureplots.network.ModPackets.UpdatePlotPayload;
@@ -156,18 +158,43 @@ public class ModPackets {
         @Override public Id<? extends CustomPayload> getId() { return ID; }
     }
 
+    /** S→C: syncs border visual config to the client on join. */
+    public record SyncBorderConfigPayload(String configJson) implements CustomPayload {
+        private static final Gson GSON = new Gson();
+        public static final Id<SyncBorderConfigPayload> ID = new Id<>(
+                Identifier.of(SecurePlots.MOD_ID, "sync_border_config"));
+        public static final PacketCodec<PacketByteBuf, SyncBorderConfigPayload> CODEC = PacketCodec.of(
+                (value, buf) -> buf.writeString(value.configJson()),
+                buf -> new SyncBorderConfigPayload(buf.readString()));
+        @Override public Id<? extends CustomPayload> getId() { return ID; }
+
+        public BorderConfig toBorderConfig() {
+            BorderConfig cfg = GSON.fromJson(configJson, BorderConfig.class);
+            if (cfg == null) cfg = BorderConfig.createDefault();
+            cfg.applyDefaults();
+            return cfg;
+        }
+    }
+
     public static void registerPayloads() {
         PayloadTypeRegistry.playS2C().register(OpenPlotScreenPayload.ID, OpenPlotScreenPayload.CODEC);
         PayloadTypeRegistry.playS2C().register(ShowPlotBorderPayload.ID, ShowPlotBorderPayload.CODEC);
         PayloadTypeRegistry.playS2C().register(HidePlotBorderPayload.ID, HidePlotBorderPayload.CODEC);
         PayloadTypeRegistry.playS2C().register(ShowPlotInfoPayload.ID, ShowPlotInfoPayload.CODEC);
         PayloadTypeRegistry.playS2C().register(OpenChatPayload.ID, OpenChatPayload.CODEC);
+        PayloadTypeRegistry.playS2C().register(SyncBorderConfigPayload.ID, SyncBorderConfigPayload.CODEC);
         PayloadTypeRegistry.playC2S().register(UpdatePlotPayload.ID, UpdatePlotPayload.CODEC);
         PayloadTypeRegistry.playC2S().register(UpgradePlotPayload.ID, UpgradePlotPayload.CODEC);
         PayloadTypeRegistry.playC2S().register(AddMemberPayload.ID, AddMemberPayload.CODEC);
         PayloadTypeRegistry.playC2S().register(SetPermissionPayload.ID, SetPermissionPayload.CODEC);
         PayloadTypeRegistry.playC2S().register(RemoveMemberPayload.ID, RemoveMemberPayload.CODEC);
         PayloadTypeRegistry.playC2S().register(GiveBlockPayload.ID, GiveBlockPayload.CODEC);
+    }
+
+    public static void sendSyncBorderConfig(ServerPlayerEntity player) {
+        if (com.zhilius.secureplots.config.BorderConfig.INSTANCE == null) return;
+        String json = new Gson().toJson(com.zhilius.secureplots.config.BorderConfig.INSTANCE);
+        ServerPlayNetworking.send(player, new SyncBorderConfigPayload(json));
     }
 
     public static void sendShowPlotInfo(ServerPlayerEntity player, BlockPos pos, PlotData data) {
