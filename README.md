@@ -7,6 +7,8 @@
 **Minecraft 1.21.1 — Fabric**  
 Territory protection mod with menus, roles, upgrades, rank-based permissions, ambient effects, and a fully configurable visual border system.
 
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/zhilius)
+
 ---
 
 ## Requirements
