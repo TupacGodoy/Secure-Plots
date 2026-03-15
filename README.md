@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="https://raw.githubusercontent.com/TupacGodoy/Secure-Plots/main-optimization/src/main/resources/assets/secure-plots/icon.png" width="160" alt="Secure Plots"/>
+</p>
+
 # 🛡 Secure Plots
 
 **Minecraft 1.21.1 — Fabric**  
