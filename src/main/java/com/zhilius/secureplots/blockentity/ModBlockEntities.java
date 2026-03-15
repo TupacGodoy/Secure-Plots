@@ -9,8 +9,8 @@
  */
 package com.zhilius.secureplots.blockentity;
 
-import com.zhilius.secureplots.block.ModBlocks;
 import com.zhilius.secureplots.SecurePlots;
+import com.zhilius.secureplots.block.ModBlocks;
 import net.minecraft.block.entity.BlockEntityType;
 import net.minecraft.registry.Registries;
 import net.minecraft.registry.Registry;
@@ -22,14 +22,14 @@ public class ModBlockEntities {
 
     public static void initialize() {
         PLOT_BLOCK_ENTITY = Registry.register(
-                Registries.BLOCK_ENTITY_TYPE,
-                Identifier.of(SecurePlots.MOD_ID, "plot_block_entity"),
-                BlockEntityType.Builder.create(PlotBlockEntity::new,
-                        ModBlocks.BRONZE_PLOT_BLOCK,
-                        ModBlocks.EMERALD_PLOT_BLOCK,   // Fixed: was emerald_PLOT_BLOCK
-                        ModBlocks.GOLD_PLOT_BLOCK,
-                        ModBlocks.DIAMOND_PLOT_BLOCK,
-                        ModBlocks.NETHERITE_PLOT_BLOCK).build());
+            Registries.BLOCK_ENTITY_TYPE,
+            Identifier.of(SecurePlots.MOD_ID, "plot_block_entity"),
+            BlockEntityType.Builder.create(PlotBlockEntity::new,
+                ModBlocks.BRONZE_PLOT_BLOCK,
+                ModBlocks.GOLD_PLOT_BLOCK,
+                ModBlocks.EMERALD_PLOT_BLOCK,
+                ModBlocks.DIAMOND_PLOT_BLOCK,
+                ModBlocks.NETHERITE_PLOT_BLOCK).build());
         SecurePlots.LOGGER.info("Registering Secure Plots block entities...");
     }
 }
