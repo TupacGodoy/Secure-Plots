@@ -145,7 +145,6 @@ public class PlotBlock extends BlockWithEntity {
                 .formatted(Formatting.GREEN, Formatting.BOLD), true);
 
         world.playSound(null, pos, SoundEvents.UI_TOAST_CHALLENGE_COMPLETE, SoundCategory.PLAYERS, 0.6f, 1.2f);
-        ModPackets.sendOpenPlotScreen(player, pos, data);
         ModPackets.sendShowPlotBorder(player, data);
     }
 
