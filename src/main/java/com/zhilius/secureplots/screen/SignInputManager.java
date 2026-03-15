@@ -16,13 +16,15 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 package com.zhilius.secureplots.screen;
-import com.zhilius.secureplots.config.SecurePlotsConfig;
 
+import com.zhilius.secureplots.config.SecurePlotsConfig;
 import com.zhilius.secureplots.plot.PlotData;
 import com.zhilius.secureplots.plot.PlotManager;
 import net.minecraft.block.Blocks;
+import net.minecraft.block.entity.BlockEntityType;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.network.packet.Packet;
+import net.minecraft.network.packet.s2c.play.BlockEntityUpdateS2CPacket;
 import net.minecraft.network.packet.s2c.play.BlockUpdateS2CPacket;
 import net.minecraft.network.packet.s2c.play.SignEditorOpenS2CPacket;
 import net.minecraft.screen.SimpleNamedScreenHandlerFactory;
@@ -38,14 +40,22 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
+/**
+ * Opens a fake sign editor to collect text input from the player,
+ * then processes it according to the pending action type.
+ *
+ * Particle and music input are handled via chat (/sp plot particle|music)
+ * and do NOT go through this manager.
+ */
 public class SignInputManager {
 
-    public enum InputType { RENAME, ADD_MEMBER, CREATE_GROUP, SET_ENTER_MESSAGE, SET_EXIT_MESSAGE,
-                            SET_PARTICLE, SET_MUSIC }
+    public enum InputType { RENAME, ADD_MEMBER, CREATE_GROUP, SET_ENTER_MESSAGE, SET_EXIT_MESSAGE }
 
     public record PendingInput(BlockPos fakePos, BlockPos plotPos, InputType type) {}
 
     private static final Map<UUID, PendingInput> pending = new ConcurrentHashMap<>();
+
+    // ── Public entry points ───────────────────────────────────────────────────
 
     public static void openForRename(ServerPlayerEntity player, BlockPos plotPos) {
         open(player, plotPos, InputType.RENAME);
@@ -67,52 +77,49 @@ public class SignInputManager {
         open(player, plotPos, InputType.SET_EXIT_MESSAGE);
     }
 
-    public static void openForParticle(ServerPlayerEntity player, BlockPos plotPos) {
-        open(player, plotPos, InputType.SET_PARTICLE);
-    }
-
-    public static void openForMusic(ServerPlayerEntity player, BlockPos plotPos) {
-        open(player, plotPos, InputType.SET_MUSIC);
-    }
+    // ── Core sign-open logic ──────────────────────────────────────────────────
 
     private static void open(ServerPlayerEntity player, BlockPos plotPos, InputType type) {
         BlockPos fakePos = new BlockPos(player.getBlockX(), player.getBlockY() + 2, player.getBlockZ());
         pending.put(player.getUuid(), new PendingInput(fakePos, plotPos, type));
 
+        // 1. Place a fake sign block
         player.networkHandler.sendPacket(
             new BlockUpdateS2CPacket(fakePos, Blocks.OAK_WALL_SIGN.getDefaultState()));
 
+        // 2. Send sign block entity data
         try {
             NbtCompound signNbt = new NbtCompound();
             signNbt.putString("id", "minecraft:sign");
             signNbt.putInt("x", fakePos.getX());
             signNbt.putInt("y", fakePos.getY());
             signNbt.putInt("z", fakePos.getZ());
-            NbtCompound front = new NbtCompound();
-            front.putString("color", "black");
-            front.putBoolean("has_glowing_text", false);
-            signNbt.put("front_text", front);
-            NbtCompound back = new NbtCompound();
-            back.putString("color", "black");
-            back.putBoolean("has_glowing_text", false);
-            signNbt.put("back_text", back);
+            signNbt.put("front_text", emptySignFace());
+            signNbt.put("back_text",  emptySignFace());
             signNbt.putBoolean("is_waxed", false);
 
-            var pktClass = net.minecraft.network.packet.s2c.play.BlockEntityUpdateS2CPacket.class;
-            var ctor = pktClass.getDeclaredConstructor(
-                net.minecraft.util.math.BlockPos.class,
-                net.minecraft.block.entity.BlockEntityType.class,
-                NbtCompound.class);
+            var ctor = BlockEntityUpdateS2CPacket.class.getDeclaredConstructor(
+                BlockPos.class, BlockEntityType.class, NbtCompound.class);
             ctor.setAccessible(true);
             player.networkHandler.sendPacket(
-                (Packet<?>) ctor.newInstance(
-                    fakePos, net.minecraft.block.entity.BlockEntityType.SIGN, signNbt));
+                (Packet<?>) ctor.newInstance(fakePos, BlockEntityType.SIGN, signNbt));
         } catch (Exception e) {
-            com.zhilius.secureplots.SecurePlots.LOGGER.error("SecurePlots: failed to send sign BE packet: {}", e.getMessage());
+            com.zhilius.secureplots.SecurePlots.LOGGER.error(
+                "SecurePlots: failed to send sign BE packet: {}", e.getMessage());
         }
 
+        // 3. Open the sign editor
         player.networkHandler.sendPacket(new SignEditorOpenS2CPacket(fakePos, true));
     }
+
+    private static NbtCompound emptySignFace() {
+        NbtCompound face = new NbtCompound();
+        face.putString("color", "black");
+        face.putBoolean("has_glowing_text", false);
+        return face;
+    }
+
+    // ── Result handling ───────────────────────────────────────────────────────
 
     public static boolean hasPending(UUID uuid) {
         return pending.containsKey(uuid);
@@ -122,14 +129,18 @@ public class SignInputManager {
         UUID uuid = player.getUuid();
         PendingInput input = pending.remove(uuid);
         if (input == null) return;
+
+        // If pos doesn't match, the player edited a real sign — restore pending and ignore
         if (!input.fakePos().equals(pos)) {
             pending.put(uuid, input);
             return;
         }
 
+        // Remove the fake sign block
         player.networkHandler.sendPacket(
             new BlockUpdateS2CPacket(input.fakePos(), Blocks.AIR.getDefaultState()));
 
+        // Read first non-blank line
         String text = "";
         for (String line : lines) {
             if (line != null && !line.isBlank()) { text = line.trim(); break; }
@@ -137,37 +148,35 @@ public class SignInputManager {
         if (text.isEmpty()) return;
 
         switch (input.type()) {
-            case RENAME             -> handleRename(player, input.plotPos(), text);
-            case ADD_MEMBER         -> handleAddMember(player, input.plotPos(), text);
-            case CREATE_GROUP       -> handleCreateGroup(player, input.plotPos(), text);
-            case SET_ENTER_MESSAGE  -> handleSetMessage(player, input.plotPos(), text, true);
-            case SET_EXIT_MESSAGE   -> handleSetMessage(player, input.plotPos(), text, false);
-            case SET_PARTICLE       -> handleSetParticle(player, input.plotPos(), text);
-            case SET_MUSIC          -> handleSetMusic(player, input.plotPos(), text);
+            case RENAME            -> handleRename(player, input.plotPos(), text);
+            case ADD_MEMBER        -> handleAddMember(player, input.plotPos(), text);
+            case CREATE_GROUP      -> handleCreateGroup(player, input.plotPos(), text);
+            case SET_ENTER_MESSAGE -> handleSetMessage(player, input.plotPos(), text, true);
+            case SET_EXIT_MESSAGE  -> handleSetMessage(player, input.plotPos(), text, false);
         }
     }
 
-    // ── Rename ────────────────────────────────────────────────────────────────
+    // ── Action handlers ───────────────────────────────────────────────────────
+
     private static void handleRename(ServerPlayerEntity player, BlockPos plotPos, String newName) {
-        if (!(player.getWorld() instanceof ServerWorld sw)) return;
-        PlotManager manager = PlotManager.getOrCreate(sw);
-        PlotData data = manager.getPlot(plotPos);
-        if (data == null) {
-            player.sendMessage(Text.translatable("sp.error.not_in_plot"), false);
-            return;
-        }
-        boolean isAdmin = player.getCommandTags().contains(SecurePlotsConfig.INSTANCE != null ? SecurePlotsConfig.INSTANCE.adminTag : "plot_admin");
+        PlotData data = getPlot(player, plotPos);
+        if (data == null) return;
+
+        boolean isAdmin = isAdmin(player);
         if (!data.getOwnerId().equals(player.getUuid()) && !isAdmin) {
             player.sendMessage(Text.translatable("sp.error.not_owner"), false);
             reopenMenu(player, plotPos, PlotMenuHandler.MenuPage.INFO);
             return;
         }
-        newName = newName.trim();
         if (newName.isEmpty() || newName.length() > 32) {
             player.sendMessage(Text.translatable("sp.rename.invalid_name"), false);
             reopenMenu(player, plotPos, PlotMenuHandler.MenuPage.INFO);
             return;
         }
+
+        if (!(player.getWorld() instanceof ServerWorld sw)) return;
+        PlotManager manager = PlotManager.getOrCreate(sw);
+
         for (PlotData p : manager.getPlayerPlots(data.getOwnerId())) {
             if (p != data && p.getPlotName().equalsIgnoreCase(newName)) {
                 player.sendMessage(Text.translatable("sp.rename.duplicate"), false);
@@ -175,12 +184,13 @@ public class SignInputManager {
                 return;
             }
         }
+
         String old = data.getPlotName();
         data.setPlotName(newName);
         manager.markDirty();
+
         sw.playSound(null, player.getBlockPos(),
-            SoundEvents.BLOCK_NOTE_BLOCK_PLING.value(),
-            SoundCategory.PLAYERS, 1f, 2f);
+            SoundEvents.BLOCK_NOTE_BLOCK_PLING.value(), SoundCategory.PLAYERS, 1f, 2f);
         player.sendMessage(
             Text.literal("✔ ").formatted(Formatting.GREEN)
                 .append(Text.literal("\"" + old + "\"").formatted(Formatting.GRAY))
@@ -190,20 +200,16 @@ public class SignInputManager {
         reopenMenu(player, plotPos, PlotMenuHandler.MenuPage.INFO);
     }
 
-    // ── Add Member ────────────────────────────────────────────────────────────
     private static void handleAddMember(ServerPlayerEntity player, BlockPos plotPos, String targetName) {
-        if (!(player.getWorld() instanceof ServerWorld sw)) return;
-        PlotManager manager = PlotManager.getOrCreate(sw);
-        PlotData data = manager.getPlot(plotPos);
-        if (data == null) {
-            player.sendMessage(Text.translatable("sp.error.not_in_plot"), false);
-            return;
-        }
-        boolean isAdmin = player.getCommandTags().contains(SecurePlotsConfig.INSTANCE != null ? SecurePlotsConfig.INSTANCE.adminTag : "plot_admin");
+        PlotData data = getPlot(player, plotPos);
+        if (data == null) return;
+
+        boolean isAdmin = isAdmin(player);
         if (!data.hasPermission(player.getUuid(), PlotData.Permission.MANAGE_MEMBERS) && !isAdmin) {
             reopenMenu(player, plotPos, PlotMenuHandler.MenuPage.MEMBERS);
             return;
         }
+
         ServerPlayerEntity target = player.getServer().getPlayerManager().getPlayer(targetName);
         if (target == null) {
             player.sendMessage(Text.translatable("sp.add.player_not_found", targetName), false);
@@ -220,33 +226,31 @@ public class SignInputManager {
             reopenMenu(player, plotPos, PlotMenuHandler.MenuPage.MEMBERS);
             return;
         }
+
+        if (!(player.getWorld() instanceof ServerWorld sw)) return;
+        PlotManager manager = PlotManager.getOrCreate(sw);
+
         data.addMember(target.getUuid(), target.getName().getString(), PlotData.Role.MEMBER);
         manager.markDirty();
+
         sw.playSound(null, player.getBlockPos(),
-            SoundEvents.ENTITY_EXPERIENCE_ORB_PICKUP,
-            SoundCategory.PLAYERS, 1f, 1.5f);
+            SoundEvents.ENTITY_EXPERIENCE_ORB_PICKUP, SoundCategory.PLAYERS, 1f, 1.5f);
         player.sendMessage(Text.translatable("sp.member.added_sender", targetName), false);
         target.sendMessage(Text.translatable("sp.member.added_target",
             data.getPlotName(), player.getName().getString()), false);
         reopenMenu(player, plotPos, PlotMenuHandler.MenuPage.MEMBERS);
     }
 
-    // ── Create Group ──────────────────────────────────────────────────────────
     private static void handleCreateGroup(ServerPlayerEntity player, BlockPos plotPos, String groupName) {
-        if (!(player.getWorld() instanceof ServerWorld sw)) return;
-        PlotManager manager = PlotManager.getOrCreate(sw);
-        PlotData data = manager.getPlot(plotPos);
-        if (data == null) {
-            player.sendMessage(Text.translatable("sp.error.not_in_plot"), false);
-            return;
-        }
-        boolean isAdmin = player.getCommandTags().contains(SecurePlotsConfig.INSTANCE != null ? SecurePlotsConfig.INSTANCE.adminTag : "plot_admin");
+        PlotData data = getPlot(player, plotPos);
+        if (data == null) return;
+
+        boolean isAdmin = isAdmin(player);
         if (!data.hasPermission(player.getUuid(), PlotData.Permission.MANAGE_GROUPS) && !isAdmin) {
             player.sendMessage(Text.translatable("sp.error.no_group_perm"), false);
             reopenMenu(player, plotPos, PlotMenuHandler.MenuPage.MEMBERS);
             return;
         }
-        groupName = groupName.trim();
         if (groupName.isEmpty() || groupName.length() > 24) {
             player.sendMessage(Text.translatable("sp.group.invalid_name"), false);
             reopenMenu(player, plotPos, PlotMenuHandler.MenuPage.MEMBERS);
@@ -257,77 +261,58 @@ public class SignInputManager {
             reopenMenu(player, plotPos, PlotMenuHandler.MenuPage.MEMBERS);
             return;
         }
+
+        if (!(player.getWorld() instanceof ServerWorld sw)) return;
+        PlotManager manager = PlotManager.getOrCreate(sw);
+
         data.getOrCreateGroup(groupName);
         manager.markDirty();
         player.sendMessage(Text.translatable("sp.group.created", groupName), false);
         reopenMenu(player, plotPos, PlotMenuHandler.MenuPage.GLOBAL_PERMS);
     }
 
-    // ── Set Enter/Exit Message ────────────────────────────────────────────────
     private static void handleSetMessage(ServerPlayerEntity player, BlockPos plotPos, String msg, boolean isEnter) {
-        if (!(player.getWorld() instanceof ServerWorld sw)) return;
-        PlotManager manager = PlotManager.getOrCreate(sw);
-        PlotData data = manager.getPlot(plotPos);
-        if (data == null) {
-            player.sendMessage(Text.translatable("sp.error.not_in_plot"), false);
-            return;
-        }
+        PlotData data = getPlot(player, plotPos);
+        if (data == null) return;
+
         if (!data.getOwnerId().equals(player.getUuid())) {
             player.sendMessage(Text.translatable("sp.error.not_owner"), false);
-            reopenMenu(player, plotPos, PlotMenuHandler.MenuPage.INFO);
+            reopenMenu(player, plotPos, PlotMenuHandler.MenuPage.AMBIENT);
             return;
         }
-        msg = msg.trim();
+
+        if (!(player.getWorld() instanceof ServerWorld sw)) return;
+        PlotManager manager = PlotManager.getOrCreate(sw);
+
         if (isEnter) data.setEnterMessage(msg);
         else         data.setExitMessage(msg);
         manager.markDirty();
+
         player.sendMessage(Text.translatable("sp.message.updated", msg), false);
         reopenMenu(player, plotPos, PlotMenuHandler.MenuPage.AMBIENT);
     }
 
-    // ── Set Particle ──────────────────────────────────────────────────────────
-    private static void handleSetParticle(ServerPlayerEntity player, BlockPos plotPos, String value) {
-        if (!(player.getWorld() instanceof ServerWorld sw)) return;
-        PlotManager manager = PlotManager.getOrCreate(sw);
-        PlotData data = manager.getPlot(plotPos);
-        if (data == null) { player.sendMessage(Text.translatable("sp.error.not_in_plot"), false); return; }
-        boolean isAdmin = player.getCommandTags().contains(
-            com.zhilius.secureplots.config.SecurePlotsConfig.INSTANCE != null
-            ? com.zhilius.secureplots.config.SecurePlotsConfig.INSTANCE.adminTag : "plot_admin");
-        boolean canEdit = data.getOwnerId().equals(player.getUuid())
-            || data.getRoleOf(player.getUuid()) == PlotData.Role.ADMIN || isAdmin;
-        if (!canEdit) { player.sendMessage(Text.translatable("sp.error.not_owner_or_admin"), false); return; }
-        data.setParticleEffect(value.trim());
-        manager.markDirty();
-        player.sendMessage(Text.translatable("sp.plot.particle_set", value.trim()), false);
-        reopenMenu(player, plotPos, PlotMenuHandler.MenuPage.AMBIENT);
+    // ── Helpers ───────────────────────────────────────────────────────────────
+
+    /** Returns the PlotData for the given position, or null (sending an error message). */
+    private static PlotData getPlot(ServerPlayerEntity player, BlockPos plotPos) {
+        if (!(player.getWorld() instanceof ServerWorld sw)) return null;
+        PlotData data = PlotManager.getOrCreate(sw).getPlot(plotPos);
+        if (data == null) player.sendMessage(Text.translatable("sp.error.not_in_plot"), false);
+        return data;
     }
 
-    // ── Set Music ─────────────────────────────────────────────────────────────
-    private static void handleSetMusic(ServerPlayerEntity player, BlockPos plotPos, String value) {
-        if (!(player.getWorld() instanceof ServerWorld sw)) return;
-        PlotManager manager = PlotManager.getOrCreate(sw);
-        PlotData data = manager.getPlot(plotPos);
-        if (data == null) { player.sendMessage(Text.translatable("sp.error.not_in_plot"), false); return; }
-        boolean isAdmin = player.getCommandTags().contains(
-            com.zhilius.secureplots.config.SecurePlotsConfig.INSTANCE != null
-            ? com.zhilius.secureplots.config.SecurePlotsConfig.INSTANCE.adminTag : "plot_admin");
-        boolean canEdit = data.getOwnerId().equals(player.getUuid())
-            || data.getRoleOf(player.getUuid()) == PlotData.Role.ADMIN || isAdmin;
-        if (!canEdit) { player.sendMessage(Text.translatable("sp.error.not_owner_or_admin"), false); return; }
-        data.setMusicSound(value.trim());
-        manager.markDirty();
-        player.sendMessage(Text.translatable("sp.plot.music_set", value.trim()), false);
-        reopenMenu(player, plotPos, PlotMenuHandler.MenuPage.AMBIENT);
+    private static boolean isAdmin(ServerPlayerEntity player) {
+        String tag = SecurePlotsConfig.INSTANCE != null ? SecurePlotsConfig.INSTANCE.adminTag : "plot_admin";
+        return player.getCommandTags().contains(tag);
     }
 
-    private static void reopenMenu(ServerPlayerEntity player, BlockPos plotPos, PlotMenuHandler.MenuPage targetPage) {
+    private static void reopenMenu(ServerPlayerEntity player, BlockPos plotPos, PlotMenuHandler.MenuPage page) {
         if (!(player.getWorld() instanceof ServerWorld sw)) return;
-        PlotManager manager = PlotManager.getOrCreate(sw);
-        PlotData fresh = manager.getPlot(plotPos);
+        PlotData fresh = PlotManager.getOrCreate(sw).getPlot(plotPos);
         if (fresh == null) return;
         player.openHandledScreen(new SimpleNamedScreenHandlerFactory(
-            (syncId, inv, p) -> new PlotMenuHandler(syncId, inv, plotPos, fresh, targetPage),
+            (syncId, inv, p) -> new PlotMenuHandler(syncId, inv, plotPos, fresh, page),
             Text.literal("🛡 " + fresh.getPlotName())
         ));
     }

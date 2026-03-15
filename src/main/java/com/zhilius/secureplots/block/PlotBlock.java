@@ -89,7 +89,6 @@ public class PlotBlock extends BlockWithEntity {
             com.zhilius.secureplots.plot.PlotData data = manager.getPlot(pos);
             if (data != null) {
                 com.zhilius.secureplots.network.ModPackets.sendShowPlotBorder((ServerPlayerEntity) player, data);
-                com.zhilius.secureplots.network.ModPackets.sendOpenPlotScreen((ServerPlayerEntity) player, pos, data);
             }
         }
         return ActionResult.SUCCESS;

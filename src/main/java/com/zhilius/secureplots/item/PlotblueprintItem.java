@@ -120,9 +120,9 @@ public class PlotblueprintItem extends Item {
         for (int i = 0; i < 9; i++)
             inv.setStack(i, named(Items.BLACK_STAINED_GLASS_PANE, " "));
         inv.setStack(4, namedLore(Items.MAP, "§e🗺 Your Plots",
-            "§7Clic: Teleportarte",
+            "§7Click: Teleport here",
             "§7Right-click: Open plot menu"));
-        inv.setStack(8, named(Items.BARRIER, "§c✕ Cerrar"));
+        inv.setStack(8, named(Items.BARRIER, "§c✕ Close"));
 
         // Plot entries
         for (int i = 0; i < plots.size() && i < size - 9; i++) {
