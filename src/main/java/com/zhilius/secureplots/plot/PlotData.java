@@ -27,78 +27,43 @@ import java.util.*;
 
 public class PlotData {
 
-    public enum Role {
-        OWNER, ADMIN, MEMBER, VISITOR
-    }
+    public enum Role { OWNER, ADMIN, MEMBER, VISITOR }
 
     /**
-     * Permisos individuales que se pueden asignar por miembro o grupo.
-     * También se usan como flags globales (para VISITOR y MEMBER por defecto).
+     * Individual permissions assignable per member or group.
+     * Also used as global flags (for VISITOR and MEMBER by default).
      */
     public enum Permission {
-        // Construcción
-        BUILD,              // colocar/romper bloques
-        BREAK,              // solo romper bloques
-        PLACE,              // solo colocar bloques
-        // Interacción
-        INTERACT,           // palancas, puertas, botones
-        CONTAINERS,         // cofres, baúles, etc.
-        USE_BEDS,           // usar camas
-        USE_CRAFTING,       // usar mesas de crafteo
-        USE_ENCHANTING,     // usar mesas de encantamiento
-        USE_ANVIL,          // usar yunques
-        USE_FURNACE,        // usar hornos
-        USE_BREWING,        // usar soportes para pociones
-        // Entidades
-        ATTACK_MOBS,        // atacar mobs
-        ATTACK_ANIMALS,     // atacar animales pasivos
-        PVP,                // atacar jugadores dentro de la plot
-        RIDE_ENTITIES,      // montar entidades (caballos, botes)
-        INTERACT_MOBS,      // interactuar con mobs (comerciantes, etc.)
-        LEASH_MOBS,         // atar/soltar mobs con correa
-        SHEAR_MOBS,         // esquilar ovejas
-        MILK_MOBS,          // ordeñar vacas
-        // Naturaleza
-        CROP_TRAMPLING,     // pisotear cultivos
-        PICKUP_ITEMS,       // recoger ítems del suelo
-        DROP_ITEMS,         // tirar ítems al suelo
-        BREAK_CROPS,        // romper plantas/cultivos
-        PLANT_SEEDS,        // plantar semillas
-        USE_BONEMEAL,       // usar hueso de polvo
-        BREAK_DECOR,        // romper decoraciones (flores, etc.)
-        // Explosivos
-        DETONATE_TNT,       // detonar TNT
-        GRIEFING,           // creepers/wither/etc. hacen daño
+        // Construction
+        BUILD, BREAK, PLACE,
+        // Interaction
+        INTERACT, CONTAINERS, USE_BEDS, USE_CRAFTING, USE_ENCHANTING,
+        USE_ANVIL, USE_FURNACE, USE_BREWING,
+        // Entities
+        ATTACK_MOBS, ATTACK_ANIMALS, PVP, RIDE_ENTITIES, INTERACT_MOBS,
+        LEASH_MOBS, SHEAR_MOBS, MILK_MOBS,
+        // Nature
+        CROP_TRAMPLING, PICKUP_ITEMS, DROP_ITEMS, BREAK_CROPS, PLANT_SEEDS,
+        USE_BONEMEAL, BREAK_DECOR,
+        // Explosives
+        DETONATE_TNT, GRIEFING,
         // Misc
-        TP,                 // teletransportarse a la plot
-        FLY,                // volar dentro de la plot
-        ENTER,              // entrar al área de la plot
-        CHAT,               // enviar mensajes en el chat mientras está en la plot
-        COMMAND_USE,        // usar comandos dentro de la plot
-        // Admin / gestión
-        MANAGE_MEMBERS,     // agregar/remover miembros
-        MANAGE_PERMS,       // cambiar permisos de miembros
-        MANAGE_FLAGS,       // cambiar flags globales
-        MANAGE_GROUPS,      // crear/editar grupos de la plot
+        TP, FLY, ENTER, CHAT, COMMAND_USE,
+        // Admin / management
+        MANAGE_MEMBERS, MANAGE_PERMS, MANAGE_FLAGS, MANAGE_GROUPS
     }
 
-    // ── Flags globales ────────────────────────────────────────────────────────
-    // Afectan a TODOS (incluso a no-miembros) si están activados
+    // ── Global flags — affect EVERYONE (including non-members) when enabled ───
     public enum Flag {
-        ALLOW_VISITOR_BUILD,     // no-miembros pueden construir
-        ALLOW_VISITOR_INTERACT,  // no-miembros pueden interactuar
-        ALLOW_VISITOR_CONTAINERS,// no-miembros pueden abrir contenedores
-        ALLOW_PVP,               // pvp habilitado en la plot
-        ALLOW_FLY,               // volar habilitado en la plot
-        ALLOW_TP,                // se puede teleportar a la plot (/sp tp)
-        GREETINGS                // mostrar mensaje de bienvenida al entrar
+        ALLOW_VISITOR_BUILD, ALLOW_VISITOR_INTERACT, ALLOW_VISITOR_CONTAINERS,
+        ALLOW_PVP, ALLOW_FLY, ALLOW_TP, GREETINGS
     }
 
-    // ── Grupo de permisos ─────────────────────────────────────────────────────
+    // ── Permission group ──────────────────────────────────────────────────────
     public static class PermissionGroup {
         public String name;
-        public Set<Permission> permissions = new HashSet<>();
-        public List<UUID> members = new ArrayList<>();
+        public Set<Permission>  permissions = new HashSet<>();
+        public List<UUID>       members     = new ArrayList<>();
 
         public PermissionGroup() {}
         public PermissionGroup(String name) { this.name = name; }
@@ -118,120 +83,99 @@ public class PlotData {
         public static PermissionGroup fromNbt(NbtCompound nbt) {
             PermissionGroup g = new PermissionGroup(nbt.getString("name"));
             NbtList permsNbt = nbt.getList("perms", 8);
-            for (int i = 0; i < permsNbt.size(); i++) {
+            for (int i = 0; i < permsNbt.size(); i++)
                 try { g.permissions.add(Permission.valueOf(permsNbt.getString(i))); } catch (Exception ignored) {}
-            }
             NbtList membersNbt = nbt.getList("members", 8);
-            for (int i = 0; i < membersNbt.size(); i++) {
+            for (int i = 0; i < membersNbt.size(); i++)
                 try { g.members.add(UUID.fromString(membersNbt.getString(i))); } catch (Exception ignored) {}
-            }
             return g;
         }
     }
 
-    // ── Campos principales ────────────────────────────────────────────────────
-    private UUID ownerId;
-    private String ownerName;
+    // ── Fields ────────────────────────────────────────────────────────────────
+    private UUID    ownerId;
+    private String  ownerName;
     private BlockPos center;
     private PlotSize size;
-    private boolean hasRank;
+    private boolean  hasRank;
+    private long     placedAtTick;
+    private long     lastOwnerSeenTick;
 
-    private long placedAtTick;
-    private long lastOwnerSeenTick;
-
-    private Map<UUID, Role> members = new HashMap<>();
-    private Map<UUID, String> memberNames = new HashMap<>();
-    private Map<UUID, Set<Permission>> memberPerms = new HashMap<>();
-
-    // Flags globales activas (por defecto vacío = todas OFF)
-    private Set<Flag> flags = new HashSet<>();
-
-    // Grupos de permisos personalizados
-    private List<PermissionGroup> groups = new ArrayList<>();
+    private final Map<UUID, Role>            members     = new HashMap<>();
+    private final Map<UUID, String>          memberNames = new HashMap<>();
+    private final Map<UUID, Set<Permission>> memberPerms = new HashMap<>();
+    private final Set<Flag>                  flags       = new HashSet<>();
+    private final List<PermissionGroup>      groups      = new ArrayList<>();
 
     private String plotName;
-    private String enterMessage = "";   // custom message shown when entering (empty = default HUD)
-    private String exitMessage  = "";   // custom message shown when leaving (empty = none)
-
-    // ── Ambient effects ───────────────────────────────────────────────────────
-    /** Particle effect ID to spawn on enter (e.g. "minecraft:happy_villager"). Empty = none. */
+    private String enterMessage  = "";
+    private String exitMessage   = "";
     private String particleEffect = "";
-    /** Weather to apply on enter: CLEAR, RAIN, THUNDER, or "" = no change. */
     private String weatherType    = "";
-    /** World time to set on enter (0-23999), or -1 = no change. */
     private long   plotTime       = -1L;
-    /** Sound ID to play as music on enter (e.g. "minecraft:music.game"). Empty = none. */
     private String musicSound     = "";
 
-    // ── Constructores ─────────────────────────────────────────────────────────
+    // ── Constructors ──────────────────────────────────────────────────────────
     public PlotData(UUID ownerId, String ownerName, BlockPos center, PlotSize size, long currentTick) {
-        this.ownerId = ownerId;
-        this.ownerName = ownerName;
-        this.center = center;
-        this.size = size;
-        this.placedAtTick = currentTick;
+        this.ownerId           = ownerId;
+        this.ownerName         = ownerName;
+        this.center            = center;
+        this.size              = size;
+        this.placedAtTick      = currentTick;
         this.lastOwnerSeenTick = currentTick;
-        this.plotName = ownerName + "'s Plot";
-        this.hasRank = false;
-        // Flags por defecto (leídas del config)
+        this.plotName          = ownerName + "'s Plot";
         loadDefaultFlags();
     }
 
     public PlotData() {}
 
-    // ── Getters / Setters básicos ─────────────────────────────────────────────
-    public UUID getOwnerId()                    { return ownerId; }
-    public String getOwnerName()                { return ownerName; }
-    public BlockPos getCenter()                 { return center; }
-    public PlotSize getSize()                   { return size; }
-    public void setSize(PlotSize size)          { this.size = size; }
-    public boolean hasRank()                    { return hasRank; }
-    public void setHasRank(boolean hasRank)     { this.hasRank = hasRank; }
-    public String getPlotName()                 { return plotName; }
-    public void setPlotName(String plotName)    { this.plotName = plotName; }
-    public String getEnterMessage()             { return enterMessage != null ? enterMessage : ""; }
-    public void setEnterMessage(String msg)     { this.enterMessage = msg != null ? msg : ""; }
-    public String getExitMessage()              { return exitMessage != null ? exitMessage : ""; }
-    public void setExitMessage(String msg)      { this.exitMessage = msg != null ? msg : ""; }
-    public String getParticleEffect()           { return particleEffect != null ? particleEffect : ""; }
-    public void setParticleEffect(String p)     { this.particleEffect = p != null ? p : ""; }
-    public String getWeatherType()              { return weatherType != null ? weatherType : ""; }
-    public void setWeatherType(String w)        { this.weatherType = w != null ? w.toUpperCase() : ""; }
-    public long getPlotTime()                   { return plotTime; }
-    public void setPlotTime(long t)             { this.plotTime = t; }
-    public String getMusicSound()               { return musicSound != null ? musicSound : ""; }
-    public void setMusicSound(String s)         { this.musicSound = s != null ? s : ""; }
-    public long getPlacedAtTick()               { return placedAtTick; }
-    public long getLastOwnerSeenTick()          { return lastOwnerSeenTick; }
-    public void setLastOwnerSeenTick(long tick) { this.lastOwnerSeenTick = tick; }
-    public Map<UUID, Role> getMembers()         { return members; }
-    public List<PermissionGroup> getGroups()    { return groups; }
-    public Set<Flag> getFlags()                 { return flags; }
+    // ── Getters / Setters ─────────────────────────────────────────────────────
+    public UUID      getOwnerId()                    { return ownerId; }
+    public String    getOwnerName()                  { return ownerName; }
+    public BlockPos  getCenter()                     { return center; }
+    public PlotSize  getSize()                       { return size; }
+    public void      setSize(PlotSize size)          { this.size = size; }
+    public boolean   hasRank()                       { return hasRank; }
+    public void      setHasRank(boolean hasRank)     { this.hasRank = hasRank; }
+    public String    getPlotName()                   { return plotName; }
+    public void      setPlotName(String name)        { this.plotName = name; }
+    public long      getPlacedAtTick()               { return placedAtTick; }
+    public long      getLastOwnerSeenTick()          { return lastOwnerSeenTick; }
+    public void      setLastOwnerSeenTick(long tick) { this.lastOwnerSeenTick = tick; }
+    public Map<UUID, Role>       getMembers()        { return members; }
+    public List<PermissionGroup> getGroups()         { return groups; }
+    public Set<Flag>             getFlags()          { return flags; }
 
-    // ── Helpers de config ──────────────────────────────────────────────────────
+    // Ambient effect getters/setters — all null-safe
+    public String getEnterMessage()          { return enterMessage   != null ? enterMessage   : ""; }
+    public void   setEnterMessage(String m)  { this.enterMessage   = m != null ? m : ""; }
+    public String getExitMessage()           { return exitMessage    != null ? exitMessage    : ""; }
+    public void   setExitMessage(String m)   { this.exitMessage    = m != null ? m : ""; }
+    public String getParticleEffect()        { return particleEffect != null ? particleEffect : ""; }
+    public void   setParticleEffect(String p){ this.particleEffect = p != null ? p : ""; }
+    public String getWeatherType()           { return weatherType    != null ? weatherType    : ""; }
+    public void   setWeatherType(String w)   { this.weatherType    = w != null ? w.toUpperCase() : ""; }
+    public long   getPlotTime()              { return plotTime; }
+    public void   setPlotTime(long t)        { this.plotTime = t; }
+    public String getMusicSound()            { return musicSound     != null ? musicSound     : ""; }
+    public void   setMusicSound(String s)    { this.musicSound     = s != null ? s : ""; }
 
-    /** Carga las flags por defecto definidas en el config. */
+    // ── Flags ─────────────────────────────────────────────────────────────────
+    public boolean hasFlag(Flag flag)                    { return flags.contains(flag); }
+    public void    setFlag(Flag flag, boolean enabled)   { if (enabled) flags.add(flag); else flags.remove(flag); }
+
     private void loadDefaultFlags() {
         SecurePlotsConfig cfg = SecurePlotsConfig.INSTANCE;
         if (cfg != null && cfg.defaultFlags != null) {
-            for (String flagName : cfg.defaultFlags) {
-                try { this.flags.add(Flag.valueOf(flagName)); } catch (Exception ignored) {}
-            }
+            for (String name : cfg.defaultFlags)
+                try { flags.add(Flag.valueOf(name)); } catch (Exception ignored) {}
         } else {
-            // Fallback si el config no está disponible
-            this.flags.add(Flag.ALLOW_TP);
-            this.flags.add(Flag.GREETINGS);
+            flags.add(Flag.ALLOW_TP);
+            flags.add(Flag.GREETINGS);
         }
     }
 
-    // ── Flags globales ────────────────────────────────────────────────────────
-    public boolean hasFlag(Flag flag) { return flags.contains(flag); }
-
-    public void setFlag(Flag flag, boolean enabled) {
-        if (enabled) flags.add(flag); else flags.remove(flag);
-    }
-
-    // ── Miembros ──────────────────────────────────────────────────────────────
+    // ── Members ───────────────────────────────────────────────────────────────
     public void addMember(UUID uuid, String name, Role role) {
         members.put(uuid, role);
         memberNames.put(uuid, name);
@@ -242,7 +186,6 @@ public class PlotData {
         members.remove(uuid);
         memberNames.remove(uuid);
         memberPerms.remove(uuid);
-        // Quitar de grupos también
         for (PermissionGroup g : groups) g.members.remove(uuid);
     }
 
@@ -251,113 +194,64 @@ public class PlotData {
         return members.getOrDefault(uuid, Role.VISITOR);
     }
 
-    // ── Permisos por defecto según rol ────────────────────────────────────────
+    public String getMemberName(UUID uuid) {
+        return memberNames.getOrDefault(uuid, uuid.toString().substring(0, 8));
+    }
+
+    // ── Default permissions by role ───────────────────────────────────────────
     public static Set<Permission> defaultPermsFor(Role role) {
         SecurePlotsConfig cfg = SecurePlotsConfig.INSTANCE;
         if (cfg != null && cfg.roleDefaults != null) {
+            if (role == Role.OWNER) return EnumSet.allOf(Permission.class);
             List<String> names = switch (role) {
-                case OWNER -> null; // siempre todos los permisos
                 case ADMIN   -> cfg.roleDefaults.admin;
                 case MEMBER  -> cfg.roleDefaults.member;
                 case VISITOR -> cfg.roleDefaults.visitor;
+                default      -> List.of();
             };
-            if (names == null) return EnumSet.allOf(Permission.class);
             Set<Permission> perms = new HashSet<>();
-            for (String name : names) {
+            for (String name : names)
                 try { perms.add(Permission.valueOf(name)); } catch (Exception ignored) {}
-            }
             return perms;
         }
-        // Fallback hardcoded si el config no está disponible
-        Set<Permission> perms = new HashSet<>();
-        switch (role) {
-            case OWNER -> perms.addAll(Arrays.asList(Permission.values()));
-            case ADMIN -> {
-                perms.add(Permission.BUILD);
-                perms.add(Permission.BREAK);
-                perms.add(Permission.PLACE);
-                perms.add(Permission.INTERACT);
-                perms.add(Permission.CONTAINERS);
-                perms.add(Permission.USE_BEDS);
-                perms.add(Permission.USE_CRAFTING);
-                perms.add(Permission.USE_ENCHANTING);
-                perms.add(Permission.USE_ANVIL);
-                perms.add(Permission.USE_FURNACE);
-                perms.add(Permission.USE_BREWING);
-                perms.add(Permission.ATTACK_MOBS);
-                perms.add(Permission.ATTACK_ANIMALS);
-                perms.add(Permission.PVP);
-                perms.add(Permission.RIDE_ENTITIES);
-                perms.add(Permission.INTERACT_MOBS);
-                perms.add(Permission.LEASH_MOBS);
-                perms.add(Permission.SHEAR_MOBS);
-                perms.add(Permission.MILK_MOBS);
-                perms.add(Permission.CROP_TRAMPLING);
-                perms.add(Permission.PICKUP_ITEMS);
-                perms.add(Permission.DROP_ITEMS);
-                perms.add(Permission.BREAK_CROPS);
-                perms.add(Permission.PLANT_SEEDS);
-                perms.add(Permission.USE_BONEMEAL);
-                perms.add(Permission.BREAK_DECOR);
-                perms.add(Permission.FLY);
-                perms.add(Permission.TP);
-                perms.add(Permission.ENTER);
-                perms.add(Permission.CHAT);
-                perms.add(Permission.MANAGE_MEMBERS);
-                perms.add(Permission.MANAGE_PERMS);
-                perms.add(Permission.MANAGE_FLAGS);
-                perms.add(Permission.MANAGE_GROUPS);
-            }
-            case MEMBER -> {
-                perms.add(Permission.BUILD);
-                perms.add(Permission.BREAK);
-                perms.add(Permission.PLACE);
-                perms.add(Permission.INTERACT);
-                perms.add(Permission.CONTAINERS);
-                perms.add(Permission.USE_BEDS);
-                perms.add(Permission.USE_CRAFTING);
-                perms.add(Permission.USE_ENCHANTING);
-                perms.add(Permission.USE_ANVIL);
-                perms.add(Permission.USE_FURNACE);
-                perms.add(Permission.USE_BREWING);
-                perms.add(Permission.ATTACK_MOBS);
-                perms.add(Permission.ATTACK_ANIMALS);
-                perms.add(Permission.RIDE_ENTITIES);
-                perms.add(Permission.INTERACT_MOBS);
-                perms.add(Permission.LEASH_MOBS);
-                perms.add(Permission.SHEAR_MOBS);
-                perms.add(Permission.MILK_MOBS);
-                perms.add(Permission.PICKUP_ITEMS);
-                perms.add(Permission.DROP_ITEMS);
-                perms.add(Permission.PLANT_SEEDS);
-                perms.add(Permission.USE_BONEMEAL);
-                perms.add(Permission.TP);
-                perms.add(Permission.ENTER);
-                perms.add(Permission.CHAT);
-            }
-            case VISITOR -> {
-                perms.add(Permission.INTERACT);
-                perms.add(Permission.ENTER);
-            }
-        }
-        return perms;
+        // Hardcoded fallback (used only before config loads)
+        return switch (role) {
+            case OWNER   -> EnumSet.allOf(Permission.class);
+            case ADMIN   -> EnumSet.of(
+                Permission.BUILD, Permission.BREAK, Permission.PLACE,
+                Permission.INTERACT, Permission.CONTAINERS, Permission.USE_BEDS,
+                Permission.USE_CRAFTING, Permission.USE_ENCHANTING, Permission.USE_ANVIL,
+                Permission.USE_FURNACE, Permission.USE_BREWING, Permission.ATTACK_MOBS,
+                Permission.ATTACK_ANIMALS, Permission.PVP, Permission.RIDE_ENTITIES,
+                Permission.INTERACT_MOBS, Permission.LEASH_MOBS, Permission.SHEAR_MOBS,
+                Permission.MILK_MOBS, Permission.CROP_TRAMPLING, Permission.PICKUP_ITEMS,
+                Permission.DROP_ITEMS, Permission.BREAK_CROPS, Permission.PLANT_SEEDS,
+                Permission.USE_BONEMEAL, Permission.BREAK_DECOR, Permission.FLY,
+                Permission.TP, Permission.ENTER, Permission.CHAT,
+                Permission.MANAGE_MEMBERS, Permission.MANAGE_PERMS,
+                Permission.MANAGE_FLAGS, Permission.MANAGE_GROUPS);
+            case MEMBER  -> EnumSet.of(
+                Permission.BUILD, Permission.BREAK, Permission.PLACE,
+                Permission.INTERACT, Permission.CONTAINERS, Permission.USE_BEDS,
+                Permission.USE_CRAFTING, Permission.USE_ENCHANTING, Permission.USE_ANVIL,
+                Permission.USE_FURNACE, Permission.USE_BREWING, Permission.ATTACK_MOBS,
+                Permission.ATTACK_ANIMALS, Permission.RIDE_ENTITIES, Permission.INTERACT_MOBS,
+                Permission.LEASH_MOBS, Permission.SHEAR_MOBS, Permission.MILK_MOBS,
+                Permission.PICKUP_ITEMS, Permission.DROP_ITEMS, Permission.PLANT_SEEDS,
+                Permission.USE_BONEMEAL, Permission.TP, Permission.ENTER, Permission.CHAT);
+            case VISITOR -> EnumSet.of(Permission.INTERACT, Permission.ENTER);
+        };
     }
 
-    // ── Resolver permisos efectivos de un jugador ─────────────────────────────
+    // ── Effective permissions ─────────────────────────────────────────────────
     public Set<Permission> getPermsOf(UUID uuid) {
         if (uuid.equals(ownerId)) return EnumSet.allOf(Permission.class);
 
-        // Permisos base según rol o asignación individual
         Set<Permission> perms = new HashSet<>(memberPerms.getOrDefault(uuid, defaultPermsFor(getRoleOf(uuid))));
 
-        // Añadir permisos de grupos
-        for (PermissionGroup g : groups) {
-            if (g.members.contains(uuid)) {
-                perms.addAll(g.permissions);
-            }
-        }
+        for (PermissionGroup g : groups)
+            if (g.members.contains(uuid)) perms.addAll(g.permissions);
 
-        // Flags globales que aplican permisos a todos
         if (hasFlag(Flag.ALLOW_VISITOR_BUILD))      perms.add(Permission.BUILD);
         if (hasFlag(Flag.ALLOW_VISITOR_INTERACT))   perms.add(Permission.INTERACT);
         if (hasFlag(Flag.ALLOW_VISITOR_CONTAINERS)) perms.add(Permission.CONTAINERS);
@@ -379,24 +273,20 @@ public class PlotData {
         return getPermsOf(uuid).contains(perm);
     }
 
-    public boolean canBuild(UUID uuid)     { return hasPermission(uuid, Permission.BUILD); }
-    public boolean canInteract(UUID uuid)  { return hasPermission(uuid, Permission.INTERACT); }
-    public boolean canManage(UUID uuid)    { return hasPermission(uuid, Permission.MANAGE_MEMBERS); }
+    public boolean canBuild(UUID uuid)    { return hasPermission(uuid, Permission.BUILD); }
+    public boolean canInteract(UUID uuid) { return hasPermission(uuid, Permission.INTERACT); }
+    public boolean canManage(UUID uuid)   { return hasPermission(uuid, Permission.MANAGE_MEMBERS); }
 
-    // ── Grupos ────────────────────────────────────────────────────────────────
+    // ── Groups ────────────────────────────────────────────────────────────────
     public PermissionGroup getGroup(String name) {
-        for (PermissionGroup g : groups) {
+        for (PermissionGroup g : groups)
             if (g.name.equalsIgnoreCase(name)) return g;
-        }
         return null;
     }
 
     public PermissionGroup getOrCreateGroup(String name) {
         PermissionGroup g = getGroup(name);
-        if (g == null) {
-            g = new PermissionGroup(name);
-            groups.add(g);
-        }
+        if (g == null) { g = new PermissionGroup(name); groups.add(g); }
         return g;
     }
 
@@ -404,14 +294,12 @@ public class PlotData {
         return groups.removeIf(g -> g.name.equalsIgnoreCase(name));
     }
 
-    // ── Expiración por inactividad ────────────────────────────────────────────
+    // ── Inactivity expiry ─────────────────────────────────────────────────────
     public boolean isExpired(long currentTick) {
         if (hasRank) return false;
         SecurePlotsConfig cfg = SecurePlotsConfig.INSTANCE;
         if (cfg == null || !cfg.inactivityExpiry.enabled) return false;
-        long inactiveDays = (currentTick - lastOwnerSeenTick) / 24000L;
-        long maxDays = cfg.inactivityExpiry.baseDays + ((long) cfg.inactivityExpiry.daysPerTier * size.tier);
-        return inactiveDays > maxDays;
+        return getDaysInactive(currentTick) > maxInactiveDays(cfg);
     }
 
     public long getDaysInactive(long currentTick) {
@@ -422,43 +310,42 @@ public class PlotData {
         if (hasRank) return Long.MAX_VALUE;
         SecurePlotsConfig cfg = SecurePlotsConfig.INSTANCE;
         if (cfg == null || !cfg.inactivityExpiry.enabled) return Long.MAX_VALUE;
-        long inactiveDays = (currentTick - lastOwnerSeenTick) / 24000L;
-        long maxDays = cfg.inactivityExpiry.baseDays + ((long) cfg.inactivityExpiry.daysPerTier * size.tier);
-        return Math.max(0, maxDays - inactiveDays);
+        return Math.max(0, maxInactiveDays(cfg) - getDaysInactive(currentTick));
     }
 
-    public String getMemberName(UUID uuid) {
-        return memberNames.getOrDefault(uuid, uuid.toString().substring(0, 8));
+    private long maxInactiveDays(SecurePlotsConfig cfg) {
+        return cfg.inactivityExpiry.baseDays + ((long) cfg.inactivityExpiry.daysPerTier * size.tier);
     }
 
     // ── NBT Serialization ─────────────────────────────────────────────────────
     public NbtCompound toNbt() {
         NbtCompound nbt = new NbtCompound();
-        nbt.putString("ownerId", ownerId.toString());
-        nbt.putString("ownerName", ownerName);
-        nbt.putInt("cx", center.getX());
-        nbt.putInt("cy", center.getY());
-        nbt.putInt("cz", center.getZ());
-        nbt.putInt("sizeTier", size.tier);
-        nbt.putBoolean("hasRank", hasRank);
-        nbt.putLong("placedAt", placedAtTick);
-        nbt.putLong("lastOwnerSeen", lastOwnerSeenTick);
-        nbt.putString("plotName", plotName);
-        nbt.putString("enterMessage", enterMessage != null ? enterMessage : "");
-        nbt.putString("exitMessage",  exitMessage  != null ? exitMessage  : "");
-        nbt.putString("particleEffect", particleEffect != null ? particleEffect : "");
-        nbt.putString("weatherType",    weatherType    != null ? weatherType    : "");
+        nbt.putString("ownerId",    ownerId.toString());
+        nbt.putString("ownerName",  ownerName);
+        nbt.putInt("cx",            center.getX());
+        nbt.putInt("cy",            center.getY());
+        nbt.putInt("cz",            center.getZ());
+        nbt.putInt("sizeTier",      size.tier);
+        nbt.putBoolean("hasRank",   hasRank);
+        nbt.putLong("placedAt",     placedAtTick);
+        nbt.putLong("lastOwnerSeen",lastOwnerSeenTick);
+        nbt.putString("plotName",       plotName);
+        nbt.putString("enterMessage",   getEnterMessage());
+        nbt.putString("exitMessage",    getExitMessage());
+        nbt.putString("particleEffect", getParticleEffect());
+        nbt.putString("weatherType",    getWeatherType());
         nbt.putLong("plotTime",         plotTime);
-        nbt.putString("musicSound",     musicSound     != null ? musicSound     : "");
+        nbt.putString("musicSound",     getMusicSound());
 
-        // Miembros
+        // Members
         NbtList membersList = new NbtList();
         for (Map.Entry<UUID, Role> entry : members.entrySet()) {
+            UUID uuid = entry.getKey();
             NbtCompound m = new NbtCompound();
-            m.putString("uuid", entry.getKey().toString());
+            m.putString("uuid", uuid.toString());
             m.putString("role", entry.getValue().name());
-            m.putString("name", memberNames.getOrDefault(entry.getKey(), "Unknown"));
-            Set<Permission> perms = memberPerms.getOrDefault(entry.getKey(), defaultPermsFor(entry.getValue()));
+            m.putString("name", memberNames.getOrDefault(uuid, "Unknown"));
+            Set<Permission> perms = memberPerms.getOrDefault(uuid, defaultPermsFor(entry.getValue()));
             StringBuilder sb = new StringBuilder();
             for (Permission p : perms) { if (sb.length() > 0) sb.append(","); sb.append(p.name()); }
             m.putString("perms", sb.toString());
@@ -471,7 +358,7 @@ public class PlotData {
         for (Flag f : flags) flagsList.add(NbtString.of(f.name()));
         nbt.put("flags", flagsList);
 
-        // Grupos
+        // Groups
         NbtList groupsList = new NbtList();
         for (PermissionGroup g : groups) groupsList.add(g.toNbt());
         nbt.put("groups", groupsList);
@@ -481,36 +368,35 @@ public class PlotData {
 
     public static PlotData fromNbt(NbtCompound nbt) {
         PlotData data = new PlotData();
-        data.ownerId = UUID.fromString(nbt.getString("ownerId"));
-        data.ownerName = nbt.getString("ownerName");
-        data.center = new BlockPos(nbt.getInt("cx"), nbt.getInt("cy"), nbt.getInt("cz"));
-        data.size = PlotSize.fromTier(nbt.getInt("sizeTier"));
-        data.hasRank = nbt.getBoolean("hasRank");
-        data.placedAtTick = nbt.getLong("placedAt");
+        data.ownerId           = UUID.fromString(nbt.getString("ownerId"));
+        data.ownerName         = nbt.getString("ownerName");
+        data.center            = new BlockPos(nbt.getInt("cx"), nbt.getInt("cy"), nbt.getInt("cz"));
+        data.size              = PlotSize.fromTier(nbt.getInt("sizeTier"));
+        data.hasRank           = nbt.getBoolean("hasRank");
+        data.placedAtTick      = nbt.getLong("placedAt");
         data.lastOwnerSeenTick = nbt.contains("lastOwnerSeen") ? nbt.getLong("lastOwnerSeen") : data.placedAtTick;
-        data.plotName = nbt.getString("plotName");
-        data.enterMessage = nbt.contains("enterMessage") ? nbt.getString("enterMessage") : "";
-        data.exitMessage  = nbt.contains("exitMessage")  ? nbt.getString("exitMessage")  : "";
-        data.particleEffect = nbt.contains("particleEffect") ? nbt.getString("particleEffect") : "";
-        data.weatherType    = nbt.contains("weatherType")    ? nbt.getString("weatherType")    : "";
-        data.plotTime       = nbt.contains("plotTime")       ? nbt.getLong("plotTime")          : -1L;
-        data.musicSound     = nbt.contains("musicSound")     ? nbt.getString("musicSound")      : "";
+        data.plotName          = nbt.getString("plotName");
+        data.enterMessage      = nbt.contains("enterMessage")   ? nbt.getString("enterMessage")   : "";
+        data.exitMessage       = nbt.contains("exitMessage")    ? nbt.getString("exitMessage")    : "";
+        data.particleEffect    = nbt.contains("particleEffect") ? nbt.getString("particleEffect") : "";
+        data.weatherType       = nbt.contains("weatherType")    ? nbt.getString("weatherType")    : "";
+        data.plotTime          = nbt.contains("plotTime")       ? nbt.getLong("plotTime")         : -1L;
+        data.musicSound        = nbt.contains("musicSound")     ? nbt.getString("musicSound")     : "";
 
-        // Miembros
+        // Members
         NbtList membersList = nbt.getList("members", 10);
         for (int i = 0; i < membersList.size(); i++) {
-            NbtCompound m = membersList.getCompound(i);
-            UUID uuid = UUID.fromString(m.getString("uuid"));
-            Role role = Role.valueOf(m.getString("role"));
-            String name = m.getString("name");
+            NbtCompound m    = membersList.getCompound(i);
+            UUID uuid        = UUID.fromString(m.getString("uuid"));
+            Role role        = Role.valueOf(m.getString("role"));
+            String name      = m.getString("name");
             data.members.put(uuid, role);
             data.memberNames.put(uuid, name);
             String permsStr = m.getString("perms");
             if (permsStr != null && !permsStr.isEmpty()) {
                 Set<Permission> perms = new HashSet<>();
-                for (String ps : permsStr.split(",")) {
+                for (String ps : permsStr.split(","))
                     try { perms.add(Permission.valueOf(ps.trim())); } catch (Exception ignored) {}
-                }
                 data.memberPerms.put(uuid, perms);
             } else {
                 data.memberPerms.put(uuid, defaultPermsFor(role));
@@ -520,22 +406,18 @@ public class PlotData {
         // Flags
         if (nbt.contains("flags")) {
             NbtList flagsList = nbt.getList("flags", 8);
-            for (int i = 0; i < flagsList.size(); i++) {
+            for (int i = 0; i < flagsList.size(); i++)
                 try { data.flags.add(Flag.valueOf(flagsList.getString(i))); } catch (Exception ignored) {}
-            }
         } else {
-            // Retrocompatibilidad: usar flags por defecto del config
-            PlotData tmp = new PlotData();
-            tmp.loadDefaultFlags();
-            data.flags.addAll(tmp.flags);
+            // Backwards compat: load defaults from config
+            data.loadDefaultFlags();
         }
 
-        // Grupos
+        // Groups
         if (nbt.contains("groups")) {
             NbtList groupsList = nbt.getList("groups", 10);
-            for (int i = 0; i < groupsList.size(); i++) {
+            for (int i = 0; i < groupsList.size(); i++)
                 data.groups.add(PermissionGroup.fromNbt(groupsList.getCompound(i)));
-            }
         }
 
         return data;

@@ -27,71 +27,50 @@ public class PlotManager extends PersistentState {
 
     private final Map<BlockPos, PlotData> plots = new HashMap<>();
 
-    // ── Config helpers ────────────────────────────────────────────────────────
-
-    private int getBuffer() {
-        return SecurePlotsConfig.INSTANCE != null ? SecurePlotsConfig.INSTANCE.plotBuffer : 15;
-    }
-
-    private List<String> getBlockedPrefixes() {
-        if (SecurePlotsConfig.INSTANCE != null && SecurePlotsConfig.INSTANCE.blockedStructurePrefixes != null)
-            return SecurePlotsConfig.INSTANCE.blockedStructurePrefixes;
-        return Arrays.asList("cobbleverse:", "legendarymonuments:");
-    }
-
     // ── Static factory ────────────────────────────────────────────────────────
 
     public static PlotManager getOrCreate(ServerWorld world) {
         PersistentStateManager manager = world.getPersistentStateManager();
         return manager.getOrCreate(new PersistentState.Type<>(
-                PlotManager::new,
-                (nbt, registries) -> { PlotManager pm = new PlotManager(); pm.readNbt(nbt); return pm; },
-                null), KEY);
+            PlotManager::new,
+            (nbt, registries) -> { PlotManager pm = new PlotManager(); pm.readNbt(nbt); return pm; },
+            null), KEY);
     }
 
     // ── Placement ─────────────────────────────────────────────────────────────
 
     public boolean canPlace(BlockPos center, PlotSize size) {
         SecurePlotsConfig cfg = SecurePlotsConfig.INSTANCE;
-        // allowNestedPlots: if true, skip proximity check entirely
         if (cfg != null && cfg.allowNestedPlots) return true;
 
-        int buffer   = getBuffer();
-        int halfSize = size.getRadius() / 2;
-        int minX = center.getX() - halfSize - buffer;
-        int maxX = center.getX() + halfSize + buffer;
-        int minZ = center.getZ() - halfSize - buffer;
-        int maxZ = center.getZ() + halfSize + buffer;
+        int buffer = cfg != null ? cfg.plotBuffer : 15;
+        int half   = size.getRadius() / 2;
+        int minX = center.getX() - half - buffer,  maxX = center.getX() + half + buffer;
+        int minZ = center.getZ() - half - buffer,  maxZ = center.getZ() + half + buffer;
 
         for (PlotData other : plots.values()) {
-            int half  = other.getSize().getRadius() / 2;
-            int oMinX = other.getCenter().getX() - half;
-            int oMaxX = other.getCenter().getX() + half;
-            int oMinZ = other.getCenter().getZ() - half;
-            int oMaxZ = other.getCenter().getZ() + half;
-            if (minX <= oMaxX && maxX >= oMinX && minZ <= oMaxZ && maxZ >= oMinZ)
-                return false;
+            int oh   = other.getSize().getRadius() / 2;
+            int oMinX = other.getCenter().getX() - oh, oMaxX = other.getCenter().getX() + oh;
+            int oMinZ = other.getCenter().getZ() - oh, oMaxZ = other.getCenter().getZ() + oh;
+            if (minX <= oMaxX && maxX >= oMinX && minZ <= oMaxZ && maxZ >= oMinZ) return false;
         }
         return true;
     }
 
     public void addPlot(PlotData data) {
-        // Enforce maxPlotsPerPlayer (0 = unlimited)
         SecurePlotsConfig cfg = SecurePlotsConfig.INSTANCE;
         if (cfg != null && cfg.maxPlotsPerPlayer > 0) {
             long owned = plots.values().stream()
                 .filter(p -> p.getOwnerId().equals(data.getOwnerId()))
                 .count();
-            if (owned >= cfg.maxPlotsPerPlayer) return; // caller should check canPlace first; silently bail
+            if (owned >= cfg.maxPlotsPerPlayer) return;
         }
 
-        String baseName  = data.getOwnerName() + "'s Plot";
-        String finalName = baseName;
+        String base = data.getOwnerName() + "'s Plot";
+        String name = base;
         int counter = 2;
-        while (isNameTaken(data.getOwnerId(), finalName)) {
-            finalName = baseName + " " + counter++;
-        }
-        data.setPlotName(finalName);
+        while (isNameTaken(data.getOwnerId(), name)) name = base + " " + counter++;
+        data.setPlotName(name);
         plots.put(data.getCenter(), data);
         markDirty();
     }
@@ -101,34 +80,25 @@ public class PlotManager extends PersistentState {
             .anyMatch(p -> p.getOwnerId().equals(ownerId) && p.getPlotName().equalsIgnoreCase(name));
     }
 
-    // ── CRUD ─────────────────────────────────────────────────────────────────
+    // ── CRUD ──────────────────────────────────────────────────────────────────
 
-    public void removePlot(BlockPos center) {
-        plots.remove(center);
-        markDirty();
-    }
-
-    public PlotData getPlot(BlockPos center) {
-        return plots.get(center);
-    }
+    public void removePlot(BlockPos center)  { plots.remove(center); markDirty(); }
+    public PlotData getPlot(BlockPos center) { return plots.get(center); }
 
     public PlotData getPlotAt(BlockPos pos) {
-        for (PlotData data : plots.values()) {
+        for (PlotData data : plots.values())
             if (isInsidePlot(pos, data)) return data;
-        }
         return null;
     }
 
     public boolean isInsidePlot(BlockPos pos, PlotData data) {
-        int half = data.getSize().getRadius() / 2;
+        int half  = data.getSize().getRadius() / 2;
         BlockPos c = data.getCenter();
         return pos.getX() >= c.getX() - half && pos.getX() <= c.getX() + half
             && pos.getZ() >= c.getZ() - half && pos.getZ() <= c.getZ() + half;
     }
 
-    public List<PlotData> getAllPlots() {
-        return new ArrayList<>(plots.values());
-    }
+    public List<PlotData> getAllPlots()                 { return new ArrayList<>(plots.values()); }
 
     public List<PlotData> getPlayerPlots(UUID playerId) {
         return plots.values().stream()
@@ -149,8 +119,7 @@ public class PlotManager extends PersistentState {
     }
 
     public void removeExpiredPlots(long currentTick) {
-        boolean removed = plots.values().removeIf(p -> p.isExpired(currentTick));
-        if (removed) markDirty();
+        if (plots.values().removeIf(p -> p.isExpired(currentTick))) markDirty();
     }
 
     // ── Persistence ───────────────────────────────────────────────────────────

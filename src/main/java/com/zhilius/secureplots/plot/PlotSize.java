@@ -20,13 +20,13 @@ package com.zhilius.secureplots.plot;
 import com.zhilius.secureplots.config.SecurePlotsConfig;
 
 public enum PlotSize {
-    BRONZE  (0, "bronze_plot_block"),
-    GOLD    (1, "gold_plot_block"),
-    EMERALD (2, "emerald_plot_block"),
-    DIAMOND (3, "diamond_plot_block"),
+    BRONZE   (0, "bronze_plot_block"),
+    GOLD     (1, "gold_plot_block"),
+    EMERALD  (2, "emerald_plot_block"),
+    DIAMOND  (3, "diamond_plot_block"),
     NETHERITE(4, "netherite_plot_block");
 
-    public final int tier;
+    public final int    tier;
     public final String blockId;
 
     PlotSize(int tier, String blockId) {
@@ -34,47 +34,32 @@ public enum PlotSize {
         this.blockId = blockId;
     }
 
-    /** Radio en bloques (leído del config; tiene fallback si el config no está cargado). */
+    /** Radius in blocks — read from config, with fallback for early startup. */
     public int getRadius() {
-        if (SecurePlotsConfig.INSTANCE != null) {
+        if (SecurePlotsConfig.INSTANCE != null)
             return SecurePlotsConfig.INSTANCE.getTierConfig(tier).radius;
-        }
-        // Fallback durante el arranque antes de cargar el config
         return switch (tier) { case 0 -> 15; case 1 -> 30; case 2 -> 50; case 3 -> 75; default -> 100; };
     }
 
-    /** Nombre visible (leído del config). */
+    /** Display name — read from config, with fallback for early startup. */
     public String getDisplayName() {
-        if (SecurePlotsConfig.INSTANCE != null) {
+        if (SecurePlotsConfig.INSTANCE != null)
             return SecurePlotsConfig.INSTANCE.getTierConfig(tier).displayName;
-        }
         return switch (tier) {
-            case 0 -> "Bronce"; case 1 -> "Oro"; case 2 -> "Esmeralda";
-            case 3 -> "Diamante"; default -> "Netherita";
+            case 0 -> "Bronze"; case 1 -> "Gold"; case 2 -> "Emerald";
+            case 3 -> "Diamond"; default -> "Netherite";
         };
     }
 
-    /**
-     * Compatibilidad: devuelve el radio directamente.
-     * Usar getRadius() es preferible, pero este campo público se mantiene
-     * para que el código existente que accede a .radius no rompa.
-     */
-    public int radius() { return getRadius(); }
-
-    /** @deprecated Usar getDisplayName() */
-    @Deprecated
-    public String displayName() { return getDisplayName(); }
-
+    /** Returns the next tier, or null if already at max. */
     public PlotSize next() {
         PlotSize[] values = values();
-        if (this.tier + 1 < values.length) return values[this.tier + 1];
-        return null;
+        return this.tier + 1 < values.length ? values[this.tier + 1] : null;
     }
 
     public static PlotSize fromTier(int tier) {
-        for (PlotSize size : values()) {
+        for (PlotSize size : values())
             if (size.tier == tier) return size;
-        }
         return BRONZE;
     }
 }
