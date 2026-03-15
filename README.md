@@ -7,8 +7,6 @@
 **Minecraft 1.21.1 — Fabric**  
 Territory protection mod with menus, roles, upgrades, rank-based permissions, ambient effects, and a fully configurable visual border system.
 
-[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/zhilius)
-
 ---
 
 ## Requirements
@@ -477,7 +475,11 @@ To add another language, create `assets/secure-plots/lang/<locale>.json` in a re
 
 If Secure Plots is useful for your server, consider supporting development:
 
-☕ **[ko-fi.com/zhilius](https://ko-fi.com/zhilius)**
+| Method | Link |
+|--------|------|
+| ☕ Ko-fi | [ko-fi.com/zhilius](https://ko-fi.com/zhilius) |
+| 💙 Mercado Pago | [link.mercadopago.com.ar/zhilius](https://link.mercadopago.com.ar/zhilius) |
+| 🅿️ PayPal | [paypal.com/ncp/payment/TWGPKWLKEJNCG](https://www.paypal.com/ncp/payment/TWGPKWLKEJNCG) |
 
 ---
 
