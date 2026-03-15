@@ -27,7 +27,8 @@ import java.util.*;
 public class SecurePlotsConfig {
 
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
-    private static final File CONFIG_FILE = new File(FabricLoader.getInstance().getConfigDir().toFile(), "secure_plots.json");
+    private static final File CONFIG_FILE = new File(
+        FabricLoader.getInstance().getConfigDir().toFile(), "secure_plots.json");
 
     public static SecurePlotsConfig INSTANCE;
 
@@ -36,7 +37,7 @@ public class SecurePlotsConfig {
     /** Master switch: enable/disable the entire plot protection system. */
     public boolean enableProtection = true;
 
-    /** Allow players to fly inside plots that have FLY flag/permission. */
+    /** Allow players to fly inside plots that have the FLY flag/permission. */
     public boolean enableFlyInPlots = true;
 
     /** Show plot name + owner in the action bar when entering a plot. */
@@ -45,30 +46,30 @@ public class SecurePlotsConfig {
     /** Show enter/exit messages (GREETINGS flag) as title overlays. */
     public boolean enableGreetingMessages = true;
 
-    /** Apply ambient particles when entering a plot. */
+    /** Spawn ambient particles when entering a plot. */
     public boolean enablePlotParticles = true;
 
     /**
-     * Cantidad de partículas del burst de ENTRADA a la plot (1–5).
-     * Máximo: 5
+     * Number of particles in the entry burst (1–5).
+     * Max: 5
      */
     public int particleCount = 3;
 
     /**
-     * Partículas continuas fijas mientras el jugador está DENTRO de la plot (1–5).
-     * Se spawnean cada ambientInterval ticks. Mantenerlo bajo para no afectar TPS.
+     * Continuous ambient particles spawned while the player is INSIDE the plot (1–5).
+     * Spawned every ambientInterval ticks. Keep low to avoid TPS impact.
      */
     public int ambientParticleCount = 2;
 
     /**
-     * Cada cuántos ticks se chequea si un jugador entró/salió de una plot.
-     * 10 = cada medio segundo. Bajar esto aumenta la precisión pero consume más CPU.
+     * How often (in ticks) to check if a player entered or left a plot.
+     * 10 = every half second. Lower = more precise but more CPU usage.
      */
     public int checkInterval = 10;
 
     /**
-     * Cada cuántos ticks se spawnean las partículas continuas dentro de la plot.
-     * 20 = una vez por segundo. Subirlo reduce el impacto en TPS.
+     * How often (in ticks) to spawn continuous ambient particles inside a plot.
+     * 20 = once per second. Higher = less TPS impact.
      */
     public int ambientInterval = 20;
 
@@ -76,7 +77,7 @@ public class SecurePlotsConfig {
     public boolean enablePlotMusic = true;
 
     /**
-     * Volumen de la música de la plot (0.1 – 4.0). Por defecto: 4.0
+     * Plot music volume (0.1 – 4.0). Default: 4.0
      */
     public float musicVolume = 4.0f;
 
@@ -101,92 +102,95 @@ public class SecurePlotsConfig {
     /** Allow custom permission groups inside plots. */
     public boolean enablePermissionGroups = true;
 
-    /** Enable inactivity expiry system (separate from inactivityExpiry.enabled). */
+    /** Enable inactivity expiry system. */
     public boolean enableInactivityExpiry = false;
 
     /** If true, plot blocks are unbreakable by non-owners (ignores hardness). */
     public boolean plotBlocksUnbreakable = true;
 
-    /** Allow players to place plots inside other plots (override area check). */
+    /** Allow players to place plots inside other plots (overrides area check). */
     public boolean allowNestedPlots = false;
 
-    /** Minimum OP level required to use /sp admin commands (0-4). */
+    /** Minimum OP level required to use /sp admin commands (0–4). */
     public int adminOpLevel = 2;
 
-    // ── General ────────────────────────────────────────────────────────────────
+    // ── General ───────────────────────────────────────────────────────────────
 
-    /** Máximo de parcelas por jugador (0 = ilimitado). */
+    /** Maximum plots per player (0 = unlimited). */
     public int maxPlotsPerPlayer = 3;
 
-    /** Buffer mínimo en bloques entre parcelas para evitar solapamiento. */
+    /** Minimum buffer in blocks between plots to prevent overlap. */
     public int plotBuffer = 15;
 
     /**
-     * Tag de comando que otorga permisos de administrador sobre todas las parcelas.
-     * Se asigna con: /tag <jugador> add <valor>
+     * Command tag that grants admin permissions over all plots.
+     * Assign with: /tag <player> add <value>
      */
     public String adminTag = "plot_admin";
 
     /**
-     * Prefijos de estructuras bloqueadas: no se puede colocar una parcela
-     * sobre estructuras cuyos IDs comiencen con alguno de estos prefijos.
+     * Blocked structure prefixes: plots cannot be placed over structures
+     * whose IDs begin with any of these prefixes.
      */
     public List<String> blockedStructurePrefixes = new ArrayList<>(
-            Arrays.asList("legendarymonuments:")
-    );
+        Arrays.asList("legendarymonuments:"));
 
-    // ── Inactividad ────────────────────────────────────────────────────────────
+    // ── Inactivity expiry ─────────────────────────────────────────────────────
 
-    /** Configuración del sistema de expiración por inactividad del dueño. */
+    /** Configuration for the owner inactivity expiry system. */
     public InactivityExpiry inactivityExpiry = new InactivityExpiry();
 
     public static class InactivityExpiry {
-        /** Si está en true, las parcelas expiran cuando el dueño es inactivo. */
+        /** If true, plots expire when the owner is inactive. */
         public boolean enabled = false;
-        /** Días base de inactividad antes de expirar. */
+        /** Base inactivity days before a plot expires. */
         public int baseDays = 45;
-        /** Días extra de gracia por cada nivel de mejora. */
+        /** Extra grace days per upgrade tier. */
         public int daysPerTier = 5;
     }
 
-    // ── Tiers de parcela ───────────────────────────────────────────────────────
+    // ── Plot tiers ────────────────────────────────────────────────────────────
 
     /**
-     * Configuración de cada tier de parcela (0 = Bronce, 4 = Netherita).
-     * Permite cambiar radio, nombre, luminosidad, dureza y resistencia.
+     * Configuration for each plot tier (0 = Bronze, 4 = Netherite).
+     * Allows changing radius, display name, luminance, hardness and blast resistance.
      */
     public List<TierConfig> tiers = new ArrayList<>();
 
     public static class TierConfig {
-        /** Número de tier (0-4). */
+        /** Tier number (0–4). */
         public int tier;
-        /** Nombre visible en el menú y comandos. */
+        /** Display name shown in menus and commands. */
         public String displayName;
-        /** Radio de la parcela en bloques (el área total es radio×radio). */
+        /** Plot radius in blocks (total area = radius × radius). */
         public int radius;
-        /** Luminosidad del bloque de parcela (0-15). */
+        /** Block luminance (0–15). */
         public int luminance;
-        /** Dureza del bloque (tiempo de minado). */
+        /** Block hardness (mining time). */
         public float hardness;
-        /** Resistencia a explosiones del bloque. */
+        /** Block blast resistance. */
         public float blastResistance;
 
         public TierConfig() {}
 
         public TierConfig(int tier, String displayName, int radius, int luminance,
                           float hardness, float blastResistance) {
-            this.tier = tier;
-            this.displayName = displayName;
-            this.radius = radius;
-            this.luminance = luminance;
-            this.hardness = hardness;
+            this.tier            = tier;
+            this.displayName     = displayName;
+            this.radius          = radius;
+            this.luminance       = luminance;
+            this.hardness        = hardness;
             this.blastResistance = blastResistance;
         }
     }
 
-    // ── Costos de mejora ───────────────────────────────────────────────────────
+    // ── Upgrade costs ─────────────────────────────────────────────────────────
 
-    /** Costos para subir de tier. Soporta ítems de cualquier mod. */
+    /**
+     * Costs to upgrade from one tier to the next.
+     * Supports items from any mod.
+     * Optionally add a "cobblecoins" field (int) if using cobbleverse economy.
+     */
     public List<UpgradeCost> upgradeCosts = new ArrayList<>();
 
     public static class UpgradeCost {
@@ -196,123 +200,86 @@ public class SecurePlotsConfig {
 
         public static class ItemCost {
             public String itemId;
-            public int amount;
+            public int    amount;
 
             public ItemCost() {}
-
             public ItemCost(String itemId, int amount) {
-                this.itemId = itemId;
-                this.amount = amount;
+                this.itemId  = itemId;
+                this.amount  = amount;
             }
         }
     }
 
-    // ── Crafting recipes ───────────────────────────────────────────────────────
+    // ── Crafting recipes ──────────────────────────────────────────────────────
 
     /**
-     * Recetas de crafteo para los bloques de parcela y el plano.
-     * El patrón es una grilla 3×3 de strings (3 filas, cada char es una clave).
-     * Usa " " (espacio) para casillas vacías.
-     * Cada clave mapea a un item ID de cualquier mod.
-     * Si disabled=true la receta no se registra (el ítem solo se obtiene en creativo
-     * o mediante /sp creative).
+     * Crafting recipes for plot blocks and the blueprint item.
+     * Pattern is a 3×3 grid of strings (3 rows, each char maps to a key).
+     * Use " " (space) for empty slots.
+     * Each key maps to any mod item ID.
+     * If disabled=true the recipe is not registered (item only obtainable in creative
+     * or via /sp creative).
      */
     public List<CraftingRecipe> craftingRecipes = new ArrayList<>();
 
     public static class CraftingRecipe {
-        /** ID del resultado: ej. "secure-plots:bronze_plot_block" */
+        /** Result item ID, e.g. "secure-plots:bronze_plot_block". */
         public String result;
-        /** Patrón de crafteo: exactamente 3 strings de 3 caracteres. */
+        /** Crafting pattern: exactly 3 strings of 3 characters. */
         public String[] pattern;
-        /** Mapa clave→itemId. Cada clave es un char del patrón. */
-        public java.util.Map<String, String> key = new java.util.LinkedHashMap<>();
-        /** Si true, la receta no se registra. */
+        /** Key map: char → item ID. Each key is a character from the pattern. */
+        public Map<String, String> key = new LinkedHashMap<>();
+        /** If true, the recipe is not registered. */
         public boolean disabled = false;
 
         public CraftingRecipe() {}
-
-        public CraftingRecipe(String result, String[] pattern,
-                              java.util.Map<String, String> key) {
+        public CraftingRecipe(String result, String[] pattern, Map<String, String> key) {
             this.result  = result;
             this.pattern = pattern;
             this.key     = key;
         }
     }
 
-    // ── Permisos por defecto por rol ───────────────────────────────────────────
+    // ── Default permissions by role ───────────────────────────────────────────
 
     /**
-     * Permisos que se asignan automáticamente a un miembro según su rol.
-     * Permisos válidos: BUILD, INTERACT, CONTAINERS, PVP,
-     *   MANAGE_MEMBERS, MANAGE_PERMS, MANAGE_FLAGS, MANAGE_GROUPS,
-     *   TP, FLY, ENTER
+     * Permissions automatically assigned to a member based on their role.
+     * Valid permissions: BUILD, BREAK, PLACE, INTERACT, CONTAINERS, USE_BEDS,
+     *   USE_CRAFTING, USE_ENCHANTING, USE_ANVIL, USE_FURNACE, USE_BREWING,
+     *   ATTACK_MOBS, ATTACK_ANIMALS, PVP, RIDE_ENTITIES, INTERACT_MOBS,
+     *   LEASH_MOBS, SHEAR_MOBS, MILK_MOBS, CROP_TRAMPLING, PICKUP_ITEMS,
+     *   DROP_ITEMS, BREAK_CROPS, PLANT_SEEDS, USE_BONEMEAL, BREAK_DECOR,
+     *   DETONATE_TNT, GRIEFING, TP, FLY, ENTER, CHAT, COMMAND_USE,
+     *   MANAGE_MEMBERS, MANAGE_PERMS, MANAGE_FLAGS, MANAGE_GROUPS
      */
     public RoleDefaults roleDefaults = new RoleDefaults();
 
     public static class RoleDefaults {
         public List<String> admin = new ArrayList<>(Arrays.asList(
-                "BUILD", "INTERACT", "CONTAINERS", "PVP",
-                "MANAGE_MEMBERS", "MANAGE_PERMS", "TP", "ENTER"
-        ));
+            "BUILD", "INTERACT", "CONTAINERS", "PVP",
+            "MANAGE_MEMBERS", "MANAGE_PERMS", "TP", "ENTER"));
         public List<String> member = new ArrayList<>(Arrays.asList(
-                "BUILD", "INTERACT", "CONTAINERS", "TP", "ENTER"
-        ));
+            "BUILD", "INTERACT", "CONTAINERS", "TP", "ENTER"));
         public List<String> visitor = new ArrayList<>(Arrays.asList(
-                "INTERACT", "ENTER"
-        ));
+            "INTERACT", "ENTER"));
     }
 
-    // ── Flags por defecto en parcelas nuevas ───────────────────────────────────
+    // ── Default flags for new plots ───────────────────────────────────────────
 
     /**
-     * Flags globales activadas al crear una parcela nueva.
-     * Flags válidas: ALLOW_VISITOR_BUILD, ALLOW_VISITOR_INTERACT,
+     * Global flags enabled when a new plot is created.
+     * Valid flags: ALLOW_VISITOR_BUILD, ALLOW_VISITOR_INTERACT,
      *   ALLOW_VISITOR_CONTAINERS, ALLOW_PVP, ALLOW_FLY, ALLOW_TP, GREETINGS
      */
-    public List<String> defaultFlags = new ArrayList<>(Arrays.asList(
-            "ALLOW_TP", "GREETINGS"
-    ));
+    public List<String> defaultFlags = new ArrayList<>(Arrays.asList("ALLOW_TP", "GREETINGS"));
 
-    // ── Carga / Guardado ───────────────────────────────────────────────────────
+    // ── Load / Save ───────────────────────────────────────────────────────────
 
     public static void load() {
         if (CONFIG_FILE.exists()) {
             try (Reader reader = new FileReader(CONFIG_FILE)) {
                 INSTANCE = GSON.fromJson(reader, SecurePlotsConfig.class);
-                // Retrocompatibilidad: rellenar campos nuevos si faltan
-                if (INSTANCE.tiers == null || INSTANCE.tiers.isEmpty()) {
-                    INSTANCE.tiers = createDefaultTiers();
-                }
-                if (INSTANCE.roleDefaults == null) {
-                    INSTANCE.roleDefaults = new RoleDefaults();
-                }
-                if (INSTANCE.defaultFlags == null || INSTANCE.defaultFlags.isEmpty()) {
-                    INSTANCE.defaultFlags = new ArrayList<>(Arrays.asList("ALLOW_TP", "GREETINGS"));
-                }
-                if (INSTANCE.blockedStructurePrefixes == null) {
-                    INSTANCE.blockedStructurePrefixes = new ArrayList<>(
-                            Arrays.asList("legendarymonuments:"));
-                }
-                if (INSTANCE.adminTag == null || INSTANCE.adminTag.isEmpty()) {
-                    INSTANCE.adminTag = "plot_admin";
-                }
-                // Nuevos campos — valores por defecto si el JSON antiguo no los tiene
-                if (INSTANCE.particleCount <= 0) INSTANCE.particleCount = 3;
-                if (INSTANCE.particleCount > 5)  INSTANCE.particleCount = 5;
-                if (INSTANCE.musicVolume <= 0f)  INSTANCE.musicVolume  = 4.0f;
-                if (INSTANCE.musicVolume > 4.0f) INSTANCE.musicVolume  = 4.0f;
-                if (INSTANCE.ambientParticleCount <= 0) INSTANCE.ambientParticleCount = 2;
-                if (INSTANCE.ambientParticleCount > 5)  INSTANCE.ambientParticleCount = 5;
-                if (INSTANCE.checkInterval  <= 0) INSTANCE.checkInterval  = 10;
-                if (INSTANCE.ambientInterval <= 0) INSTANCE.ambientInterval = 20;
-                // Backwards compat: populate crafting recipes if missing from old config
-                if (INSTANCE.craftingRecipes == null || INSTANCE.craftingRecipes.isEmpty()) {
-                    INSTANCE.craftingRecipes = createDefault().craftingRecipes;
-                }
-                // Feature toggles: set defaults if null (backwards compat)
-                // All booleans default to true/false via Java field initializers when GSON
-                // reads an older config that doesn't have them yet.
-
+                applyBackwardsCompat(INSTANCE);
             } catch (IOException e) {
                 e.printStackTrace();
                 INSTANCE = createDefault();
@@ -331,81 +298,102 @@ public class SecurePlotsConfig {
         }
     }
 
-    private static SecurePlotsConfig createDefault() {
-        SecurePlotsConfig config = new SecurePlotsConfig();
-        config.tiers = createDefaultTiers();
+    /** Fills in missing fields when loading an older config file. */
+    private static void applyBackwardsCompat(SecurePlotsConfig c) {
+        if (c.tiers == null || c.tiers.isEmpty())
+            c.tiers = createDefaultTiers();
+        if (c.roleDefaults == null)
+            c.roleDefaults = new RoleDefaults();
+        if (c.defaultFlags == null || c.defaultFlags.isEmpty())
+            c.defaultFlags = new ArrayList<>(Arrays.asList("ALLOW_TP", "GREETINGS"));
+        if (c.blockedStructurePrefixes == null)
+            c.blockedStructurePrefixes = new ArrayList<>(Arrays.asList("legendarymonuments:"));
+        if (c.adminTag == null || c.adminTag.isEmpty())
+            c.adminTag = "plot_admin";
+        if (c.particleCount     <= 0 || c.particleCount > 5)  c.particleCount = 3;
+        if (c.ambientParticleCount <= 0 || c.ambientParticleCount > 5) c.ambientParticleCount = 2;
+        if (c.musicVolume       <= 0f || c.musicVolume > 4f)  c.musicVolume = 4.0f;
+        if (c.checkInterval     <= 0) c.checkInterval  = 10;
+        if (c.ambientInterval   <= 0) c.ambientInterval = 20;
+        if (c.craftingRecipes == null || c.craftingRecipes.isEmpty())
+            c.craftingRecipes = createDefault().craftingRecipes;
+    }
 
-        // Bronce (0) → Oro (1)
+    // ── Default config ────────────────────────────────────────────────────────
+
+    private static SecurePlotsConfig createDefault() {
+        SecurePlotsConfig cfg = new SecurePlotsConfig();
+        cfg.tiers = createDefaultTiers();
+
+        // Bronze (0) → Gold (1)
         UpgradeCost u1 = new UpgradeCost();
         u1.fromTier = 0; u1.toTier = 1;
         u1.items.add(new UpgradeCost.ItemCost("minecraft:gold_block", 15));
-        config.upgradeCosts.add(u1);
+        cfg.upgradeCosts.add(u1);
 
-        // Oro (1) → Esmeralda (2)
+        // Gold (1) → Emerald (2)
         UpgradeCost u2 = new UpgradeCost();
         u2.fromTier = 1; u2.toTier = 2;
         u2.items.add(new UpgradeCost.ItemCost("minecraft:emerald_block", 10));
-        config.upgradeCosts.add(u2);
+        cfg.upgradeCosts.add(u2);
 
-        // Esmeralda (2) → Diamante (3)
+        // Emerald (2) → Diamond (3)
         UpgradeCost u3 = new UpgradeCost();
         u3.fromTier = 2; u3.toTier = 3;
         u3.items.add(new UpgradeCost.ItemCost("minecraft:diamond", 64));
-        config.upgradeCosts.add(u3);
+        cfg.upgradeCosts.add(u3);
 
-        // Diamante (3) → Netherita (4)
+        // Diamond (3) → Netherite (4)
         UpgradeCost u4 = new UpgradeCost();
         u4.fromTier = 3; u4.toTier = 4;
         u4.items.add(new UpgradeCost.ItemCost("minecraft:netherite_block", 1));
-        config.upgradeCosts.add(u4);
+        cfg.upgradeCosts.add(u4);
 
-        // ── Crafting recipes (defaults match the static JSON files) ──
-        java.util.Map<String,String> bronzeKey = new java.util.LinkedHashMap<>();
+        // Crafting recipes
+        Map<String,String> bronzeKey = new LinkedHashMap<>();
         bronzeKey.put("C", "minecraft:copper_block");
         bronzeKey.put("B", "minecraft:redstone_block");
         bronzeKey.put("H", "minecraft:heart_of_the_sea");
-        config.craftingRecipes.add(new CraftingRecipe(
+        cfg.craftingRecipes.add(new CraftingRecipe(
             "secure-plots:bronze_plot_block",
             new String[]{"CBC", "BHB", "CBC"},
             bronzeKey));
 
-        java.util.Map<String,String> blueprintKey = new java.util.LinkedHashMap<>();
+        Map<String,String> blueprintKey = new LinkedHashMap<>();
         blueprintKey.put("S", "minecraft:amethyst_shard");
         blueprintKey.put("P", "minecraft:paper");
         blueprintKey.put("C", "minecraft:compass");
-        config.craftingRecipes.add(new CraftingRecipe(
+        cfg.craftingRecipes.add(new CraftingRecipe(
             "secure-plots:plot_blueprint",
             new String[]{"SPS", "PCP", "SPS"},
             blueprintKey));
 
-        return config;
+        return cfg;
     }
 
     private static List<TierConfig> createDefaultTiers() {
-        List<TierConfig> list = new ArrayList<>();
-        list.add(new TierConfig(0, "Bronce",    15,  4, 50f, 1200f));
-        list.add(new TierConfig(1, "Oro",       30,  5, 50f, 1200f));
-        list.add(new TierConfig(2, "Esmeralda", 50,  6, 50f, 1200f));
-        list.add(new TierConfig(3, "Diamante",  75,  7, 50f, 1200f));
-        list.add(new TierConfig(4, "Netherita", 100, 8, 50f, 1200f));
-        return list;
+        return new ArrayList<>(Arrays.asList(
+            new TierConfig(0, "Bronze",    15,  4, 50f, 1200f),
+            new TierConfig(1, "Gold",      30,  5, 50f, 1200f),
+            new TierConfig(2, "Emerald",   50,  6, 50f, 1200f),
+            new TierConfig(3, "Diamond",   75,  7, 50f, 1200f),
+            new TierConfig(4, "Netherite", 100, 8, 50f, 1200f)
+        ));
     }
 
-    // ── Helpers ────────────────────────────────────────────────────────────────
+    // ── Helpers ───────────────────────────────────────────────────────────────
 
-    /** Obtiene el costo de mejora desde un tier específico. */
+    /** Returns the upgrade cost from a specific tier, or null if not configured. */
     public UpgradeCost getUpgradeCost(int fromTier) {
-        for (UpgradeCost cost : upgradeCosts) {
+        for (UpgradeCost cost : upgradeCosts)
             if (cost.fromTier == fromTier) return cost;
-        }
         return null;
     }
 
-    /** Obtiene la configuración de un tier. Si no existe, devuelve valores seguros. */
+    /** Returns the config for a tier, falling back to safe values if not found. */
     public TierConfig getTierConfig(int tier) {
-        for (TierConfig t : tiers) {
+        for (TierConfig t : tiers)
             if (t.tier == tier) return t;
-        }
         return new TierConfig(tier, "Tier " + tier, 15 + tier * 10, 4 + tier, 50f, 1200f);
     }
 }

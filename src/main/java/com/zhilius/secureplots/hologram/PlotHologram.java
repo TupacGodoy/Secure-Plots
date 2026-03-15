@@ -25,23 +25,27 @@ import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.minecraft.entity.EntityType;
 import net.minecraft.entity.decoration.DisplayEntity;
 import net.minecraft.nbt.NbtCompound;
-import net.minecraft.nbt.NbtList;
 import net.minecraft.nbt.NbtFloat;
+import net.minecraft.nbt.NbtList;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.world.ServerWorld;
 import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.server.world.ServerWorld;
 import net.minecraft.text.Text;
-import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.hit.BlockHitResult;
 import net.minecraft.util.hit.HitResult;
-import net.minecraft.world.RaycastContext;
-import net.minecraft.util.math.Box;
+import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.RaycastContext;
 
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
+/**
+ * Server-side hologram spawning for plot blocks.
+ * Note: visual rendering is handled client-side by {@code PlotHologramClient}.
+ * This class handles spawning TextDisplayEntity holograms and their lifecycle.
+ */
 public class PlotHologram {
 
     private static final String TAG = "sp_holo";
@@ -49,15 +53,16 @@ public class PlotHologram {
     private static final Map<UUID, int[]>    timers = new HashMap<>();
 
     public static void registerTicker() {
+        // Discard any leftover holograms from previous sessions on load
         ServerEntityEvents.ENTITY_LOAD.register((entity, world) -> {
             if (entity instanceof DisplayEntity.TextDisplayEntity disp) {
                 Text name = disp.getCustomName();
-                if (name != null && TAG.equals(name.getString())) {
+                if (name != null && TAG.equals(name.getString()))
                     world.getServer().execute(disp::discard);
-                }
             }
         });
 
+        // Tick down hologram timers and discard expired ones
         ServerTickEvents.END_SERVER_TICK.register(server -> {
             timers.entrySet().removeIf(e -> {
                 e.getValue()[0]--;
@@ -75,19 +80,8 @@ public class PlotHologram {
         });
     }
 
-    /**
-     * @deprecated Server-side hologram spawning is no longer used.
-     * Holograms are rendered client-side by {@code PlotHologramClient}.
-     * This method is kept for API compatibility but does nothing useful.
-     */
-    @Deprecated
     public static void spawn(ServerWorld world, BlockPos blockPos, PlotData data,
-                              int durationTicks, float playerYaw) {
-        spawn(world, blockPos, data, durationTicks, playerYaw, null);
-    }
-
-    public static void spawn(ServerWorld world, BlockPos blockPos, PlotData data,
-                              int durationTicks, float playerYaw, ServerPlayerEntity player) {
+                             int durationTicks, float playerYaw, ServerPlayerEntity player) {
         // Remove previous hologram at this position
         UUID prev = active.remove(blockPos);
         if (prev != null) {
@@ -96,23 +90,18 @@ public class PlotHologram {
             if (e != null) e.discard();
         }
 
-        // Spawn 1.5 blocks above the plot block (was 2.5)
         double x = blockPos.getX() + 0.5;
         double y = blockPos.getY() + 1.5;
         double z = blockPos.getZ() + 0.5;
 
-        // Raycast: if blocks obstruct view from player to hologram, send chat instead
+        // If blocks obstruct the view from player to hologram, fall back to chat
         if (player != null) {
-            Vec3d playerEye = player.getEyePos();
-            Vec3d holoPos   = new Vec3d(x, y, z);
             BlockHitResult hit = world.raycast(new RaycastContext(
-                playerEye, holoPos,
+                player.getEyePos(), new Vec3d(x, y, z),
                 RaycastContext.ShapeType.VISUAL,
                 RaycastContext.FluidHandling.NONE,
-                player
-            ));
+                player));
             if (hit.getType() == HitResult.Type.BLOCK && !hit.getBlockPos().equals(blockPos)) {
-                // Something is blocking the view — send info to chat instead
                 sendToChat(player, data);
                 return;
             }
@@ -120,24 +109,23 @@ public class PlotHologram {
 
         DisplayEntity.TextDisplayEntity disp = EntityType.TEXT_DISPLAY.create(world);
         if (disp == null) {
-            SecurePlots.LOGGER.error("[PlotHologram] TEXT_DISPLAY.create() null");
+            SecurePlots.LOGGER.error("[PlotHologram] TEXT_DISPLAY.create() returned null");
             return;
         }
 
-        // Set via NBT — same as /summon
         NbtCompound nbt = new NbtCompound();
         NbtList rotation = new NbtList();
         rotation.add(NbtFloat.of(playerYaw + 180f));
         rotation.add(NbtFloat.of(0f));
         nbt.put("Rotation", rotation);
-        nbt.putByte("billboard", (byte) 0); // FIXED
-        nbt.putString("text", buildJson(data));
-        nbt.putInt("background", 0xC0000000); // semi-transparent black background
-        nbt.putInt("line_width", 200);
+        nbt.putByte("billboard",    (byte) 0);   // FIXED
+        nbt.putString("text",       buildJson(data));
+        nbt.putInt("background",    0xC0000000); // semi-transparent black
+        nbt.putInt("line_width",    200);
         nbt.putByte("text_opacity", (byte) 255);
-        nbt.putByte("shadow", (byte) 0);
-        nbt.putByte("see_through", (byte) 0);
-        nbt.putFloat("scale", 1.0f);
+        nbt.putByte("shadow",       (byte) 0);
+        nbt.putByte("see_through",  (byte) 0);
+        nbt.putFloat("scale",       1.0f);
         disp.readNbt(nbt);
         disp.setPos(x, y, z);
 
@@ -157,121 +145,113 @@ public class PlotHologram {
         }
     }
 
-    public static boolean hasSpace(ServerWorld world, BlockPos blockPos) { return true; }
-
     public static void clearAll(MinecraftServer server) {
         for (ServerWorld world : server.getWorlds()) {
             world.getEntitiesByType(EntityType.TEXT_DISPLAY,
-                    e -> { Text n = e.getCustomName(); return n != null && TAG.equals(n.getString()); }
+                e -> { Text n = e.getCustomName(); return n != null && TAG.equals(n.getString()); }
             ).forEach(net.minecraft.entity.Entity::discard);
         }
         active.clear();
         timers.clear();
     }
 
+    // ── Chat fallback (when hologram is obstructed) ───────────────────────────
 
     private static void sendToChat(ServerPlayerEntity player, PlotData data) {
-        String tc = tierColorCode(data.getSize().tier);
-        String name = (data.getPlotName() != null && !data.getPlotName().isBlank())
-                ? data.getPlotName() : "Parcela Protegida";
+        String tc   = tierColorCode(data.getSize().tier);
+        String name = plotName(data);
         PlotSize next = data.getSize().next();
-        String nextLine = (next != null)
-                ? "\u00a77Siguiente: " + tierColorCode(next.tier) + "\u00a7l" + next.getDisplayName()
-                : "\u00a76\u00a7lNivel M\u00e1ximo";
+        String nextLine = next != null
+            ? "\u00a77Next: " + tierColorCode(next.tier) + "\u00a7l" + next.getDisplayName()
+            : "\u00a76\u00a7lMaximum Level";
 
-        player.sendMessage(net.minecraft.text.Text.literal(
-            tc + "\u00a7l" + name.toUpperCase()), false);
-        player.sendMessage(net.minecraft.text.Text.literal(
-            "\u00a78- - - - - - - - - - - - -"), false);
-        player.sendMessage(net.minecraft.text.Text.literal(
-            "\u00a77Due\u00f1o:    \u00a7f" + data.getOwnerName()), false);
-        player.sendMessage(net.minecraft.text.Text.literal(
-            "\u00a77Nivel:    " + tc + "\u00a7l" + data.getSize().getDisplayName()), false);
-        player.sendMessage(net.minecraft.text.Text.literal(
-            "\u00a77Tama\u00f1o:   \u00a7b" + data.getSize().getRadius() + "x" + data.getSize().getRadius()), false);
-        player.sendMessage(net.minecraft.text.Text.literal(
-            "\u00a77Miembros: \u00a7a" + data.getMembers().size()), false);
-        player.sendMessage(net.minecraft.text.Text.literal(
-            "\u00a78- - - - - - - - - - - - -"), false);
-        player.sendMessage(net.minecraft.text.Text.literal(nextLine), false);
+        player.sendMessage(Text.literal(tc + "\u00a7l" + name.toUpperCase()), false);
+        player.sendMessage(Text.literal("\u00a78- - - - - - - - - - - - -"), false);
+        player.sendMessage(Text.literal("\u00a77Owner:   \u00a7f"  + data.getOwnerName()), false);
+        player.sendMessage(Text.literal("\u00a77Tier:    " + tc + "\u00a7l" + data.getSize().getDisplayName()), false);
+        player.sendMessage(Text.literal("\u00a77Size:    \u00a7b"  + data.getSize().getRadius() + "x" + data.getSize().getRadius()), false);
+        player.sendMessage(Text.literal("\u00a77Members: \u00a7a"  + data.getMembers().size()), false);
+        player.sendMessage(Text.literal("\u00a78- - - - - - - - - - - - -"), false);
+        player.sendMessage(Text.literal(nextLine), false);
     }
 
-    private static String tierColorCode(int tier) {
-        return switch (tier) {
-            case 0 -> "\u00a76";  // Bronce - dorado
-            case 1 -> "\u00a7e";  // Oro - amarillo
-            case 2 -> "\u00a7a";  // Esmeralda - verde
-            case 3 -> "\u00a7b";  // Diamante - aqua
-            case 4 -> "\u00a75";  // Netherita - purpura
-            default -> "\u00a7f";
-        };
-    }
-
-    /** Measure string width in Minecraft font pixels (no color codes) */
-    private static int mcWidth(String s) {
-        String clean = s.replaceAll("§.", "");
-        int w = 0;
-        for (char ch : clean.toCharArray()) {
-            if (ch == ' ') { w += 4; }
-            else if (ch == 'i' || ch == '!' || ch == '.' || ch == ':' || ch == ';' || ch == '|') { w += 2; }
-            else if (ch == 'l') { w += 3; }
-            else if (ch == 'f' || ch == 'k' || ch == 't') { w += 5; }
-            else { w += 6; }
-        }
-        return w;
-    }
+    // ── Hologram JSON builder ─────────────────────────────────────────────────
 
     private static String buildJson(PlotData data) {
-        String name = (data.getPlotName() != null && !data.getPlotName().isBlank())
-                ? data.getPlotName().toUpperCase() : "PARCELA PROTEGIDA";
+        String name   = plotName(data).toUpperCase();
         PlotSize next = data.getSize().next();
-        String tc = tierColorCode(data.getSize().tier);
+        String tc     = tierColorCode(data.getSize().tier);
+        String ntc    = next != null ? tierColorCode(next.tier) : "";
+        String nextLine = next != null
+            ? "\u00a7e\u2b06 \u00a77Next: " + ntc + "\u00a7l" + next.getDisplayName()
+            : "\u00a76\u00a7l\u2605 Maximum Level \u2605";
 
-        // Arrow: thin vertical bar body + triangle tip (unicode)
-        String ntc = next != null ? tierColorCode(next.tier) : "";
-        String nextLine = (next != null)
-                ? "\u00a7e\u2b06 \u00a77Siguiente: " + ntc + "\u00a7l" + next.getDisplayName()
-                : "\u00a76\u00a7l\u2605 Nivel Maximo \u2605";
-
-        // Measure each visible line in Minecraft font pixels
-        // § codes are stripped inside mcWidth()
-        String raw_name    = " " + name;
-        String raw_dueno   = " Owner:    " + data.getOwnerName();
-        String raw_nivel   = " Nivel:    " + data.getSize().getDisplayName();
-        String raw_tamano  = " Size:     " + data.getSize().getRadius() + "x" + data.getSize().getRadius();
-        String raw_members = " Miembros: " + data.getMembers().size();
-        String raw_next    = next != null
-                ? " ⬡ Next: " + next.getDisplayName()
-                : " ★ Nivel Maximo ★";
-
+        // Calculate border width based on longest line
+        String[] lines = {
+            " " + name,
+            " Owner:   " + data.getOwnerName(),
+            " Tier:    " + data.getSize().getDisplayName(),
+            " Size:    " + data.getSize().getRadius() + "x" + data.getSize().getRadius(),
+            " Members: " + data.getMembers().size(),
+            next != null ? " \u2b06 Next: " + next.getDisplayName() : " \u2605 Maximum Level \u2605"
+        };
         int maxPx = 0;
-        for (String l : new String[]{raw_name, raw_dueno, raw_nivel, raw_tamano, raw_members, raw_next}) {
-            maxPx = Math.max(maxPx, mcWidth(l));
-        }
+        for (String l : lines) maxPx = Math.max(maxPx, mcWidth(l));
 
-        // '-' = 6px wide in Minecraft font — use it for both border and divider
-        int dashCount = maxPx / 6 + 6; // +3 dashes each side
-        StringBuilder borderSB  = new StringBuilder();
-        StringBuilder dividerSB = new StringBuilder();
-        for (int i = 0; i < dashCount; i++) { borderSB.append("-"); dividerSB.append("-"); }
-        String border  = tc  + "\u00a7l" + borderSB;
-        String divider = "\u00a78" + dividerSB;
+        int dashCount = maxPx / 6 + 6;
+        String dashes = "-".repeat(dashCount);
+        String border  = tc + "\u00a7l" + dashes;
+        String divider = "\u00a78" + dashes;
         String NL = "\n";
 
         String text =
-            border + NL +
+            border  + NL +
             divider + NL +
             tc + "\u00a7l " + name + NL +
             divider + NL +
-            "\u00a77 Due\u00f1o:    \u00a7f" + data.getOwnerName() + NL +
-            "\u00a77 Nivel:    " + tc + "\u00a7l" + data.getSize().getDisplayName() + NL +
-            "\u00a77 Tama\u00f1o:   \u00a7b" + data.getSize().getRadius() + "x" + data.getSize().getRadius() + NL +
-            "\u00a77 Miembros: \u00a7a" + data.getMembers().size() + NL +
+            "\u00a77 Owner:   \u00a7f" + data.getOwnerName() + NL +
+            "\u00a77 Tier:    " + tc + "\u00a7l" + data.getSize().getDisplayName() + NL +
+            "\u00a77 Size:    \u00a7b" + data.getSize().getRadius() + "x" + data.getSize().getRadius() + NL +
+            "\u00a77 Members: \u00a7a" + data.getMembers().size() + NL +
             divider + NL +
             " " + nextLine + NL +
             border;
 
-        text = text.replace("\"", "\\");
-        return "{\"text\":\"" + text + "\"}";
+        return "{\"text\":\"" + text.replace("\"", "\\") + "\"}";
+    }
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
+
+    /** Returns the plot name, falling back to a default if blank. */
+    private static String plotName(PlotData data) {
+        return (data.getPlotName() != null && !data.getPlotName().isBlank())
+            ? data.getPlotName() : "Protected Plot";
+    }
+
+    private static String tierColorCode(int tier) {
+        return switch (tier) {
+            case 0 -> "\u00a76"; // Bronze  - gold
+            case 1 -> "\u00a7e"; // Gold    - yellow
+            case 2 -> "\u00a7a"; // Emerald - green
+            case 3 -> "\u00a7b"; // Diamond - aqua
+            case 4 -> "\u00a75"; // Netherite - purple
+            default -> "\u00a7f";
+        };
+    }
+
+    /** Estimates string width in Minecraft font pixels (strips color codes). */
+    private static int mcWidth(String s) {
+        String clean = s.replaceAll("§.", "");
+        int w = 0;
+        for (char ch : clean.toCharArray()) {
+            w += switch (ch) {
+                case ' '                              -> 4;
+                case 'i', '!', '.', ':', ';', '|'    -> 2;
+                case 'l'                              -> 3;
+                case 'f', 'k', 't'                   -> 5;
+                default                              -> 6;
+            };
+        }
+        return w;
     }
 }

@@ -34,11 +34,11 @@ public class BorderConfig {
 
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static final File CONFIG_FILE = new File(
-            FabricLoader.getInstance().getConfigDir().toFile(), "secure_plots_client.json");
+        FabricLoader.getInstance().getConfigDir().toFile(), "secure_plots_client.json");
 
     public static BorderConfig INSTANCE;
 
-    // ── Thickness ─────────────────────────────────────────────────────────────
+    // ── Border thickness ──────────────────────────────────────────────────────
 
     /** Core edge thickness. */
     public float edgeThickness = 0.06f;
@@ -60,10 +60,10 @@ public class BorderConfig {
     /** Pulse cycle duration in milliseconds (lower = faster pulse). */
     public int pulseCycleMs = 2000;
 
-    /** Minimum pulse brightness (0.0 - 1.0). */
+    /** Minimum pulse brightness (0.0 – 1.0). */
     public float pulseMin = 0.6f;
 
-    /** Pulse variation range (0.0 - 1.0). pulseMin + pulseRange should be <= 1.0 */
+    /** Pulse variation range (0.0 – 1.0). pulseMin + pulseRange should be <= 1.0. */
     public float pulseRange = 0.4f;
 
     /** Lightning bolt flicker interval in milliseconds. */
@@ -95,14 +95,12 @@ public class BorderConfig {
     /** Line spacing in font pixels. */
     public int hologramLineSpacing = 1;
 
-    // Fade in/out
     /** Duration of the fade-in animation in milliseconds. */
     public int hologramFadeInMs = 400;
 
     /** Duration of the fade-out animation in milliseconds (before expiry). */
     public int hologramFadeOutMs = 600;
 
-    // Float animation
     /** Whether the hologram floats up and down. */
     public boolean hologramFloat = true;
 
@@ -112,7 +110,7 @@ public class BorderConfig {
     /** Float cycle duration in milliseconds. */
     public int hologramFloatCycleMs = 3000;
 
-    // ── Plot screen UI ───────────────────────────────────────────────────────────
+    // ── Plot screen UI ────────────────────────────────────────────────────────
 
     /** Width of the plot management screen panel in pixels. */
     public int screenPanelWidth = 320;
@@ -134,7 +132,7 @@ public class BorderConfig {
     public int screenColorShadowDark   = 0xFF8B8B8B;
     public int screenColorShadowLight  = 0xFFFFFFFF;
 
-    // ── Hologram text labels ─────────────────────────────────────────────────────
+    // ── Hologram text labels ──────────────────────────────────────────────────
 
     /** Label shown when the plot has no name. */
     public String hologramDefaultName = "PROTECTED PLOT";
@@ -155,28 +153,28 @@ public class BorderConfig {
     public String hologramLabelNext = "Next: ";
 
     /** Label shown when the plot is at max level. */
-    public String hologramLabelMaxLevel = "§6§l★ Max Level ★";
+    public String hologramLabelMaxLevel = "\u00a76\u00a7l\u2605 Max Level \u2605";
 
     // ── Tier colors ───────────────────────────────────────────────────────────
 
     /**
-     * Colors for each tier.
-     * Each entry has 9 values: r_core, g_core, b_core, r_glow, g_glow, b_glow, r_white, g_white, b_white
-     * All values are between 0.0 and 1.0.
+     * Colors for each tier (0=Bronze … 4=Netherite).
+     * Each entry has 9 float values in [0.0, 1.0]:
+     * r_core, g_core, b_core, r_glow, g_glow, b_glow, r_white, g_white, b_white
      */
     public List<TierColors> tierColors = new ArrayList<>();
 
     public static class TierColors {
-        public int tier;
-        public float coreR, coreG, coreB;
-        public float glowR, glowG, glowB;
+        public int   tier;
+        public float coreR,  coreG,  coreB;
+        public float glowR,  glowG,  glowB;
         public float whiteR, whiteG, whiteB;
 
         public TierColors() {}
 
         public TierColors(int tier,
-                          float coreR, float coreG, float coreB,
-                          float glowR, float glowG, float glowB,
+                          float coreR,  float coreG,  float coreB,
+                          float glowR,  float glowG,  float glowB,
                           float whiteR, float whiteG, float whiteB) {
             this.tier   = tier;
             this.coreR  = coreR;  this.coreG  = coreG;  this.coreB  = coreB;
@@ -225,55 +223,56 @@ public class BorderConfig {
 
     public static List<TierColors> createDefaultTierColors() {
         return new ArrayList<>(Arrays.asList(
-            new TierColors(0, 1.00f,0.55f,0.05f, 0.70f,0.28f,0.00f, 1.00f,0.88f,0.55f), // bronze
-            new TierColors(1, 1.00f,0.85f,0.00f, 0.80f,0.50f,0.00f, 1.00f,0.97f,0.65f), // gold
-            new TierColors(2, 0.10f,0.90f,0.20f, 0.00f,0.55f,0.10f, 0.70f,1.00f,0.75f), // emerald
-            new TierColors(3, 0.15f,0.95f,1.00f, 0.00f,0.50f,0.80f, 0.75f,1.00f,1.00f), // diamond
-            new TierColors(4, 0.45f,0.20f,0.60f, 0.22f,0.05f,0.32f, 0.78f,0.58f,0.90f)  // netherite
+            new TierColors(0, 1.00f,0.55f,0.05f, 0.70f,0.28f,0.00f, 1.00f,0.88f,0.55f), // Bronze
+            new TierColors(1, 1.00f,0.85f,0.00f, 0.80f,0.50f,0.00f, 1.00f,0.97f,0.65f), // Gold
+            new TierColors(2, 0.10f,0.90f,0.20f, 0.00f,0.55f,0.10f, 0.70f,1.00f,0.75f), // Emerald
+            new TierColors(3, 0.15f,0.95f,1.00f, 0.00f,0.50f,0.80f, 0.75f,1.00f,1.00f), // Diamond
+            new TierColors(4, 0.45f,0.20f,0.60f, 0.22f,0.05f,0.32f, 0.78f,0.58f,0.90f)  // Netherite
         ));
     }
 
+    /** Applies safe default values for any field that is invalid or out of range. */
     public void applyDefaults() {
-        if (edgeThickness     <= 0) edgeThickness     = 0.06f;
-        if (glowThickness     <= 0) glowThickness     = 0.13f;
-        if (scanlineThickness <= 0) scanlineThickness = 0.025f;
-        if (scanlineSpacing   <= 0) scanlineSpacing   = 1.5f;
-        if (borderHeight      <= 0) borderHeight      = 25f;
-        if (pulseCycleMs      <= 0) pulseCycleMs      = 2000;
-        if (pulseMin < 0 || pulseMin > 1)    pulseMin    = 0.6f;
-        if (pulseRange < 0 || pulseRange > 1) pulseRange = 0.4f;
-        if (boltFlickerMs     <= 0) boltFlickerMs     = 120;
-        if (hologramHeight      <= 0) hologramHeight      = 3.0f;
-        if (hologramMaxDistance <= 0) hologramMaxDistance = 24f;
-        if (hologramScale       <= 0) hologramScale       = 0.025f;
-        if (hologramBackgroundOpacity < 0 || hologramBackgroundOpacity > 1) hologramBackgroundOpacity = 0.75f;
-        if (hologramPaddingX    <= 0) hologramPaddingX    = 8;
-        if (hologramPaddingY    <= 0) hologramPaddingY    = 6;
-        if (hologramLineSpacing <  0) hologramLineSpacing = 1;
-        if (hologramFadeInMs    <= 0) hologramFadeInMs    = 400;
-        if (hologramFadeOutMs   <= 0) hologramFadeOutMs   = 600;
-        if (hologramFloatAmplitude < 0) hologramFloatAmplitude = 0.1f;
-        if (hologramFloatCycleMs   <= 0) hologramFloatCycleMs  = 3000;
-        if (screenPanelWidth    <= 0)   screenPanelWidth    = 320;
-        if (screenPanelHeight   <= 0)   screenPanelHeight   = 240;
-        if (screenRowSpacing    <= 0)   screenRowSpacing    = 16;
-        if (screenMaxNameLength <= 0)   screenMaxNameLength = 32;
-        if (hologramDefaultName == null || hologramDefaultName.isBlank()) hologramDefaultName = "PROTECTED PLOT";
+        if (edgeThickness      <= 0)           edgeThickness      = 0.06f;
+        if (glowThickness      <= 0)           glowThickness      = 0.13f;
+        if (scanlineThickness  <= 0)           scanlineThickness  = 0.025f;
+        if (scanlineSpacing    <= 0)           scanlineSpacing    = 1.5f;
+        if (borderHeight       <= 0)           borderHeight       = 25f;
+        if (pulseCycleMs       <= 0)           pulseCycleMs       = 2000;
+        if (pulseMin    < 0 || pulseMin > 1)   pulseMin           = 0.6f;
+        if (pulseRange  < 0 || pulseRange > 1) pulseRange         = 0.4f;
+        if (boltFlickerMs      <= 0)           boltFlickerMs      = 120;
+        if (hologramHeight     <= 0)           hologramHeight     = 3.0f;
+        if (hologramMaxDistance<= 0)           hologramMaxDistance= 24f;
+        if (hologramScale      <= 0)           hologramScale      = 0.025f;
+        if (hologramBackgroundOpacity < 0 || hologramBackgroundOpacity > 1)
+                                               hologramBackgroundOpacity = 0.75f;
+        if (hologramPaddingX   <= 0)           hologramPaddingX   = 8;
+        if (hologramPaddingY   <= 0)           hologramPaddingY   = 6;
+        if (hologramLineSpacing < 0)           hologramLineSpacing= 1;
+        if (hologramFadeInMs   <= 0)           hologramFadeInMs   = 400;
+        if (hologramFadeOutMs  <= 0)           hologramFadeOutMs  = 600;
+        if (hologramFloatAmplitude < 0)        hologramFloatAmplitude = 0.1f;
+        if (hologramFloatCycleMs   <= 0)       hologramFloatCycleMs   = 3000;
+        if (screenPanelWidth   <= 0)           screenPanelWidth   = 320;
+        if (screenPanelHeight  <= 0)           screenPanelHeight  = 240;
+        if (screenRowSpacing   <= 0)           screenRowSpacing   = 16;
+        if (screenMaxNameLength<= 0)           screenMaxNameLength= 32;
+        if (hologramDefaultName == null || hologramDefaultName.isBlank())
+                                               hologramDefaultName = "PROTECTED PLOT";
         if (hologramLabelOwner   == null) hologramLabelOwner   = "Owner:   ";
         if (hologramLabelTier    == null) hologramLabelTier    = "Tier:    ";
         if (hologramLabelSize    == null) hologramLabelSize    = "Size:    ";
         if (hologramLabelMembers == null) hologramLabelMembers = "Members: ";
         if (hologramLabelNext    == null) hologramLabelNext    = "Next: ";
-        if (hologramLabelMaxLevel== null) hologramLabelMaxLevel= "§6§l★ Max Level ★";
-        if (tierColors == null || tierColors.isEmpty()) {
-            tierColors = createDefaultTierColors();
-        }
+        if (hologramLabelMaxLevel== null) hologramLabelMaxLevel= "\u00a76\u00a7l\u2605 Max Level \u2605";
+        if (tierColors == null || tierColors.isEmpty())
+                                               tierColors = createDefaultTierColors();
     }
 
     public float[] getTierColors(int tier) {
-        for (TierColors tc : tierColors) {
+        for (TierColors tc : tierColors)
             if (tc.tier == tier) return tc.toArray();
-        }
         float[][] defaults = {
             { 1.00f,0.55f,0.05f, 0.70f,0.28f,0.00f, 1.00f,0.88f,0.55f },
             { 1.00f,0.85f,0.00f, 0.80f,0.50f,0.00f, 1.00f,0.97f,0.65f },
