@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "id": "secure-plots",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "name": "Secure Plots",
   "description": "Territory protection mod for Fabric servers. Claim land with plot blocks, manage members and roles, upgrade tiers, set ambient effects, and customize a fully animated border — all server-side configurable.",
   "authors": [
