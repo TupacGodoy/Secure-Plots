@@ -214,6 +214,38 @@ public class SecurePlotsConfig {
         }
     }
 
+    // ── Crafting recipes ───────────────────────────────────────────────────────
+
+    /**
+     * Recetas de crafteo para los bloques de parcela y el plano.
+     * El patrón es una grilla 3×3 de strings (3 filas, cada char es una clave).
+     * Usa " " (espacio) para casillas vacías.
+     * Cada clave mapea a un item ID de cualquier mod.
+     * Si disabled=true la receta no se registra (el ítem solo se obtiene en creativo
+     * o mediante /sp creative).
+     */
+    public List<CraftingRecipe> craftingRecipes = new ArrayList<>();
+
+    public static class CraftingRecipe {
+        /** ID del resultado: ej. "secure-plots:bronze_plot_block" */
+        public String result;
+        /** Patrón de crafteo: exactamente 3 strings de 3 caracteres. */
+        public String[] pattern;
+        /** Mapa clave→itemId. Cada clave es un char del patrón. */
+        public java.util.Map<String, String> key = new java.util.LinkedHashMap<>();
+        /** Si true, la receta no se registra. */
+        public boolean disabled = false;
+
+        public CraftingRecipe() {}
+
+        public CraftingRecipe(String result, String[] pattern,
+                              java.util.Map<String, String> key) {
+            this.result  = result;
+            this.pattern = pattern;
+            this.key     = key;
+        }
+    }
+
     // ── Permisos por defecto por rol ───────────────────────────────────────────
 
     /**
@@ -280,6 +312,10 @@ public class SecurePlotsConfig {
                 if (INSTANCE.ambientParticleCount > 5)  INSTANCE.ambientParticleCount = 5;
                 if (INSTANCE.checkInterval  <= 0) INSTANCE.checkInterval  = 10;
                 if (INSTANCE.ambientInterval <= 0) INSTANCE.ambientInterval = 20;
+                // Backwards compat: populate crafting recipes if missing from old config
+                if (INSTANCE.craftingRecipes == null || INSTANCE.craftingRecipes.isEmpty()) {
+                    INSTANCE.craftingRecipes = createDefault().craftingRecipes;
+                }
                 // Feature toggles: set defaults if null (backwards compat)
                 // All booleans default to true/false via Java field initializers when GSON
                 // reads an older config that doesn't have them yet.
@@ -329,6 +365,25 @@ public class SecurePlotsConfig {
         u4.fromTier = 3; u4.toTier = 4; u4.cobblecoins = 0;
         u4.items.add(new UpgradeCost.ItemCost("minecraft:netherite_block", 1));
         config.upgradeCosts.add(u4);
+
+        // ── Crafting recipes (defaults match the static JSON files) ──
+        java.util.Map<String,String> bronzeKey = new java.util.LinkedHashMap<>();
+        bronzeKey.put("C", "minecraft:copper_block");
+        bronzeKey.put("B", "minecraft:redstone_block");
+        bronzeKey.put("H", "minecraft:heart_of_the_sea");
+        config.craftingRecipes.add(new CraftingRecipe(
+            "secure-plots:bronze_plot_block",
+            new String[]{"CBC", "BHB", "CBC"},
+            bronzeKey));
+
+        java.util.Map<String,String> blueprintKey = new java.util.LinkedHashMap<>();
+        blueprintKey.put("S", "minecraft:amethyst_shard");
+        blueprintKey.put("P", "minecraft:paper");
+        blueprintKey.put("C", "minecraft:compass");
+        config.craftingRecipes.add(new CraftingRecipe(
+            "secure-plots:plot_blueprint",
+            new String[]{"SPS", "PCP", "SPS"},
+            blueprintKey));
 
         return config;
     }

@@ -58,6 +58,7 @@ public class SecurePlots implements ModInitializer {
         ModPackets.registerServerHandlers();
         SpCommand.register();
         PlotHologram.registerTicker();
+        com.zhilius.secureplots.recipe.DynamicRecipeManager.register();
 
         com.zhilius.secureplots.screen.PlotChatListener.register();
         com.zhilius.secureplots.plot.PlotAreaTracker.register();
