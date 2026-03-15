@@ -3,6 +3,8 @@
 **Minecraft 1.21.1 — Fabric**  
 Territory protection mod with menus, roles, upgrades, ambient effects, and a fully configurable visual border system.
 
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/zhilius)
+
 ---
 
 ## Requirements
@@ -317,6 +319,14 @@ All 256 translation keys cover commands, UI, tooltips, HUD messages, permission 
 - Players need **no special permissions** to place plot blocks or use `/sp` commands on their own plots.
 - Admin override: give the player the `plot_admin` command tag (`/tag <player> add plot_admin`) or grant OP level ≥ `adminOpLevel` (default 2).
 - The Creative tab in the plot menu (gives plot blocks) requires OP or creative mode.
+
+---
+
+## Support
+
+If Secure Plots is useful for your server, consider supporting development:
+
+☕ **[ko-fi.com/zhilius](https://ko-fi.com/zhilius)**
 
 ---
 

@@ -3,12 +3,16 @@
   "id": "secure-plots",
   "version": "1.0.0",
   "name": "Secure Plots",
-  "description": "Protección de territorios con menú, roles y mejoras.",
+  "description": "Territory protection mod for Fabric servers. Claim land with plot blocks, manage members and roles, upgrade tiers, set ambient effects, and customize a fully animated border — all server-side configurable.",
   "authors": [
     "zhilius"
   ],
-  "contact": {},
-  "license": "MIT",
+  "contact": {
+    "sources": "https://github.com/zhilius/secure-plots",
+    "email": "zhilius.t@gmail.com",
+    "ko-fi": "https://ko-fi.com/zhilius"
+  },
+  "license": "GPL-3.0-only",
   "icon": "assets/secure-plots/icon.png",
   "environment": "*",
   "entrypoints": {
@@ -32,6 +36,5 @@
     "java": ">=21",
     "fabric-api": "*"
   },
-  "suggests": {},
   "accessWidener": "secure-plots.accesswidener"
 }

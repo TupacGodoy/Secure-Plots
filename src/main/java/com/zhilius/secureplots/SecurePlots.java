@@ -38,9 +38,15 @@ public class SecurePlots implements ModInitializer {
     // How many blocks outside the plot border members can still interact from
     private static final int MEMBER_REACH_BONUS = 5;
 
+    private static final String KOFI_URL = "https://ko-fi.com/zhilius";
+
     @Override
     public void onInitialize() {
         LOGGER.info("Inicializando Secure Plots...");
+
+        boolean firstRun = !new java.io.File(
+            net.fabricmc.loader.api.FabricLoader.getInstance().getConfigDir().toFile(),
+            "secure_plots.json").exists();
 
         SecurePlotsConfig.load();
         com.zhilius.secureplots.config.BorderConfig.load();
@@ -61,6 +67,16 @@ public class SecurePlots implements ModInitializer {
         registerActivityTracking();
 
         LOGGER.info("Secure Plots listo!");
+
+        if (firstRun) {
+            LOGGER.info("  ");
+            LOGGER.info("  ╔══════════════════════════════════════════╗");
+            LOGGER.info("  ║        Thanks for using Secure Plots!    ║");
+            LOGGER.info("  ║  If you enjoy it, consider supporting:   ║");
+            LOGGER.info("  ║       https://ko-fi.com/zhilius           ║");
+            LOGGER.info("  ╚══════════════════════════════════════════╝");
+            LOGGER.info("  ");
+        }
     }
 
     private void registerActivityTracking() {
