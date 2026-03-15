@@ -40,6 +40,11 @@ public class PlotHologramClient {
 
     private static final List<HologramDisplay> active = new ArrayList<>();
 
+    // Cache isSpanish() — recomputed at most once per second (20 ticks) instead of every frame
+    private static boolean cachedIsSpanish    = false;
+    private static long    langCacheTimestamp = 0L;
+    private static final long LANG_CACHE_MS   = 1000L;
+
     private static class HologramDisplay {
         PlotData data;
         BlockPos pos;
@@ -88,11 +93,18 @@ public class PlotHologramClient {
 
     public static void register() {
         WorldRenderEvents.AFTER_TRANSLUCENT.register(context -> {
+            if (active.isEmpty()) return; // skip entirely when no holograms are active
             MinecraftClient mc = MinecraftClient.getInstance();
             if (mc.player == null || mc.world == null) return;
 
             long now = System.currentTimeMillis();
-            boolean es = isSpanish(); // compute once per frame for all holograms
+            // Recompute language at most once per second, not every frame
+            long nowMs = System.currentTimeMillis();
+            if (nowMs - langCacheTimestamp > LANG_CACHE_MS) {
+                cachedIsSpanish    = isSpanish();
+                langCacheTimestamp = nowMs;
+            }
+            boolean es = cachedIsSpanish;
             Iterator<HologramDisplay> iter = active.iterator();
             while (iter.hasNext()) {
                 HologramDisplay h = iter.next();

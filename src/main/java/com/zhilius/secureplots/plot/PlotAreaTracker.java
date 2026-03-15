@@ -46,6 +46,11 @@ import java.util.concurrent.ConcurrentHashMap;
  *           and applies ambient effects (particles, weather, time, music).
  * On exit:  shows optional exit message and restores ambient effects.
  * Checks every checkInterval ticks (default 10).
+ *
+ * Performance notes:
+ * - Config values (checkInterval, ambientInterval) are cached and refreshed
+ *   every 200 ticks (~10s) to avoid reading the config object on every tick.
+ * - getPlotAt() is O(k) via chunk index in PlotManager, not O(n).
  */
 public class PlotAreaTracker {
 
@@ -57,37 +62,53 @@ public class PlotAreaTracker {
     private static int tick        = 0;
     private static int ambientTick = 0;
 
+    // Cached config values — refreshed every CONFIG_REFRESH_INTERVAL ticks
+    private static final int CONFIG_REFRESH_INTERVAL = 200;
+    private static int configRefreshTick = 0;
+    private static int cachedCheckInt    = 10;
+    private static int cachedAmbientInt  = 20;
+
     public static void register() {
         ServerTickEvents.END_SERVER_TICK.register(PlotAreaTracker::onTick);
     }
 
-    private static void onTick(MinecraftServer server) {
+    private static void refreshCachedConfig() {
         SecurePlotsConfig cfg = SecurePlotsConfig.INSTANCE;
-        int checkInt   = (cfg != null && cfg.checkInterval   > 0) ? cfg.checkInterval   : 10;
-        int ambientInt = (cfg != null && cfg.ambientInterval > 0) ? cfg.ambientInterval : 20;
+        cachedCheckInt   = (cfg != null && cfg.checkInterval   > 0) ? cfg.checkInterval   : 10;
+        cachedAmbientInt = (cfg != null && cfg.ambientInterval > 0) ? cfg.ambientInterval : 20;
+    }
 
-        boolean doCheck   = (++tick        >= checkInt);
-        boolean doAmbient = (++ambientTick >= ambientInt);
+    private static void onTick(MinecraftServer server) {
+        // Refresh cached config periodically instead of on every tick
+        if (++configRefreshTick >= CONFIG_REFRESH_INTERVAL) {
+            configRefreshTick = 0;
+            refreshCachedConfig();
+        }
+
+        boolean doCheck   = (++tick        >= cachedCheckInt);
+        boolean doAmbient = (++ambientTick >= cachedAmbientInt);
         if (doCheck)   tick        = 0;
         if (doAmbient) ambientTick = 0;
 
         if (!doCheck && !doAmbient) return;
 
+        // Read config once per tick cycle, not once per player
+        SecurePlotsConfig cfg = SecurePlotsConfig.INSTANCE;
+
         for (ServerPlayerEntity player : server.getPlayerManager().getPlayerList()) {
             if (!(player.getWorld() instanceof ServerWorld sw)) continue;
 
-            PlotManager manager   = PlotManager.getOrCreate(sw);
-            PlotData    current   = manager.getPlotAt(player.getBlockPos());
-            UUID        id        = player.getUuid();
+            PlotManager manager    = PlotManager.getOrCreate(sw);
+            PlotData    current    = manager.getPlotAt(player.getBlockPos());
+            UUID        id         = player.getUuid();
             BlockPos    prevCenter = lastPlot.get(id);
             BlockPos    curCenter  = current != null ? current.getCenter() : null;
 
             boolean same = prevCenter == null ? curCenter == null : prevCenter.equals(curCenter);
 
-            if (doCheck) updateFly(player, current);
+            if (doCheck) updateFly(player, current, cfg);
 
             if (same) {
-                // Continuous particles: only every ambientInterval ticks
                 if (doAmbient && current != null) {
                     String pId = current.getParticleEffect();
                     if (!pId.isBlank() && (cfg == null || cfg.enablePlotParticles))
@@ -164,13 +185,11 @@ public class PlotAreaTracker {
         Long prevTime = savedTime.remove(id);
         if (prevTime != null) sw.setTimeOfDay(prevTime);
 
-        // Stop music (RECORDS channel covers most music events)
         player.networkHandler.sendPacket(new StopSoundS2CPacket(null, SoundCategory.RECORDS));
     }
 
     // ── Particles ─────────────────────────────────────────────────────────────
 
-    /** Normalizes a particle ID and resolves it to a ParticleEffect, or returns null. */
     private static ParticleEffect resolveParticle(String particleId) {
         String normalized = particleId.contains(":") ? particleId : "minecraft:" + particleId;
         Identifier rid = Identifier.tryParse(normalized);
@@ -186,24 +205,18 @@ public class PlotAreaTracker {
             SecurePlotsConfig cfg = SecurePlotsConfig.INSTANCE;
             int count = cfg != null ? Math.max(1, Math.min(cfg.particleCount, 5)) : 3;
             Vec3d pos = player.getPos();
-            // Outer ring (radius 3)
             for (int i = 0; i < 24; i++) {
                 double a = (2 * Math.PI / 24) * i;
-                sw.spawnParticles(effect, pos.x + Math.cos(a) * 3.0, pos.y + 0.3, pos.z + Math.sin(a) * 3.0,
-                    count, 0, 0.2, 0, 0.05);
+                sw.spawnParticles(effect, pos.x + Math.cos(a) * 3.0, pos.y + 0.3, pos.z + Math.sin(a) * 3.0, count, 0, 0.2, 0, 0.05);
             }
-            // Inner ring (radius 1.2)
             for (int i = 0; i < 12; i++) {
                 double a = (2 * Math.PI / 12) * i;
-                sw.spawnParticles(effect, pos.x + Math.cos(a) * 1.2, pos.y + 1.2, pos.z + Math.sin(a) * 1.2,
-                    count + 1, 0, 0.15, 0, 0.04);
+                sw.spawnParticles(effect, pos.x + Math.cos(a) * 1.2, pos.y + 1.2, pos.z + Math.sin(a) * 1.2, count + 1, 0, 0.15, 0, 0.04);
             }
-            // Column burst above player
             sw.spawnParticles(effect, pos.x, pos.y + 0.5, pos.z, count * 5, 0.4, 0.8, 0.4, 0.06);
         } catch (Exception ignored) {}
     }
 
-    // Called every ambientInterval ticks while the player is inside the plot
     private static void spawnAmbientParticles(ServerWorld sw, ServerPlayerEntity player, String particleId) {
         try {
             ParticleEffect effect = resolveParticle(particleId);
@@ -214,11 +227,7 @@ public class PlotAreaTracker {
             for (int i = 0; i < count; i++) {
                 double angle = Math.random() * 2 * Math.PI;
                 double r     = 0.5 + Math.random() * 1.5;
-                sw.spawnParticles(effect,
-                    pos.x + Math.cos(angle) * r,
-                    pos.y + Math.random() * 2.0,
-                    pos.z + Math.sin(angle) * r,
-                    1, 0, 0, 0, 0.01);
+                sw.spawnParticles(effect, pos.x + Math.cos(angle) * r, pos.y + Math.random() * 2.0, pos.z + Math.sin(angle) * r, 1, 0, 0, 0, 0.01);
             }
         } catch (Exception ignored) {}
     }
@@ -239,24 +248,21 @@ public class PlotAreaTracker {
         }
     }
 
-    private static void playMusic(ServerPlayerEntity player, ServerWorld sw,
-                                  String soundId, SecurePlotsConfig cfg) {
+    private static void playMusic(ServerPlayerEntity player, ServerWorld sw, String soundId, SecurePlotsConfig cfg) {
         try {
             Identifier rid = Identifier.tryParse(soundId);
             if (rid == null) return;
             SoundEvent event = Registries.SOUND_EVENT.get(rid);
             if (event == null) return;
             float vol = cfg != null ? Math.max(0.1f, Math.min(cfg.musicVolume, 4.0f)) : 4.0f;
-            sw.playSound(null, player.getX(), player.getY(), player.getZ(),
-                event, SoundCategory.RECORDS, vol, 1.0f);
+            sw.playSound(null, player.getX(), player.getY(), player.getZ(), event, SoundCategory.RECORDS, vol, 1.0f);
         } catch (Exception ignored) {}
     }
 
     // ── Fly management ────────────────────────────────────────────────────────
 
-    private static void updateFly(ServerPlayerEntity player, PlotData plot) {
+    private static void updateFly(ServerPlayerEntity player, PlotData plot, SecurePlotsConfig cfg) {
         if (player.isCreative() || player.isSpectator()) return;
-        SecurePlotsConfig cfg = SecurePlotsConfig.INSTANCE;
         if (cfg != null && !cfg.enableFlyInPlots) return;
 
         UUID id = player.getUuid();
@@ -275,10 +281,6 @@ public class PlotAreaTracker {
         }
     }
 
-    /**
-     * Sends a custom message as a title overlay (center screen).
-     * Supports legacy '&' color codes.
-     */
     private static void sendTitleMessage(ServerPlayerEntity player, String msg) {
         Text text = Text.literal(msg.replace("&", "\u00a7"));
         player.networkHandler.sendPacket(new TitleFadeS2CPacket(10, 60, 20));

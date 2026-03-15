@@ -254,5 +254,12 @@
   "sp.perm.desc.manage_perms": "Cambiar permisos de miembros",
   "sp.perm.desc.manage_flags": "Cambiar flags globales",
   "sp.perm.desc.manage_groups": "Crear y editar grupos",
-  "sp.block.max_plots": "§c✗ Límite de protecciones alcanzado (%d máximo)."
+  "sp.block.max_plots": "§c✗ Límite de protecciones alcanzado (%d máximo).",
+  "sp.help.plot_particle_header": "§e══ Opciones de partículas ══",
+  "sp.help.plot_particle_usage": "§7Uso: §e/sp plot particle <tipo|clear>",
+  "sp.help.plot_particle_hint": "§7Escribí §eclear§7 para quitar. Tab autocompleta todas las opciones.",
+  "sp.help.plot_music_header": "§e══ Opciones de música ══",
+  "sp.help.plot_music_usage": "§7Uso: §e/sp plot music <id_sonido|clear>",
+  "sp.help.plot_music_discs": "§7Discos de música:",
+  "sp.help.plot_music_bg": "§7Música de fondo:"
 }

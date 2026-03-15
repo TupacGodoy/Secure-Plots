@@ -254,5 +254,12 @@
   "sp.perm.desc.manage_perms": "Change member permissions",
   "sp.perm.desc.manage_flags": "Change global flags",
   "sp.perm.desc.manage_groups": "Create and edit groups",
-  "sp.block.max_plots": "§c✗ Plot limit reached (%d maximum)."
+  "sp.block.max_plots": "§c✗ Plot limit reached (%d maximum).",
+  "sp.help.plot_particle_header": "§e══ Particle options ══",
+  "sp.help.plot_particle_usage": "§7Usage: §e/sp plot particle <type|clear>",
+  "sp.help.plot_particle_hint": "§7Type §eclear§7 to remove. Tab autocompletes all options.",
+  "sp.help.plot_music_header": "§e══ Music options ══",
+  "sp.help.plot_music_usage": "§7Usage: §e/sp plot music <sound_id|clear>",
+  "sp.help.plot_music_discs": "§7Music disc options:",
+  "sp.help.plot_music_bg": "§7Background music options:"
 }

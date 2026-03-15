@@ -213,6 +213,7 @@ public class SecurePlotsClient implements ClientModInitializer {
     // -------------------------------------------------------------------------
     private void registerWorldRenderer() {
         WorldRenderEvents.AFTER_TRANSLUCENT.register(context -> {
+            if (activeBorders.isEmpty()) return; // skip entirely when no borders are active
             activeBorders.removeIf(BorderDisplay::isExpired);
             activeBorders.forEach(bd -> PlotBorderRenderer.render(context, bd));
         });
