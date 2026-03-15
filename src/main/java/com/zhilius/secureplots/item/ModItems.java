@@ -23,27 +23,26 @@ import net.minecraft.util.Rarity;
 
 public class ModItems {
 
-    // Fixed: was "PLOT_blueprint" (inconsistent naming)
     public static final Item PLOT_BLUEPRINT = register("plot_blueprint",
-            new PlotblueprintItem(new Item.Settings()
-                    .maxCount(1)
-                    .rarity(Rarity.UNCOMMON)));
+        new PlotblueprintItem(new Item.Settings()
+            .maxCount(1)
+            .rarity(Rarity.UNCOMMON)));
 
     public static final ItemGroup SECURE_PLOTS_GROUP = Registry.register(
-            Registries.ITEM_GROUP,
-            Identifier.of(SecurePlots.MOD_ID, "secure_plots"),
-            FabricItemGroup.builder()
-                    .displayName(Text.literal("Secure Plots"))
-                    .icon(() -> new ItemStack(ModBlocks.BRONZE_PLOT_BLOCK))
-                    .entries((context, entries) -> {
-                        entries.add(PLOT_BLUEPRINT);
-                        entries.add(ModBlocks.BRONZE_PLOT_BLOCK);
-                        entries.add(ModBlocks.GOLD_PLOT_BLOCK);
-                        entries.add(ModBlocks.EMERALD_PLOT_BLOCK);   // Fixed: was emerald_PLOT_BLOCK
-                        entries.add(ModBlocks.DIAMOND_PLOT_BLOCK);
-                        entries.add(ModBlocks.NETHERITE_PLOT_BLOCK);
-                    })
-                    .build());
+        Registries.ITEM_GROUP,
+        Identifier.of(SecurePlots.MOD_ID, "secure_plots"),
+        FabricItemGroup.builder()
+            .displayName(Text.literal("Secure Plots"))
+            .icon(() -> new ItemStack(ModBlocks.BRONZE_PLOT_BLOCK))
+            .entries((context, entries) -> {
+                entries.add(PLOT_BLUEPRINT);
+                entries.add(ModBlocks.BRONZE_PLOT_BLOCK);
+                entries.add(ModBlocks.GOLD_PLOT_BLOCK);
+                entries.add(ModBlocks.EMERALD_PLOT_BLOCK);
+                entries.add(ModBlocks.DIAMOND_PLOT_BLOCK);
+                entries.add(ModBlocks.NETHERITE_PLOT_BLOCK);
+            })
+            .build());
 
     private static Item register(String name, Item item) {
         return Registry.register(Registries.ITEM, Identifier.of(SecurePlots.MOD_ID, name), item);

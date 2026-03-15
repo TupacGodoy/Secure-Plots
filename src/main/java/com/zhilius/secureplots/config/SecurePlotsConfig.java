@@ -128,17 +128,11 @@ public class SecurePlotsConfig {
     public String adminTag = "plot_admin";
 
     /**
-     * ID del ítem de Cobblecoins (integración con mod cobbleverse).
-     * Si no se usa ese mod, este campo se ignora.
-     */
-    public String cobblescoinsItemId = "cobbleverse:cobblecoin";
-
-    /**
      * Prefijos de estructuras bloqueadas: no se puede colocar una parcela
      * sobre estructuras cuyos IDs comiencen con alguno de estos prefijos.
      */
     public List<String> blockedStructurePrefixes = new ArrayList<>(
-            Arrays.asList("cobbleverse:", "legendarymonuments:")
+            Arrays.asList("legendarymonuments:")
     );
 
     // ── Inactividad ────────────────────────────────────────────────────────────
@@ -198,7 +192,6 @@ public class SecurePlotsConfig {
     public static class UpgradeCost {
         public int fromTier;
         public int toTier;
-        public int cobblecoins;
         public List<ItemCost> items = new ArrayList<>();
 
         public static class ItemCost {
@@ -298,7 +291,7 @@ public class SecurePlotsConfig {
                 }
                 if (INSTANCE.blockedStructurePrefixes == null) {
                     INSTANCE.blockedStructurePrefixes = new ArrayList<>(
-                            Arrays.asList("cobbleverse:", "legendarymonuments:"));
+                            Arrays.asList("legendarymonuments:"));
                 }
                 if (INSTANCE.adminTag == null || INSTANCE.adminTag.isEmpty()) {
                     INSTANCE.adminTag = "plot_admin";
@@ -344,25 +337,25 @@ public class SecurePlotsConfig {
 
         // Bronce (0) → Oro (1)
         UpgradeCost u1 = new UpgradeCost();
-        u1.fromTier = 0; u1.toTier = 1; u1.cobblecoins = 0;
+        u1.fromTier = 0; u1.toTier = 1;
         u1.items.add(new UpgradeCost.ItemCost("minecraft:gold_block", 15));
         config.upgradeCosts.add(u1);
 
         // Oro (1) → Esmeralda (2)
         UpgradeCost u2 = new UpgradeCost();
-        u2.fromTier = 1; u2.toTier = 2; u2.cobblecoins = 0;
+        u2.fromTier = 1; u2.toTier = 2;
         u2.items.add(new UpgradeCost.ItemCost("minecraft:emerald_block", 10));
         config.upgradeCosts.add(u2);
 
         // Esmeralda (2) → Diamante (3)
         UpgradeCost u3 = new UpgradeCost();
-        u3.fromTier = 2; u3.toTier = 3; u3.cobblecoins = 0;
+        u3.fromTier = 2; u3.toTier = 3;
         u3.items.add(new UpgradeCost.ItemCost("minecraft:diamond", 64));
         config.upgradeCosts.add(u3);
 
         // Diamante (3) → Netherita (4)
         UpgradeCost u4 = new UpgradeCost();
-        u4.fromTier = 3; u4.toTier = 4; u4.cobblecoins = 0;
+        u4.fromTier = 3; u4.toTier = 4;
         u4.items.add(new UpgradeCost.ItemCost("minecraft:netherite_block", 1));
         config.upgradeCosts.add(u4);
 

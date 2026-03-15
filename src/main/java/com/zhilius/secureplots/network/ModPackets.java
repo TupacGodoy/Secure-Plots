@@ -16,146 +16,125 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 package com.zhilius.secureplots.network;
-import com.zhilius.secureplots.config.SecurePlotsConfig;
 
 import com.google.gson.Gson;
 import com.zhilius.secureplots.SecurePlots;
+import com.zhilius.secureplots.block.ModBlocks;
 import com.zhilius.secureplots.config.BorderConfig;
-import com.zhilius.secureplots.network.ModPackets.OpenPlotScreenPayload;
-import com.zhilius.secureplots.network.ModPackets.UpdatePlotPayload;
-import com.zhilius.secureplots.network.ModPackets.UpgradePlotPayload;
+import com.zhilius.secureplots.config.SecurePlotsConfig;
 import com.zhilius.secureplots.plot.PlotData;
+import com.zhilius.secureplots.plot.PlotManager;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
+import net.minecraft.block.Block;
+import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.network.PacketByteBuf;
 import net.minecraft.network.codec.PacketCodec;
 import net.minecraft.network.packet.CustomPayload;
 import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.server.world.ServerWorld;
+import net.minecraft.text.Text;
+import net.minecraft.util.Formatting;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.math.BlockPos;
 
+import java.util.Map;
+import java.util.UUID;
+
 public class ModPackets {
 
-    public record OpenPlotScreenPayload(BlockPos pos, NbtCompound nbt) implements CustomPayload {
-        public static final Id<OpenPlotScreenPayload> ID = new Id<>(
-                Identifier.of(SecurePlots.MOD_ID, "open_plot_screen"));
-        public static final PacketCodec<PacketByteBuf, OpenPlotScreenPayload> CODEC = PacketCodec.of(
-                (value, buf) -> {
-                    buf.writeBlockPos(value.pos());
-                    buf.writeNbt(value.nbt());
-                },
-                buf -> new OpenPlotScreenPayload(buf.readBlockPos(), buf.readNbt()));
+    // ── Payload definitions ───────────────────────────────────────────────────
 
-        @Override
-        public Id<? extends CustomPayload> getId() {
-            return ID;
-        }
+    public record OpenPlotScreenPayload(BlockPos pos, NbtCompound nbt) implements CustomPayload {
+        public static final Id<OpenPlotScreenPayload> ID = new Id<>(Identifier.of(SecurePlots.MOD_ID, "open_plot_screen"));
+        public static final PacketCodec<PacketByteBuf, OpenPlotScreenPayload> CODEC = PacketCodec.of(
+            (v, buf) -> { buf.writeBlockPos(v.pos()); buf.writeNbt(v.nbt()); },
+            buf -> new OpenPlotScreenPayload(buf.readBlockPos(), buf.readNbt()));
+        @Override public Id<? extends CustomPayload> getId() { return ID; }
     }
 
     public record ShowPlotBorderPayload(NbtCompound nbt) implements CustomPayload {
-        public static final Id<ShowPlotBorderPayload> ID = new Id<>(
-                Identifier.of(SecurePlots.MOD_ID, "show_plot_border"));
+        public static final Id<ShowPlotBorderPayload> ID = new Id<>(Identifier.of(SecurePlots.MOD_ID, "show_plot_border"));
         public static final PacketCodec<PacketByteBuf, ShowPlotBorderPayload> CODEC = PacketCodec.of(
-                (value, buf) -> buf.writeNbt(value.nbt()),
-                buf -> new ShowPlotBorderPayload(buf.readNbt()));
-
-        @Override
-        public Id<? extends CustomPayload> getId() {
-            return ID;
-        }
+            (v, buf) -> buf.writeNbt(v.nbt()),
+            buf -> new ShowPlotBorderPayload(buf.readNbt()));
+        @Override public Id<? extends CustomPayload> getId() { return ID; }
     }
 
     public record HidePlotBorderPayload(BlockPos pos) implements CustomPayload {
-        public static final Id<HidePlotBorderPayload> ID = new Id<>(
-                Identifier.of(SecurePlots.MOD_ID, "hide_plot_border"));
+        public static final Id<HidePlotBorderPayload> ID = new Id<>(Identifier.of(SecurePlots.MOD_ID, "hide_plot_border"));
         public static final PacketCodec<PacketByteBuf, HidePlotBorderPayload> CODEC = PacketCodec.of(
-                (value, buf) -> buf.writeBlockPos(value.pos()),
-                buf -> new HidePlotBorderPayload(buf.readBlockPos()));
-
-        @Override
-        public Id<? extends CustomPayload> getId() {
-            return ID;
-        }
+            (v, buf) -> buf.writeBlockPos(v.pos()),
+            buf -> new HidePlotBorderPayload(buf.readBlockPos()));
+        @Override public Id<? extends CustomPayload> getId() { return ID; }
     }
 
-        public record UpdatePlotPayload(BlockPos pos, NbtCompound nbt) implements CustomPayload {
+    public record UpdatePlotPayload(BlockPos pos, NbtCompound nbt) implements CustomPayload {
         public static final Id<UpdatePlotPayload> ID = new Id<>(Identifier.of(SecurePlots.MOD_ID, "update_plot"));
         public static final PacketCodec<PacketByteBuf, UpdatePlotPayload> CODEC = PacketCodec.of(
-                (value, buf) -> {
-                    buf.writeBlockPos(value.pos());
-                    buf.writeNbt(value.nbt());
-                },
-                buf -> new UpdatePlotPayload(buf.readBlockPos(), buf.readNbt()));
-
-        @Override
-        public Id<? extends CustomPayload> getId() {
-            return ID;
-        }
+            (v, buf) -> { buf.writeBlockPos(v.pos()); buf.writeNbt(v.nbt()); },
+            buf -> new UpdatePlotPayload(buf.readBlockPos(), buf.readNbt()));
+        @Override public Id<? extends CustomPayload> getId() { return ID; }
     }
 
     public record AddMemberPayload(BlockPos pos, String playerName) implements CustomPayload {
         public static final Id<AddMemberPayload> ID = new Id<>(Identifier.of(SecurePlots.MOD_ID, "add_member"));
         public static final PacketCodec<PacketByteBuf, AddMemberPayload> CODEC = PacketCodec.of(
-                (value, buf) -> { buf.writeBlockPos(value.pos()); buf.writeString(value.playerName()); },
-                buf -> new AddMemberPayload(buf.readBlockPos(), buf.readString()));
+            (v, buf) -> { buf.writeBlockPos(v.pos()); buf.writeString(v.playerName()); },
+            buf -> new AddMemberPayload(buf.readBlockPos(), buf.readString()));
         @Override public Id<? extends CustomPayload> getId() { return ID; }
     }
 
     public record RemoveMemberPayload(BlockPos pos, String playerName) implements CustomPayload {
         public static final Id<RemoveMemberPayload> ID = new Id<>(Identifier.of(SecurePlots.MOD_ID, "remove_member"));
         public static final PacketCodec<PacketByteBuf, RemoveMemberPayload> CODEC = PacketCodec.of(
-                (value, buf) -> { buf.writeBlockPos(value.pos()); buf.writeString(value.playerName()); },
-                buf -> new RemoveMemberPayload(buf.readBlockPos(), buf.readString()));
+            (v, buf) -> { buf.writeBlockPos(v.pos()); buf.writeString(v.playerName()); },
+            buf -> new RemoveMemberPayload(buf.readBlockPos(), buf.readString()));
         @Override public Id<? extends CustomPayload> getId() { return ID; }
     }
 
     public record SetPermissionPayload(BlockPos pos, String memberUuid, String permission, boolean enabled) implements CustomPayload {
         public static final Id<SetPermissionPayload> ID = new Id<>(Identifier.of(SecurePlots.MOD_ID, "set_permission"));
         public static final PacketCodec<PacketByteBuf, SetPermissionPayload> CODEC = PacketCodec.of(
-                (value, buf) -> { buf.writeBlockPos(value.pos()); buf.writeString(value.memberUuid()); buf.writeString(value.permission()); buf.writeBoolean(value.enabled()); },
-                buf -> new SetPermissionPayload(buf.readBlockPos(), buf.readString(), buf.readString(), buf.readBoolean()));
+            (v, buf) -> { buf.writeBlockPos(v.pos()); buf.writeString(v.memberUuid()); buf.writeString(v.permission()); buf.writeBoolean(v.enabled()); },
+            buf -> new SetPermissionPayload(buf.readBlockPos(), buf.readString(), buf.readString(), buf.readBoolean()));
         @Override public Id<? extends CustomPayload> getId() { return ID; }
     }
 
     public record UpgradePlotPayload(BlockPos pos) implements CustomPayload {
         public static final Id<UpgradePlotPayload> ID = new Id<>(Identifier.of(SecurePlots.MOD_ID, "upgrade_plot"));
         public static final PacketCodec<PacketByteBuf, UpgradePlotPayload> CODEC = PacketCodec.of(
-                (value, buf) -> buf.writeBlockPos(value.pos()),
-                buf -> new UpgradePlotPayload(buf.readBlockPos()));
-
-        @Override
-        public Id<? extends CustomPayload> getId() {
-            return ID;
-        }
-    }
-
-    /** C→S: el owner pide que el server le dé un plot block por tier (modo creativo). */
-    public record GiveBlockPayload(int tier) implements CustomPayload {
-        public static final Id<GiveBlockPayload> ID = new Id<>(Identifier.of(SecurePlots.MOD_ID, "give_block"));
-        public static final PacketCodec<PacketByteBuf, GiveBlockPayload> CODEC = PacketCodec.of(
-                (value, buf) -> buf.writeInt(value.tier()),
-                buf -> new GiveBlockPayload(buf.readInt()));
+            (v, buf) -> buf.writeBlockPos(v.pos()),
+            buf -> new UpgradePlotPayload(buf.readBlockPos()));
         @Override public Id<? extends CustomPayload> getId() { return ID; }
     }
 
-    /** Sent server→client: close current screen and open chat pre-filled with a command. */
+    /** C→S: owner requests a plot block by tier (creative mode). */
+    public record GiveBlockPayload(int tier) implements CustomPayload {
+        public static final Id<GiveBlockPayload> ID = new Id<>(Identifier.of(SecurePlots.MOD_ID, "give_block"));
+        public static final PacketCodec<PacketByteBuf, GiveBlockPayload> CODEC = PacketCodec.of(
+            (v, buf) -> buf.writeInt(v.tier()),
+            buf -> new GiveBlockPayload(buf.readInt()));
+        @Override public Id<? extends CustomPayload> getId() { return ID; }
+    }
+
+    /** S→C: close current screen and open chat pre-filled with a command. */
     public record OpenChatPayload(String prefill) implements CustomPayload {
         public static final Id<OpenChatPayload> ID = new Id<>(Identifier.of(SecurePlots.MOD_ID, "open_chat"));
         public static final PacketCodec<PacketByteBuf, OpenChatPayload> CODEC = PacketCodec.of(
-                (value, buf) -> buf.writeString(value.prefill()),
-                buf -> new OpenChatPayload(buf.readString()));
+            (v, buf) -> buf.writeString(v.prefill()),
+            buf -> new OpenChatPayload(buf.readString()));
         @Override public Id<? extends CustomPayload> getId() { return ID; }
     }
 
     /** S→C: syncs border visual config to the client on join. */
     public record SyncBorderConfigPayload(String configJson) implements CustomPayload {
         private static final Gson GSON = new Gson();
-        public static final Id<SyncBorderConfigPayload> ID = new Id<>(
-                Identifier.of(SecurePlots.MOD_ID, "sync_border_config"));
+        public static final Id<SyncBorderConfigPayload> ID = new Id<>(Identifier.of(SecurePlots.MOD_ID, "sync_border_config"));
         public static final PacketCodec<PacketByteBuf, SyncBorderConfigPayload> CODEC = PacketCodec.of(
-                (value, buf) -> buf.writeString(value.configJson()),
-                buf -> new SyncBorderConfigPayload(buf.readString()));
+            (v, buf) -> buf.writeString(v.configJson()),
+            buf -> new SyncBorderConfigPayload(buf.readString()));
         @Override public Id<? extends CustomPayload> getId() { return ID; }
 
         public BorderConfig toBorderConfig() {
@@ -166,30 +145,30 @@ public class ModPackets {
         }
     }
 
+    // ── Registration ──────────────────────────────────────────────────────────
+
     public static void registerPayloads() {
-        PayloadTypeRegistry.playS2C().register(OpenPlotScreenPayload.ID, OpenPlotScreenPayload.CODEC);
-        PayloadTypeRegistry.playS2C().register(ShowPlotBorderPayload.ID, ShowPlotBorderPayload.CODEC);
-        PayloadTypeRegistry.playS2C().register(HidePlotBorderPayload.ID, HidePlotBorderPayload.CODEC);
-        PayloadTypeRegistry.playS2C().register(OpenChatPayload.ID, OpenChatPayload.CODEC);
+        PayloadTypeRegistry.playS2C().register(OpenPlotScreenPayload.ID,   OpenPlotScreenPayload.CODEC);
+        PayloadTypeRegistry.playS2C().register(ShowPlotBorderPayload.ID,   ShowPlotBorderPayload.CODEC);
+        PayloadTypeRegistry.playS2C().register(HidePlotBorderPayload.ID,   HidePlotBorderPayload.CODEC);
+        PayloadTypeRegistry.playS2C().register(OpenChatPayload.ID,         OpenChatPayload.CODEC);
         PayloadTypeRegistry.playS2C().register(SyncBorderConfigPayload.ID, SyncBorderConfigPayload.CODEC);
-        PayloadTypeRegistry.playC2S().register(UpdatePlotPayload.ID, UpdatePlotPayload.CODEC);
-        PayloadTypeRegistry.playC2S().register(UpgradePlotPayload.ID, UpgradePlotPayload.CODEC);
-        PayloadTypeRegistry.playC2S().register(AddMemberPayload.ID, AddMemberPayload.CODEC);
-        PayloadTypeRegistry.playC2S().register(SetPermissionPayload.ID, SetPermissionPayload.CODEC);
-        PayloadTypeRegistry.playC2S().register(RemoveMemberPayload.ID, RemoveMemberPayload.CODEC);
-        PayloadTypeRegistry.playC2S().register(GiveBlockPayload.ID, GiveBlockPayload.CODEC);
+        PayloadTypeRegistry.playC2S().register(UpdatePlotPayload.ID,       UpdatePlotPayload.CODEC);
+        PayloadTypeRegistry.playC2S().register(UpgradePlotPayload.ID,      UpgradePlotPayload.CODEC);
+        PayloadTypeRegistry.playC2S().register(AddMemberPayload.ID,        AddMemberPayload.CODEC);
+        PayloadTypeRegistry.playC2S().register(SetPermissionPayload.ID,    SetPermissionPayload.CODEC);
+        PayloadTypeRegistry.playC2S().register(RemoveMemberPayload.ID,     RemoveMemberPayload.CODEC);
+        PayloadTypeRegistry.playC2S().register(GiveBlockPayload.ID,        GiveBlockPayload.CODEC);
     }
 
+    // ── Send helpers ──────────────────────────────────────────────────────────
+
     public static void sendSyncBorderConfig(ServerPlayerEntity player) {
-        if (com.zhilius.secureplots.config.BorderConfig.INSTANCE == null) return;
-        // Stamp runtime toggles from SecurePlotsConfig into the visual config before syncing
-        com.zhilius.secureplots.config.BorderConfig bc =
-            com.zhilius.secureplots.config.BorderConfig.INSTANCE;
-        if (SecurePlotsConfig.INSTANCE != null) {
+        if (BorderConfig.INSTANCE == null) return;
+        BorderConfig bc = BorderConfig.INSTANCE;
+        if (SecurePlotsConfig.INSTANCE != null)
             bc.hologramEnabled = SecurePlotsConfig.INSTANCE.enableHologram;
-        }
-        String json = new Gson().toJson(bc);
-        ServerPlayNetworking.send(player, new SyncBorderConfigPayload(json));
+        ServerPlayNetworking.send(player, new SyncBorderConfigPayload(new Gson().toJson(bc)));
     }
 
     public static void sendOpenPlotScreen(ServerPlayerEntity player, BlockPos pos, PlotData data) {
@@ -204,153 +183,129 @@ public class ModPackets {
         ServerPlayNetworking.send(player, new HidePlotBorderPayload(pos));
     }
 
+    // ── Server-side handlers ──────────────────────────────────────────────────
+
     public static void registerServerHandlers() {
         registerPayloads();
 
-        ServerPlayNetworking.registerGlobalReceiver(UpdatePlotPayload.ID, (payload, context) -> {
+        ServerPlayNetworking.registerGlobalReceiver(UpdatePlotPayload.ID, (payload, ctx) -> {
             BlockPos pos = payload.pos();
             NbtCompound nbt = payload.nbt();
-            ServerPlayerEntity player = context.player();
-            context.server().execute(() -> {
-                if (player.getWorld() instanceof net.minecraft.server.world.ServerWorld serverWorld) {
-                    var manager = com.zhilius.secureplots.plot.PlotManager.getOrCreate(serverWorld);
-                    PlotData existing = manager.getPlot(pos);
-                    if (existing != null && existing.getOwnerId().equals(player.getUuid())) {
-                        PlotData updated = PlotData.fromNbt(nbt);
-                        existing.setPlotName(updated.getPlotName());
-                        for (var entry : updated.getMembers().entrySet()) {
-                            existing.addMember(entry.getKey(), updated.getMemberName(entry.getKey()), entry.getValue());
-                        }
-                        manager.markDirty();
-                    }
-                }
+            ServerPlayerEntity player = ctx.player();
+            ctx.server().execute(() -> {
+                if (!(player.getWorld() instanceof ServerWorld sw)) return;
+                PlotManager manager = PlotManager.getOrCreate(sw);
+                PlotData existing = manager.getPlot(pos);
+                if (existing == null || !existing.getOwnerId().equals(player.getUuid())) return;
+                PlotData updated = PlotData.fromNbt(nbt);
+                existing.setPlotName(updated.getPlotName());
+                for (Map.Entry<UUID, PlotData.Role> entry : updated.getMembers().entrySet())
+                    existing.addMember(entry.getKey(), updated.getMemberName(entry.getKey()), entry.getValue());
+                manager.markDirty();
             });
         });
 
-        ServerPlayNetworking.registerGlobalReceiver(UpgradePlotPayload.ID, (payload, context) -> {
+        ServerPlayNetworking.registerGlobalReceiver(UpgradePlotPayload.ID, (payload, ctx) -> {
             BlockPos pos = payload.pos();
-            ServerPlayerEntity player = context.player();
-            context.server().execute(() -> {
-                if (player.getWorld() instanceof net.minecraft.server.world.ServerWorld serverWorld) {
-                    // enableUpgrades toggle
-                    SecurePlotsConfig cfgU = SecurePlotsConfig.INSTANCE;
-                    if (cfgU != null && !cfgU.enableUpgrades) return;
+            ServerPlayerEntity player = ctx.player();
+            ctx.server().execute(() -> {
+                if (!(player.getWorld() instanceof ServerWorld sw)) return;
+                SecurePlotsConfig cfg = SecurePlotsConfig.INSTANCE;
+                if (cfg != null && !cfg.enableUpgrades) return;
 
-                    var manager = com.zhilius.secureplots.plot.PlotManager.getOrCreate(serverWorld);
-                    PlotData data = manager.getPlot(pos);
-                    if (data == null || !data.getOwnerId().equals(player.getUuid()))
-                        return;
-                    var nextSize = data.getSize().next();
-                    if (nextSize == null) {
-                        player.sendMessage(net.minecraft.text.Text.translatable("sp.upgrade.max_level")
-                                .formatted(net.minecraft.util.Formatting.RED), false);
-                        return;
-                    }
-                    data.setSize(nextSize);
-                    manager.markDirty();
-
-                    // Replace the block in the world with the matching tier block
-                    net.minecraft.block.Block newBlock =
-                            com.zhilius.secureplots.block.ModBlocks.fromTier(nextSize.tier);
-                    serverWorld.setBlockState(pos, newBlock.getDefaultState());
-
-                    player.sendMessage(
-                            net.minecraft.text.Text.translatable("sp.upgrade.success",
-                                    nextSize.getDisplayName(), nextSize.getRadius(), nextSize.getRadius())
-                                    .formatted(net.minecraft.util.Formatting.GREEN),
-                            false);
-                    sendOpenPlotScreen(player, pos, data);
-                }
-            });
-        });
-
-        // Add member handler
-        ServerPlayNetworking.registerGlobalReceiver(AddMemberPayload.ID, (payload, context) -> {
-            BlockPos pos = payload.pos();
-            String targetName = payload.playerName();
-            ServerPlayerEntity player = context.player();
-            context.server().execute(() -> {
-                if (!(player.getWorld() instanceof net.minecraft.server.world.ServerWorld serverWorld)) return;
-                var manager = com.zhilius.secureplots.plot.PlotManager.getOrCreate(serverWorld);
+                PlotManager manager = PlotManager.getOrCreate(sw);
                 PlotData data = manager.getPlot(pos);
                 if (data == null || !data.getOwnerId().equals(player.getUuid())) return;
 
-                ServerPlayerEntity target = context.server().getPlayerManager().getPlayer(targetName);
+                var nextSize = data.getSize().next();
+                if (nextSize == null) {
+                    player.sendMessage(Text.translatable("sp.upgrade.max_level").formatted(Formatting.RED), false);
+                    return;
+                }
+                data.setSize(nextSize);
+                manager.markDirty();
+
+                Block newBlock = ModBlocks.fromTier(nextSize.tier);
+                sw.setBlockState(pos, newBlock.getDefaultState());
+                player.sendMessage(
+                    Text.translatable("sp.upgrade.success", nextSize.getDisplayName(), nextSize.getRadius(), nextSize.getRadius())
+                        .formatted(Formatting.GREEN), false);
+                sendOpenPlotScreen(player, pos, data);
+            });
+        });
+
+        ServerPlayNetworking.registerGlobalReceiver(AddMemberPayload.ID, (payload, ctx) -> {
+            BlockPos pos = payload.pos();
+            String targetName = payload.playerName();
+            ServerPlayerEntity player = ctx.player();
+            ctx.server().execute(() -> {
+                if (!(player.getWorld() instanceof ServerWorld sw)) return;
+                PlotManager manager = PlotManager.getOrCreate(sw);
+                PlotData data = manager.getPlot(pos);
+                if (data == null || !data.getOwnerId().equals(player.getUuid())) return;
+
+                ServerPlayerEntity target = ctx.server().getPlayerManager().getPlayer(targetName);
                 if (target == null) {
-                    player.sendMessage(net.minecraft.text.Text.translatable("sp.add.player_not_found", targetName)
-                            .formatted(net.minecraft.util.Formatting.RED), false);
+                    player.sendMessage(Text.translatable("sp.add.player_not_found", targetName).formatted(Formatting.RED), false);
                     return;
                 }
                 if (target.getUuid().equals(player.getUuid())) {
-                    player.sendMessage(net.minecraft.text.Text.translatable("sp.add.self")
-                            .formatted(net.minecraft.util.Formatting.RED), false);
+                    player.sendMessage(Text.translatable("sp.add.self").formatted(Formatting.RED), false);
                     return;
                 }
                 if (data.getRoleOf(target.getUuid()) != PlotData.Role.VISITOR) {
-                    player.sendMessage(net.minecraft.text.Text.translatable("sp.member.already_has_access", targetName)
-                            .formatted(net.minecraft.util.Formatting.YELLOW), false);
+                    player.sendMessage(Text.translatable("sp.member.already_has_access", targetName).formatted(Formatting.YELLOW), false);
                     return;
                 }
                 data.addMember(target.getUuid(), target.getName().getString(), PlotData.Role.MEMBER);
                 manager.markDirty();
-                player.sendMessage(net.minecraft.text.Text.translatable("sp.member.added_sender", targetName)
-                        .formatted(net.minecraft.util.Formatting.GREEN), false);
-                target.sendMessage(net.minecraft.text.Text.translatable("sp.member.added_target",
-                        data.getPlotName(), player.getName().getString())
-                        .formatted(net.minecraft.util.Formatting.GREEN), false);
-                // Refresh screen
+                player.sendMessage(Text.translatable("sp.member.added_sender", targetName).formatted(Formatting.GREEN), false);
+                target.sendMessage(Text.translatable("sp.member.added_target", data.getPlotName(), player.getName().getString()).formatted(Formatting.GREEN), false);
                 sendOpenPlotScreen(player, pos, data);
             });
         });
 
-        // Remove member handler
-        ServerPlayNetworking.registerGlobalReceiver(RemoveMemberPayload.ID, (payload, context) -> {
+        ServerPlayNetworking.registerGlobalReceiver(RemoveMemberPayload.ID, (payload, ctx) -> {
             BlockPos pos = payload.pos();
             String targetName = payload.playerName();
-            ServerPlayerEntity player = context.player();
-            context.server().execute(() -> {
-                if (!(player.getWorld() instanceof net.minecraft.server.world.ServerWorld serverWorld)) return;
-                var manager = com.zhilius.secureplots.plot.PlotManager.getOrCreate(serverWorld);
+            ServerPlayerEntity player = ctx.player();
+            ctx.server().execute(() -> {
+                if (!(player.getWorld() instanceof ServerWorld sw)) return;
+                PlotManager manager = PlotManager.getOrCreate(sw);
                 PlotData data = manager.getPlot(pos);
                 if (data == null || !data.getOwnerId().equals(player.getUuid())) return;
 
-                java.util.UUID targetUuid = null;
-                for (java.util.Map.Entry<java.util.UUID, PlotData.Role> entry : data.getMembers().entrySet()) {
-                    if (data.getMemberName(entry.getKey()).equalsIgnoreCase(targetName)) {
-                        targetUuid = entry.getKey();
-                        break;
-                    }
-                }
+                UUID targetUuid = data.getMembers().keySet().stream()
+                    .filter(u -> data.getMemberName(u).equalsIgnoreCase(targetName))
+                    .findFirst().orElse(null);
+
                 if (targetUuid == null) {
-                    player.sendMessage(net.minecraft.text.Text.translatable("sp.member.not_member_simple", targetName)
-                            .formatted(net.minecraft.util.Formatting.RED), false);
+                    player.sendMessage(Text.translatable("sp.member.not_member_simple", targetName).formatted(Formatting.RED), false);
                     return;
                 }
                 data.removeMember(targetUuid);
                 manager.markDirty();
-                player.sendMessage(net.minecraft.text.Text.translatable("sp.member.removed_sender", targetName)
-                        .formatted(net.minecraft.util.Formatting.GREEN), false);
-                ServerPlayerEntity target = context.server().getPlayerManager().getPlayer(targetUuid);
-                if (target != null) {
-                    target.sendMessage(net.minecraft.text.Text.translatable("sp.member.removed_target", data.getPlotName())
-                            .formatted(net.minecraft.util.Formatting.RED), false);
-                }
+                player.sendMessage(Text.translatable("sp.member.removed_sender", targetName).formatted(Formatting.GREEN), false);
+                ServerPlayerEntity target = ctx.server().getPlayerManager().getPlayer(targetUuid);
+                if (target != null)
+                    target.sendMessage(Text.translatable("sp.member.removed_target", data.getPlotName()).formatted(Formatting.RED), false);
                 sendOpenPlotScreen(player, pos, data);
             });
         });
-        // Set permission handler
-        ServerPlayNetworking.registerGlobalReceiver(SetPermissionPayload.ID, (payload, context) -> {
+
+        ServerPlayNetworking.registerGlobalReceiver(SetPermissionPayload.ID, (payload, ctx) -> {
             BlockPos pos = payload.pos();
-            ServerPlayerEntity player = context.player();
-            context.server().execute(() -> {
-                if (!(player.getWorld() instanceof net.minecraft.server.world.ServerWorld serverWorld)) return;
-                var manager = com.zhilius.secureplots.plot.PlotManager.getOrCreate(serverWorld);
+            ServerPlayerEntity player = ctx.player();
+            ctx.server().execute(() -> {
+                if (!(player.getWorld() instanceof ServerWorld sw)) return;
+                PlotManager manager = PlotManager.getOrCreate(sw);
                 PlotData data = manager.getPlot(pos);
                 if (data == null) return;
-                boolean isAdmin = player.getCommandTags().contains(SecurePlotsConfig.INSTANCE != null ? SecurePlotsConfig.INSTANCE.adminTag : "plot_admin");
+                String adminTag = SecurePlotsConfig.INSTANCE != null ? SecurePlotsConfig.INSTANCE.adminTag : "plot_admin";
+                boolean isAdmin = player.getCommandTags().contains(adminTag);
                 if (!data.getOwnerId().equals(player.getUuid()) && !isAdmin) return;
                 try {
-                    java.util.UUID memberUuid = java.util.UUID.fromString(payload.memberUuid());
+                    UUID memberUuid = UUID.fromString(payload.memberUuid());
                     PlotData.Permission perm = PlotData.Permission.valueOf(payload.permission());
                     data.setPermission(memberUuid, perm, payload.enabled());
                     manager.markDirty();
@@ -359,27 +314,18 @@ public class ModPackets {
             });
         });
 
-        // Give plot block (creative tab) — only ops or players with creative mode
-        ServerPlayNetworking.registerGlobalReceiver(GiveBlockPayload.ID, (payload, context) -> {
-            ServerPlayerEntity player = context.player();
+        ServerPlayNetworking.registerGlobalReceiver(GiveBlockPayload.ID, (payload, ctx) -> {
+            ServerPlayerEntity player = ctx.player();
             int tier = payload.tier();
-            context.server().execute(() -> {
-                // Only allow if the player is an operator (adminOpLevel+) or in creative
+            ctx.server().execute(() -> {
                 int opLevel = SecurePlotsConfig.INSTANCE != null ? SecurePlotsConfig.INSTANCE.adminOpLevel : 2;
-                boolean isOp = player.hasPermissionLevel(opLevel);
-                boolean isCreative = player.isCreative();
-                if (!isOp && !isCreative) {
-                    player.sendMessage(net.minecraft.text.Text.translatable("sp.give_block.no_permission")
-                            .formatted(net.minecraft.util.Formatting.RED), false);
+                if (!player.hasPermissionLevel(opLevel) && !player.isCreative()) {
+                    player.sendMessage(Text.translatable("sp.give_block.no_permission").formatted(Formatting.RED), false);
                     return;
                 }
-                net.minecraft.block.Block block = com.zhilius.secureplots.block.ModBlocks.fromTier(tier);
-                net.minecraft.item.ItemStack stack = new net.minecraft.item.ItemStack(block.asItem(), 1);
-                if (!player.giveItemStack(stack)) {
-                    player.dropItem(stack, false);
-                }
-                player.sendMessage(net.minecraft.text.Text.translatable("sp.give_block.success")
-                        .formatted(net.minecraft.util.Formatting.GREEN), true);
+                ItemStack stack = new ItemStack(ModBlocks.fromTier(tier).asItem(), 1);
+                if (!player.giveItemStack(stack)) player.dropItem(stack, false);
+                player.sendMessage(Text.translatable("sp.give_block.success").formatted(Formatting.GREEN), true);
             });
         });
     }

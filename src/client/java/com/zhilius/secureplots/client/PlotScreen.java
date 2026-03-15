@@ -398,13 +398,7 @@ public class PlotScreen extends Screen {
 
         if (cost != null) {
             ctx.drawTextWithShadow(textRenderer, Text.translatable("sp.screen.materials"), x, row, 0x333333);
-            row += gap;
-            if (cost.cobblecoins > 0) {
-                ctx.drawTextWithShadow(textRenderer,
-                    Text.literal("  \u2022 " + cost.cobblecoins + " Cobblecoins"), x, row, 0x000000);
-                row += gap;
-            }
-            for (SecurePlotsConfig.UpgradeCost.ItemCost item : cost.items) {
+            row += gap;            for (SecurePlotsConfig.UpgradeCost.ItemCost item : cost.items) {
                 String raw = item.itemId.contains(":") ? item.itemId.split(":")[1] : item.itemId;
                 String name = Character.toUpperCase(raw.charAt(0)) + raw.substring(1).replace("_", " ");
                 ctx.drawTextWithShadow(textRenderer,

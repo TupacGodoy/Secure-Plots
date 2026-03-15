@@ -16,8 +16,8 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 package com.zhilius.secureplots.item;
-import com.zhilius.secureplots.config.SecurePlotsConfig;
 
+import com.zhilius.secureplots.config.SecurePlotsConfig;
 import com.zhilius.secureplots.network.ModPackets;
 import com.zhilius.secureplots.plot.PlotData;
 import com.zhilius.secureplots.plot.PlotManager;
@@ -46,7 +46,6 @@ import net.minecraft.util.TypedActionResult;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.Heightmap;
 import net.minecraft.world.World;
-import net.minecraft.item.Item.TooltipContext;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -60,40 +59,34 @@ public class PlotblueprintItem extends Item {
 
     @Override
     public TypedActionResult<ItemStack> use(World world, PlayerEntity user, Hand hand) {
-        // Funciona desde ambas manos igual que el mapa de vanilla.
-        // Si el blueprint está en la mano principal Y también en la secundaria,
-        // evitamos doble acción ignorando la mano secundaria en ese caso.
+        // Skip off-hand if main hand also has a blueprint (avoid double action)
         if (hand == Hand.OFF_HAND) {
-            ItemStack mainStack = user.getMainHandStack();
-            // Si la mano principal tiene blueprint o cualquier ítem que ya dispara use(),
-            // dejamos que la mano principal maneje la acción.
-            if (!mainStack.isEmpty() && mainStack.getItem() instanceof PlotblueprintItem) {
+            ItemStack main = user.getMainHandStack();
+            if (!main.isEmpty() && main.getItem() instanceof PlotblueprintItem)
                 return TypedActionResult.pass(user.getStackInHand(hand));
-            }
         }
+
         if (!world.isClient && user instanceof ServerPlayerEntity player) {
             PlotManager manager = PlotManager.getOrCreate((ServerWorld) world);
-            PlotData atPos = manager.getPlotAt(player.getBlockPos());
-            boolean isAdmin = player.getCommandTags().contains(SecurePlotsConfig.INSTANCE != null ? SecurePlotsConfig.INSTANCE.adminTag : "plot_admin");
+            PlotData atPos    = manager.getPlotAt(player.getBlockPos());
+            boolean isAdmin   = isAdmin(player);
 
             if (player.isSneaking()) {
-                // Shift+click: mostrar rayos del borde
+                // Shift+click: show plot border
                 if (atPos != null && (atPos.getRoleOf(player.getUuid()) != PlotData.Role.VISITOR || isAdmin)) {
                     ModPackets.sendShowPlotBorder(player, atPos);
                 } else {
                     player.sendMessage(Text.translatable("sp.block.not_owner"), false);
                 }
             } else {
-                // Click normal: si está dentro de una plot propia → abrir menú de la plot
-                // Si está fuera → abrir lista de parcelas
+                // Normal click: open plot menu if inside own plot, otherwise open plot list
                 if (atPos != null && (atPos.getRoleOf(player.getUuid()) != PlotData.Role.VISITOR || isAdmin)) {
                     BlockPos plotPos = atPos.getCenter();
                     player.openHandledScreen(new SimpleNamedScreenHandlerFactory(
-                            (syncId, inv, p) -> new PlotMenuHandler(syncId, inv, plotPos, atPos, PlotMenuHandler.MenuPage.INFO),
-                            Text.literal("🛡 " + atPos.getPlotName())
+                        (syncId, inv, p) -> new PlotMenuHandler(syncId, inv, plotPos, atPos, PlotMenuHandler.MenuPage.INFO),
+                        Text.literal("🛡 " + atPos.getPlotName())
                     ));
                 } else {
-                    // Fuera de protección → siempre abrir lista (sin shift requerido)
                     List<PlotData> playerPlots = manager.getPlayerPlots(player.getUuid());
                     if (playerPlots.isEmpty()) {
                         player.sendMessage(Text.translatable("sp.error.no_plots"), false);
@@ -106,19 +99,14 @@ public class PlotblueprintItem extends Item {
         return TypedActionResult.success(user.getStackInHand(hand));
     }
 
-    /**
-     * Abre un menú inventario con la lista de plots del jugador.
-     * Cada ítem muestra nombre, coordenadas y permite hacer TP si el flag está activo.
-     */
+    /** Opens an inventory menu listing all the player's plots with TP and menu options. */
     private static void openPlotListMenu(ServerPlayerEntity player, List<PlotData> plots, PlotManager manager) {
-        int rows = Math.min(6, (int) Math.ceil((plots.size() + 9) / 9.0) + 1);
-        rows = Math.max(rows, 2);
+        int rows = Math.max(2, Math.min(6, (int) Math.ceil((plots.size() + 9) / 9.0) + 1));
         int size = rows * 9;
         SimpleInventory inv = new SimpleInventory(size);
 
-        // Header
-        for (int i = 0; i < 9; i++)
-            inv.setStack(i, named(Items.BLACK_STAINED_GLASS_PANE, " "));
+        // Header row
+        for (int i = 0; i < 9; i++) inv.setStack(i, named(Items.BLACK_STAINED_GLASS_PANE, " "));
         inv.setStack(4, namedLore(Items.MAP, "§e🗺 Your Plots",
             "§7Click: Teleport here",
             "§7Right-click: Open plot menu"));
@@ -126,15 +114,14 @@ public class PlotblueprintItem extends Item {
 
         // Plot entries
         for (int i = 0; i < plots.size() && i < size - 9; i++) {
-            PlotData p = plots.get(i);
-            BlockPos c = p.getCenter();
+            PlotData p  = plots.get(i);
+            BlockPos c  = p.getCenter();
             boolean tpOn = p.hasFlag(PlotData.Flag.ALLOW_TP);
-            String tpStatus = tpOn ? "§aPublic TP: ON" : "§7Public TP: OFF";
 
             List<Text> lore = new ArrayList<>();
             lore.add(Text.literal("§7X: §f" + c.getX() + "  §7Z: §f" + c.getZ()).styled(s -> s.withItalic(false)));
             lore.add(Text.translatable("sp.blueprint.lore_tier", p.getSize().getDisplayName()).styled(s -> s.withItalic(false)));
-            lore.add(Text.literal(tpStatus).styled(s -> s.withItalic(false)));
+            lore.add(Text.literal(tpOn ? "§aPublic TP: ON" : "§7Public TP: OFF").styled(s -> s.withItalic(false)));
             lore.add(Text.translatable("sp.blueprint.lore_click").styled(s -> s.withItalic(false)));
             lore.add(Text.translatable("sp.blueprint.lore_rightclick").styled(s -> s.withItalic(false)));
 
@@ -145,46 +132,50 @@ public class PlotblueprintItem extends Item {
             inv.setStack(9 + i, plotItem);
         }
 
-        final int invRows = rows;
         player.openHandledScreen(new SimpleNamedScreenHandlerFactory(
-            (syncId, playerInv, p) -> new PlotListMenuHandler(syncId, playerInv, inv, plots, manager, invRows),
+            (syncId, playerInv, p) -> new PlotListMenuHandler(syncId, playerInv, inv, plots, manager, rows),
             Text.literal("§e🗺 My Plots")
         ));
     }
 
-    // ── Inner handler for plot list menu ──────────────────────────────────────
+    // ── Plot list menu handler ────────────────────────────────────────────────
+
     public static class PlotListMenuHandler extends GenericContainerScreenHandler {
-        private final List<PlotData> plots;
-        private final PlotManager manager;
-        private final ServerPlayerEntity player;
+        private final List<PlotData>      plots;
+        private final PlotManager         manager;
+        private final ServerPlayerEntity  player;
 
         public PlotListMenuHandler(int syncId, PlayerInventory playerInv, SimpleInventory inv,
                                    List<PlotData> plots, PlotManager manager, int rows) {
-            super(rows == 2 ? ScreenHandlerType.GENERIC_9X2 :
-                  rows == 3 ? ScreenHandlerType.GENERIC_9X3 :
-                  rows == 4 ? ScreenHandlerType.GENERIC_9X4 :
-                  rows == 5 ? ScreenHandlerType.GENERIC_9X5 : ScreenHandlerType.GENERIC_9X6,
-                  syncId, playerInv, inv, rows);
-            this.plots = plots;
+            super(rowsToType(rows), syncId, playerInv, inv, rows);
+            this.plots   = plots;
             this.manager = manager;
-            this.player = (ServerPlayerEntity) playerInv.player;
+            this.player  = (ServerPlayerEntity) playerInv.player;
+        }
+
+        private static ScreenHandlerType<GenericContainerScreenHandler> rowsToType(int rows) {
+            return switch (rows) {
+                case 2  -> ScreenHandlerType.GENERIC_9X2;
+                case 3  -> ScreenHandlerType.GENERIC_9X3;
+                case 4  -> ScreenHandlerType.GENERIC_9X4;
+                case 5  -> ScreenHandlerType.GENERIC_9X5;
+                default -> ScreenHandlerType.GENERIC_9X6;
+            };
         }
 
         @Override
         public void onSlotClick(int slotIndex, int button, SlotActionType actionType, PlayerEntity actor) {
-            int size = slots.size() - 36; // subtract player inv slots
+            int size = slots.size() - 36;
             if (slotIndex < 0 || slotIndex >= size) return;
 
-            // Cerrar
             if (slotIndex == 8) { player.closeHandledScreen(); return; }
 
-            // Plot slots start at index 9
             int plotIdx = slotIndex - 9;
             if (plotIdx < 0 || plotIdx >= plots.size()) return;
 
             PlotData plot = plots.get(plotIdx);
 
-            // Shift+click → abrir menú de la plot
+            // Right-click or double-click → open plot menu
             if (actionType == SlotActionType.PICKUP_ALL || button == 1) {
                 player.closeHandledScreen();
                 if (!(player.getWorld() instanceof ServerWorld sw)) return;
@@ -199,11 +190,10 @@ public class PlotblueprintItem extends Item {
                 return;
             }
 
-            // Click normal → TP
+            // Left-click → teleport
             if (!(player.getWorld() instanceof ServerWorld sw)) return;
-            BlockPos c = plot.getCenter();
-            double tpY = sw.getTopPosition(Heightmap.Type.MOTION_BLOCKING_NO_LEAVES,
-                new BlockPos(c.getX(), c.getY(), c.getZ())).getY();
+            BlockPos c  = plot.getCenter();
+            double tpY  = sw.getTopPosition(Heightmap.Type.MOTION_BLOCKING_NO_LEAVES, c).getY();
             player.closeHandledScreen();
             player.teleport(sw, c.getX() + 0.5, tpY, c.getZ() + 0.5,
                 Set.of(), player.getYaw(), player.getPitch());
@@ -211,11 +201,17 @@ public class PlotblueprintItem extends Item {
             sw.playSound(null, player.getBlockPos(), SoundEvents.ENTITY_ENDERMAN_TELEPORT, SoundCategory.PLAYERS, 1f, 1f);
         }
 
-        @Override public boolean canUse(PlayerEntity player) { return true; }
+        @Override public boolean canUse(PlayerEntity player)               { return true; }
         @Override public ItemStack quickMove(PlayerEntity player, int slot) { return ItemStack.EMPTY; }
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
+
+    private static boolean isAdmin(ServerPlayerEntity player) {
+        String tag = SecurePlotsConfig.INSTANCE != null ? SecurePlotsConfig.INSTANCE.adminTag : "plot_admin";
+        return player.getCommandTags().contains(tag);
+    }
+
     private static ItemStack named(Item item, String name) {
         ItemStack stack = new ItemStack(item);
         stack.set(DataComponentTypes.CUSTOM_NAME, Text.literal(name).styled(s -> s.withItalic(false)));
@@ -223,8 +219,7 @@ public class PlotblueprintItem extends Item {
     }
 
     private static ItemStack namedLore(Item item, String name, String... loreLines) {
-        ItemStack stack = new ItemStack(item);
-        stack.set(DataComponentTypes.CUSTOM_NAME, Text.literal(name).styled(s -> s.withItalic(false)));
+        ItemStack stack = named(item, name);
         List<Text> lore = new ArrayList<>();
         for (String line : loreLines)
             lore.add(Text.literal(line).styled(s -> s.withItalic(false)));
@@ -234,28 +229,28 @@ public class PlotblueprintItem extends Item {
 
     private static Item itemForTier(int tier) {
         return switch (tier) {
-            case 0 -> Items.COPPER_INGOT;
-            case 1 -> Items.GOLD_INGOT;
-            case 2 -> Items.EMERALD;
-            case 3 -> Items.DIAMOND;
-            case 4 -> Items.NETHERITE_INGOT;
+            case 0  -> Items.COPPER_INGOT;
+            case 1  -> Items.GOLD_INGOT;
+            case 2  -> Items.EMERALD;
+            case 3  -> Items.DIAMOND;
+            case 4  -> Items.NETHERITE_INGOT;
             default -> Items.PAPER;
         };
     }
 
     private static String tierColor(int tier) {
         return switch (tier) {
-            case 0 -> "§6";
-            case 1 -> "§e";
-            case 2 -> "§a";
-            case 3 -> "§b";
-            case 4 -> "§5";
+            case 0  -> "§6";
+            case 1  -> "§e";
+            case 2  -> "§a";
+            case 3  -> "§b";
+            case 4  -> "§5";
             default -> "§f";
         };
     }
 
     @Override
-    public void appendTooltip(ItemStack stack, TooltipContext context, List<Text> tooltip, TooltipType type) {
+    public void appendTooltip(ItemStack stack, Item.TooltipContext context, List<Text> tooltip, TooltipType type) {
         tooltip.add(Text.translatable("sp.blueprint.tooltip_click").formatted(Formatting.GRAY));
         tooltip.add(Text.translatable("sp.blueprint.tooltip_shift").formatted(Formatting.DARK_GRAY));
     }

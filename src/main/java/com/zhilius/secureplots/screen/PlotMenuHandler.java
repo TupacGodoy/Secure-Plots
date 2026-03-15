@@ -365,17 +365,7 @@ public class PlotMenuHandler extends GenericContainerScreenHandler {
 
         if (cost != null) {
             List<String> costLore = new ArrayList<>();
-            costLore.add("§eYou need:");
-            if (cost.cobblecoins > 0 && cfg != null && !cfg.cobblescoinsItemId.isBlank()) {
-                var coinItem = Registries.ITEM.get(Identifier.of(cfg.cobblescoinsItemId));
-                int hasCoins = countItem(player, coinItem);
-                boolean ok = hasCoins >= cost.cobblecoins;
-                if (!ok) canAfford = false;
-                String coinName = formatItemId(cfg.cobblescoinsItemId);
-                costLore.add((ok ? "§a✔" : "§c✗") + " §7" + coinName + ": "
-                    + (ok ? "§a" : "§c") + hasCoins + "§7/" + cost.cobblecoins);
-            }
-            for (SecurePlotsConfig.UpgradeCost.ItemCost ic : cost.items) {
+            costLore.add("§eYou need:");            for (SecurePlotsConfig.UpgradeCost.ItemCost ic : cost.items) {
                 var item = Registries.ITEM.get(Identifier.of(ic.itemId));
                 int has = countItem(player, item);
                 boolean ok = has >= ic.amount;
@@ -754,16 +744,10 @@ public class PlotMenuHandler extends GenericContainerScreenHandler {
 
         SecurePlotsConfig.UpgradeCost cost = cfg != null ? cfg.getUpgradeCost(fresh.getSize().tier) : null;
         if (cost != null) {
-            if (cost.cobblecoins > 0 && cfg != null && !cfg.cobblescoinsItemId.isBlank()) {
-                var coinItem = Registries.ITEM.get(Identifier.of(cfg.cobblescoinsItemId));
-                if (countItem(player, coinItem) < cost.cobblecoins) { playSound(SoundEvents.ENTITY_VILLAGER_NO, 1f, 0.8f); refreshMenu(); return; }
-            }
             for (var ic : cost.items) {
                 var item = Registries.ITEM.get(Identifier.of(ic.itemId));
                 if (countItem(player, item) < ic.amount) { playSound(SoundEvents.ENTITY_VILLAGER_NO, 1f, 0.8f); refreshMenu(); return; }
             }
-            if (cost.cobblecoins > 0 && cfg != null && !cfg.cobblescoinsItemId.isBlank())
-                removeItem(player, Registries.ITEM.get(Identifier.of(cfg.cobblescoinsItemId)), cost.cobblecoins);
             for (var ic : cost.items)
                 removeItem(player, Registries.ITEM.get(Identifier.of(ic.itemId)), ic.amount);
         }
