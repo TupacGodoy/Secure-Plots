@@ -20,6 +20,7 @@ package com.zhilius.secureplots.config;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import net.fabricmc.loader.api.FabricLoader;
+import net.minecraft.server.network.ServerPlayerEntity;
 
 import java.io.*;
 import java.util.*;
@@ -49,36 +50,22 @@ public class SecurePlotsConfig {
     /** Spawn ambient particles when entering a plot. */
     public boolean enablePlotParticles = true;
 
-    /**
-     * Number of particles in the entry burst (1–5).
-     * Max: 5
-     */
+    /** Number of particles in the entry burst (1–5). */
     public int particleCount = 3;
 
-    /**
-     * Continuous ambient particles spawned while the player is INSIDE the plot (1–5).
-     * Spawned every ambientInterval ticks. Keep low to avoid TPS impact.
-     */
+    /** Continuous ambient particles spawned while inside a plot (1–5). */
     public int ambientParticleCount = 2;
 
-    /**
-     * How often (in ticks) to check if a player entered or left a plot.
-     * 10 = every half second. Lower = more precise but more CPU usage.
-     */
+    /** How often (in ticks) to check if a player entered or left a plot. */
     public int checkInterval = 10;
 
-    /**
-     * How often (in ticks) to spawn continuous ambient particles inside a plot.
-     * 20 = once per second. Higher = less TPS impact.
-     */
+    /** How often (in ticks) to spawn continuous ambient particles inside a plot. */
     public int ambientInterval = 20;
 
     /** Play ambient music when entering a plot. */
     public boolean enablePlotMusic = true;
 
-    /**
-     * Plot music volume (0.1 – 4.0). Default: 4.0
-     */
+    /** Plot music volume (0.1 – 4.0). */
     public float musicVolume = 4.0f;
 
     /** Apply weather override when entering a plot. */
@@ -116,7 +103,10 @@ public class SecurePlotsConfig {
 
     // ── General ───────────────────────────────────────────────────────────────
 
-    /** Maximum plots per player (0 = unlimited). */
+    /**
+     * Default maximum plots per player (0 = unlimited).
+     * Can be overridden per rank via rankPerks.
+     */
     public int maxPlotsPerPlayer = 3;
 
     /** Minimum buffer in blocks between plots to prevent overlap. */
@@ -134,6 +124,195 @@ public class SecurePlotsConfig {
      */
     public List<String> blockedStructurePrefixes = new ArrayList<>(
         Arrays.asList("legendarymonuments:"));
+
+    // ── Rank-based perks ──────────────────────────────────────────────────────
+
+    /**
+     * Per-rank plot feature configuration.
+     *
+     * Each entry maps a command tag (assigned with /tag <player> add <tag>)
+     * to a set of plot feature permissions and limits.
+     *
+     * If a player has multiple rank tags, the BEST value of each field wins
+     * (highest maxPlots, most permissive booleans).
+     *
+     * If a player has no rank tags, the global defaults apply.
+     * The adminTag always bypasses all rank restrictions.
+     *
+     * Example — add three ranks:
+     *   /tag Steve add vip
+     *   /tag Alex add mvp
+     *
+     * Field descriptions:
+     *   tag                — the /tag value to match
+     *   maxPlots           — max plots this rank can own (0 = use global default)
+     *   maxTier            — highest plot tier this rank can place (0–4)
+     *   canRename          — can rename their plot
+     *   canSetMusic        — can set plot music
+     *   canSetParticles    — can set plot particles
+     *   canSetWeather      — can set plot weather override
+     *   canSetTime         — can set plot time override
+     *   canSetEnterExit    — can set enter/exit messages
+     *   canTp              — can use /sp tp
+     *   canFly             — can enable fly in their plot
+     *   canUpgrade         — can upgrade their plot tier
+     *   canGroups          — can create permission groups
+     *   hasRankProtection  — plot is immune to inactivity expiry
+     */
+    public List<RankPerks> rankPerks = new ArrayList<>();
+
+    public static class RankPerks {
+        /** The command tag assigned with /tag <player> add <this value>. */
+        public String  tag                = "";
+
+        /** Maximum plots this rank can own. 0 = use global maxPlotsPerPlayer. */
+        public int     maxPlots           = 0;
+
+        /** Highest plot tier (0–4) this rank can place. Default: 4 (all tiers). */
+        public int     maxTier            = 4;
+
+        /** Can rename their plot. */
+        public boolean canRename          = true;
+
+        /** Can set ambient music on their plot. */
+        public boolean canSetMusic        = true;
+
+        /** Can set ambient particles on their plot. */
+        public boolean canSetParticles    = true;
+
+        /** Can set a weather override on their plot. */
+        public boolean canSetWeather      = true;
+
+        /** Can set a time override on their plot. */
+        public boolean canSetTime         = true;
+
+        /** Can set enter/exit messages on their plot. */
+        public boolean canSetEnterExit    = true;
+
+        /** Can use /sp tp to teleport to their own plot. */
+        public boolean canTp              = true;
+
+        /** Can enable the fly flag on their plot. */
+        public boolean canFly             = true;
+
+        /** Can upgrade their plot to a higher tier. */
+        public boolean canUpgrade         = true;
+
+        /** Can create and manage permission groups. */
+        public boolean canGroups          = true;
+
+        /** Plot is immune to inactivity expiry. */
+        public boolean hasRankProtection  = false;
+
+        public RankPerks() {}
+
+        public RankPerks(String tag) { this.tag = tag; }
+    }
+
+    // ── Rank resolution ───────────────────────────────────────────────────────
+
+    /**
+     * Resolved perks for a player, merging all their rank tags.
+     * Best-value wins: highest maxPlots, most permissive booleans.
+     */
+    public static class ResolvedPerks {
+        public int     maxPlots          = 0;   // 0 = use global default
+        public int     maxTier           = 4;
+        public boolean canRename         = true;
+        public boolean canSetMusic       = true;
+        public boolean canSetParticles   = true;
+        public boolean canSetWeather     = true;
+        public boolean canSetTime        = true;
+        public boolean canSetEnterExit   = true;
+        public boolean canTp             = true;
+        public boolean canFly            = true;
+        public boolean canUpgrade        = true;
+        public boolean canGroups         = true;
+        public boolean hasRankProtection = false;
+        public boolean hasAnyRank        = false;
+    }
+
+    /**
+     * Resolves the effective perks for a player by merging all matching rank tags.
+     * Admin players get full perks regardless.
+     *
+     * @param player the server player to resolve perks for
+     * @return resolved perks (never null)
+     */
+    public ResolvedPerks resolvePerks(ServerPlayerEntity player) {
+        SecurePlotsConfig cfg = SecurePlotsConfig.INSTANCE;
+        ResolvedPerks result = new ResolvedPerks();
+
+        // Admin bypasses everything
+        if (player.getCommandTags().contains(adminTag)
+                || player.hasPermissionLevel(adminOpLevel)) {
+            result.maxPlots          = 0; // unlimited
+            result.maxTier           = 4;
+            result.canRename         = true;
+            result.canSetMusic       = true;
+            result.canSetParticles   = true;
+            result.canSetWeather     = true;
+            result.canSetTime        = true;
+            result.canSetEnterExit   = true;
+            result.canTp             = true;
+            result.canFly            = true;
+            result.canUpgrade        = true;
+            result.canGroups         = true;
+            result.hasRankProtection = true;
+            result.hasAnyRank        = true;
+            return result;
+        }
+
+        if (cfg == null || cfg.rankPerks == null || cfg.rankPerks.isEmpty())
+            return result; // use defaults
+
+        Set<String> playerTags = player.getCommandTags();
+
+        for (RankPerks rank : cfg.rankPerks) {
+            if (rank.tag == null || !playerTags.contains(rank.tag)) continue;
+            result.hasAnyRank = true;
+
+            // Best-value merge: take the most permissive value of each field
+            if (rank.maxPlots > result.maxPlots)    result.maxPlots  = rank.maxPlots;
+            if (rank.maxTier  > result.maxTier)     result.maxTier   = rank.maxTier;
+            result.canRename        |= rank.canRename;
+            result.canSetMusic      |= rank.canSetMusic;
+            result.canSetParticles  |= rank.canSetParticles;
+            result.canSetWeather    |= rank.canSetWeather;
+            result.canSetTime       |= rank.canSetTime;
+            result.canSetEnterExit  |= rank.canSetEnterExit;
+            result.canTp            |= rank.canTp;
+            result.canFly           |= rank.canFly;
+            result.canUpgrade       |= rank.canUpgrade;
+            result.canGroups        |= rank.canGroups;
+            result.hasRankProtection|= rank.hasRankProtection;
+        }
+
+        if (!result.hasAnyRank) {
+            // No rank tags — apply global feature toggles as defaults
+            result.canRename        = true;
+            result.canSetMusic      = cfg.enablePlotMusic;
+            result.canSetParticles  = cfg.enablePlotParticles;
+            result.canSetWeather    = cfg.enablePlotWeather;
+            result.canSetTime       = cfg.enablePlotTime;
+            result.canTp            = cfg.enablePlotTeleport;
+            result.canFly           = cfg.enableFlyInPlots;
+            result.canUpgrade       = cfg.enableUpgrades;
+            result.canGroups        = cfg.enablePermissionGroups;
+        }
+
+        return result;
+    }
+
+    /**
+     * Returns the effective max plots for a player,
+     * considering their rank perks and the global default.
+     */
+    public int getMaxPlotsFor(ServerPlayerEntity player) {
+        ResolvedPerks perks = resolvePerks(player);
+        if (perks.maxPlots > 0) return perks.maxPlots;
+        return maxPlotsPerPlayer; // global default (0 = unlimited)
+    }
 
     // ── Inactivity expiry ─────────────────────────────────────────────────────
 
@@ -153,44 +332,27 @@ public class SecurePlotsConfig {
 
     /**
      * Configuration for each plot tier (0 = Bronze, 4 = Netherite).
-     * Allows changing radius, display name, luminance, hardness and blast resistance.
      */
     public List<TierConfig> tiers = new ArrayList<>();
 
     public static class TierConfig {
-        /** Tier number (0–4). */
-        public int tier;
-        /** Display name shown in menus and commands. */
+        public int    tier;
         public String displayName;
-        /** Plot radius in blocks (total area = radius × radius). */
-        public int radius;
-        /** Block luminance (0–15). */
-        public int luminance;
-        /** Block hardness (mining time). */
-        public float hardness;
-        /** Block blast resistance. */
-        public float blastResistance;
+        public int    radius;
+        public int    luminance;
+        public float  hardness;
+        public float  blastResistance;
 
         public TierConfig() {}
-
         public TierConfig(int tier, String displayName, int radius, int luminance,
                           float hardness, float blastResistance) {
-            this.tier            = tier;
-            this.displayName     = displayName;
-            this.radius          = radius;
-            this.luminance       = luminance;
-            this.hardness        = hardness;
-            this.blastResistance = blastResistance;
+            this.tier = tier; this.displayName = displayName; this.radius = radius;
+            this.luminance = luminance; this.hardness = hardness; this.blastResistance = blastResistance;
         }
     }
 
     // ── Upgrade costs ─────────────────────────────────────────────────────────
 
-    /**
-     * Costs to upgrade from one tier to the next.
-     * Supports items from any mod.
-     * Optionally add a "cobblecoins" field (int) if using cobbleverse economy.
-     */
     public List<UpgradeCost> upgradeCosts = new ArrayList<>();
 
     public static class UpgradeCost {
@@ -201,57 +363,28 @@ public class SecurePlotsConfig {
         public static class ItemCost {
             public String itemId;
             public int    amount;
-
             public ItemCost() {}
-            public ItemCost(String itemId, int amount) {
-                this.itemId  = itemId;
-                this.amount  = amount;
-            }
+            public ItemCost(String itemId, int amount) { this.itemId = itemId; this.amount = amount; }
         }
     }
 
     // ── Crafting recipes ──────────────────────────────────────────────────────
 
-    /**
-     * Crafting recipes for plot blocks and the blueprint item.
-     * Pattern is a 3×3 grid of strings (3 rows, each char maps to a key).
-     * Use " " (space) for empty slots.
-     * Each key maps to any mod item ID.
-     * If disabled=true the recipe is not registered (item only obtainable in creative
-     * or via /sp creative).
-     */
     public List<CraftingRecipe> craftingRecipes = new ArrayList<>();
 
     public static class CraftingRecipe {
-        /** Result item ID, e.g. "secure-plots:bronze_plot_block". */
         public String result;
-        /** Crafting pattern: exactly 3 strings of 3 characters. */
         public String[] pattern;
-        /** Key map: char → item ID. Each key is a character from the pattern. */
         public Map<String, String> key = new LinkedHashMap<>();
-        /** If true, the recipe is not registered. */
         public boolean disabled = false;
-
         public CraftingRecipe() {}
         public CraftingRecipe(String result, String[] pattern, Map<String, String> key) {
-            this.result  = result;
-            this.pattern = pattern;
-            this.key     = key;
+            this.result = result; this.pattern = pattern; this.key = key;
         }
     }
 
     // ── Default permissions by role ───────────────────────────────────────────
 
-    /**
-     * Permissions automatically assigned to a member based on their role.
-     * Valid permissions: BUILD, BREAK, PLACE, INTERACT, CONTAINERS, USE_BEDS,
-     *   USE_CRAFTING, USE_ENCHANTING, USE_ANVIL, USE_FURNACE, USE_BREWING,
-     *   ATTACK_MOBS, ATTACK_ANIMALS, PVP, RIDE_ENTITIES, INTERACT_MOBS,
-     *   LEASH_MOBS, SHEAR_MOBS, MILK_MOBS, CROP_TRAMPLING, PICKUP_ITEMS,
-     *   DROP_ITEMS, BREAK_CROPS, PLANT_SEEDS, USE_BONEMEAL, BREAK_DECOR,
-     *   DETONATE_TNT, GRIEFING, TP, FLY, ENTER, CHAT, COMMAND_USE,
-     *   MANAGE_MEMBERS, MANAGE_PERMS, MANAGE_FLAGS, MANAGE_GROUPS
-     */
     public RoleDefaults roleDefaults = new RoleDefaults();
 
     public static class RoleDefaults {
@@ -266,11 +399,6 @@ public class SecurePlotsConfig {
 
     // ── Default flags for new plots ───────────────────────────────────────────
 
-    /**
-     * Global flags enabled when a new plot is created.
-     * Valid flags: ALLOW_VISITOR_BUILD, ALLOW_VISITOR_INTERACT,
-     *   ALLOW_VISITOR_CONTAINERS, ALLOW_PVP, ALLOW_FLY, ALLOW_TP, GREETINGS
-     */
     public List<String> defaultFlags = new ArrayList<>(Arrays.asList("ALLOW_TP", "GREETINGS"));
 
     // ── Load / Save ───────────────────────────────────────────────────────────
@@ -298,25 +426,19 @@ public class SecurePlotsConfig {
         }
     }
 
-    /** Fills in missing fields when loading an older config file. */
     private static void applyBackwardsCompat(SecurePlotsConfig c) {
-        if (c.tiers == null || c.tiers.isEmpty())
-            c.tiers = createDefaultTiers();
-        if (c.roleDefaults == null)
-            c.roleDefaults = new RoleDefaults();
-        if (c.defaultFlags == null || c.defaultFlags.isEmpty())
-            c.defaultFlags = new ArrayList<>(Arrays.asList("ALLOW_TP", "GREETINGS"));
-        if (c.blockedStructurePrefixes == null)
-            c.blockedStructurePrefixes = new ArrayList<>(Arrays.asList("legendarymonuments:"));
-        if (c.adminTag == null || c.adminTag.isEmpty())
-            c.adminTag = "plot_admin";
-        if (c.particleCount     <= 0 || c.particleCount > 5)  c.particleCount = 3;
+        if (c.tiers == null || c.tiers.isEmpty())                  c.tiers = createDefaultTiers();
+        if (c.roleDefaults == null)                                 c.roleDefaults = new RoleDefaults();
+        if (c.defaultFlags == null || c.defaultFlags.isEmpty())     c.defaultFlags = new ArrayList<>(Arrays.asList("ALLOW_TP", "GREETINGS"));
+        if (c.blockedStructurePrefixes == null)                     c.blockedStructurePrefixes = new ArrayList<>(Arrays.asList("legendarymonuments:"));
+        if (c.adminTag == null || c.adminTag.isEmpty())             c.adminTag = "plot_admin";
+        if (c.rankPerks == null)                                    c.rankPerks = new ArrayList<>();
+        if (c.particleCount <= 0 || c.particleCount > 5)           c.particleCount = 3;
         if (c.ambientParticleCount <= 0 || c.ambientParticleCount > 5) c.ambientParticleCount = 2;
-        if (c.musicVolume       <= 0f || c.musicVolume > 4f)  c.musicVolume = 4.0f;
-        if (c.checkInterval     <= 0) c.checkInterval  = 10;
-        if (c.ambientInterval   <= 0) c.ambientInterval = 20;
-        if (c.craftingRecipes == null || c.craftingRecipes.isEmpty())
-            c.craftingRecipes = createDefault().craftingRecipes;
+        if (c.musicVolume <= 0f || c.musicVolume > 4f)             c.musicVolume = 4.0f;
+        if (c.checkInterval <= 0)                                   c.checkInterval = 10;
+        if (c.ambientInterval <= 0)                                 c.ambientInterval = 20;
+        if (c.craftingRecipes == null || c.craftingRecipes.isEmpty()) c.craftingRecipes = createDefault().craftingRecipes;
     }
 
     // ── Default config ────────────────────────────────────────────────────────
@@ -324,6 +446,24 @@ public class SecurePlotsConfig {
     private static SecurePlotsConfig createDefault() {
         SecurePlotsConfig cfg = new SecurePlotsConfig();
         cfg.tiers = createDefaultTiers();
+
+        // Example rank: VIP gets 5 plots, all features
+        RankPerks vip = new RankPerks("vip");
+        vip.maxPlots = 5; vip.maxTier = 4;
+        cfg.rankPerks.add(vip);
+
+        // Example rank: MVP gets 10 plots, all features + rank protection
+        RankPerks mvp = new RankPerks("mvp");
+        mvp.maxPlots = 10; mvp.maxTier = 4; mvp.hasRankProtection = true;
+        cfg.rankPerks.add(mvp);
+
+        // Example rank: basic gets 2 plots, limited features
+        RankPerks basic = new RankPerks("basic");
+        basic.maxPlots = 2; basic.maxTier = 1;
+        basic.canSetMusic = false; basic.canSetParticles = false;
+        basic.canSetWeather = false; basic.canSetTime = false;
+        basic.canFly = false; basic.canUpgrade = false; basic.canGroups = false;
+        cfg.rankPerks.add(basic);
 
         // Bronze (0) → Gold (1)
         UpgradeCost u1 = new UpgradeCost();
@@ -349,24 +489,19 @@ public class SecurePlotsConfig {
         u4.items.add(new UpgradeCost.ItemCost("minecraft:netherite_block", 1));
         cfg.upgradeCosts.add(u4);
 
-        // Crafting recipes
         Map<String,String> bronzeKey = new LinkedHashMap<>();
         bronzeKey.put("C", "minecraft:copper_block");
         bronzeKey.put("B", "minecraft:redstone_block");
         bronzeKey.put("H", "minecraft:heart_of_the_sea");
-        cfg.craftingRecipes.add(new CraftingRecipe(
-            "secure-plots:bronze_plot_block",
-            new String[]{"CBC", "BHB", "CBC"},
-            bronzeKey));
+        cfg.craftingRecipes.add(new CraftingRecipe("secure-plots:bronze_plot_block",
+            new String[]{"CBC","BHB","CBC"}, bronzeKey));
 
         Map<String,String> blueprintKey = new LinkedHashMap<>();
         blueprintKey.put("S", "minecraft:amethyst_shard");
         blueprintKey.put("P", "minecraft:paper");
         blueprintKey.put("C", "minecraft:compass");
-        cfg.craftingRecipes.add(new CraftingRecipe(
-            "secure-plots:plot_blueprint",
-            new String[]{"SPS", "PCP", "SPS"},
-            blueprintKey));
+        cfg.craftingRecipes.add(new CraftingRecipe("secure-plots:plot_blueprint",
+            new String[]{"SPS","PCP","SPS"}, blueprintKey));
 
         return cfg;
     }
@@ -383,17 +518,13 @@ public class SecurePlotsConfig {
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
-    /** Returns the upgrade cost from a specific tier, or null if not configured. */
     public UpgradeCost getUpgradeCost(int fromTier) {
-        for (UpgradeCost cost : upgradeCosts)
-            if (cost.fromTier == fromTier) return cost;
+        for (UpgradeCost cost : upgradeCosts) if (cost.fromTier == fromTier) return cost;
         return null;
     }
 
-    /** Returns the config for a tier, falling back to safe values if not found. */
     public TierConfig getTierConfig(int tier) {
-        for (TierConfig t : tiers)
-            if (t.tier == tier) return t;
+        for (TierConfig t : tiers) if (t.tier == tier) return t;
         return new TierConfig(tier, "Tier " + tier, 15 + tier * 10, 4 + tier, 50f, 1200f);
     }
 }

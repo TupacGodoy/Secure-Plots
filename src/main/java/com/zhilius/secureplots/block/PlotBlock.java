@@ -21,6 +21,7 @@ import com.mojang.serialization.MapCodec;
 import com.zhilius.secureplots.blockentity.ModBlockEntities;
 import com.zhilius.secureplots.blockentity.PlotBlockEntity;
 import com.zhilius.secureplots.config.SecurePlotsConfig;
+import com.zhilius.secureplots.config.SecurePlotsConfig.ResolvedPerks;
 import com.zhilius.secureplots.network.ModPackets;
 import com.zhilius.secureplots.plot.PlotData;
 import com.zhilius.secureplots.plot.PlotManager;
@@ -106,10 +107,21 @@ public class PlotBlock extends BlockWithEntity {
             return;
         }
 
-        if (cfg != null && cfg.maxPlotsPerPlayer > 0
-                && manager.getPlayerPlots(player.getUuid()).size() >= cfg.maxPlotsPerPlayer) {
+        // Check rank-based max plots and max tier
+        ResolvedPerks perks = cfg != null ? cfg.resolvePerks(player) : null;
+        int effectiveMaxPlots = (perks != null && perks.maxPlots > 0) ? perks.maxPlots
+            : (cfg != null ? cfg.maxPlotsPerPlayer : 0);
+        if (effectiveMaxPlots > 0
+                && manager.getPlayerPlots(player.getUuid()).size() >= effectiveMaxPlots) {
             world.breakBlock(pos, true, player);
-            player.sendMessage(Text.translatable("sp.block.max_plots", cfg.maxPlotsPerPlayer), false);
+            player.sendMessage(Text.translatable("sp.block.max_plots", effectiveMaxPlots), false);
+            return;
+        }
+        // Check rank-based max tier
+        int allowedMaxTier = perks != null ? perks.maxTier : 4;
+        if (this.tier > allowedMaxTier) {
+            world.breakBlock(pos, true, player);
+            player.sendMessage(Text.translatable("sp.block.tier_not_allowed"), false);
             return;
         }
 

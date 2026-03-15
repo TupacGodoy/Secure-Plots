@@ -261,5 +261,11 @@
   "sp.help.plot_music_header": "§e══ Music options ══",
   "sp.help.plot_music_usage": "§7Usage: §e/sp plot music <sound_id|clear>",
   "sp.help.plot_music_discs": "§7Music disc options:",
-  "sp.help.plot_music_bg": "§7Background music options:"
+  "sp.help.plot_music_bg": "§7Background music options:",
+  "sp.block.tier_not_allowed": "§c✗ Your rank does not allow placing this tier of plot block.",
+  "sp.rank.no_perm": "§c✗ Your rank does not allow: %s.",
+  "sp.help.myrank": "§e/sp myrank §7— Show your plot rank perks",
+  "sp.help.admin_listall": "§e/sp admin listall [page] §7— List all plots on the server",
+  "sp.help.admin_search": "§e/sp admin search <player> [page] §7— Search plots by player",
+  "sp.help.admin_nearby": "§e/sp admin nearby [count] [x y z] §7— Find nearest plots"
 }

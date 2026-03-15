@@ -24,10 +24,12 @@ import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.suggestion.Suggestions;
 import com.mojang.brigadier.suggestion.SuggestionsBuilder;
 import com.zhilius.secureplots.config.SecurePlotsConfig;
+import com.zhilius.secureplots.config.SecurePlotsConfig.ResolvedPerks;
 import com.zhilius.secureplots.network.ModPackets;
 import com.zhilius.secureplots.plot.PlotData;
 import com.zhilius.secureplots.plot.PlotManager;
 import com.zhilius.secureplots.plot.PlotSize;
+import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.zhilius.secureplots.block.ModBlocks;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.minecraft.registry.Registries;
@@ -119,6 +121,10 @@ public class SpCommand {
                 // /sp upgrade
                 .then(CommandManager.literal("upgrade")
                     .executes(ctx -> executeUpgrade(ctx.getSource())))
+
+                // /sp myrank  — shows the player their current rank perks
+                .then(CommandManager.literal("myrank")
+                    .executes(ctx -> executeMyRank(ctx.getSource())))
 
                 // /sp flag [flag] [value] [plot]
                 .then(CommandManager.literal("flag")
@@ -256,6 +262,35 @@ public class SpCommand {
                 .then(CommandManager.literal("admin")
                     .requires(src -> src.hasPermissionLevel(
                         SecurePlotsConfig.INSTANCE != null ? SecurePlotsConfig.INSTANCE.adminOpLevel : 2))
+                    // /sp admin listall [page]  — all plots on the server
+                    .then(CommandManager.literal("listall")
+                        .executes(ctx -> executeAdminListAll(ctx.getSource(), 1, null))
+                        .then(CommandManager.argument("page", IntegerArgumentType.integer(1))
+                            .executes(ctx -> executeAdminListAll(ctx.getSource(),
+                                IntegerArgumentType.getInteger(ctx, "page"), null))))
+                    // /sp admin search <player> [page]  — all plots of a player
+                    .then(CommandManager.literal("search")
+                        .then(CommandManager.argument("player", StringArgumentType.word())
+                            .executes(ctx -> executeAdminSearch(ctx.getSource(),
+                                StringArgumentType.getString(ctx, "player"), 1))
+                            .then(CommandManager.argument("page", IntegerArgumentType.integer(1))
+                                .executes(ctx -> executeAdminSearch(ctx.getSource(),
+                                    StringArgumentType.getString(ctx, "player"),
+                                    IntegerArgumentType.getInteger(ctx, "page"))))))
+                    // /sp admin nearby [count]  — plots nearest to the admin (or given coords)
+                    .then(CommandManager.literal("nearby")
+                        .executes(ctx -> executeAdminNearby(ctx.getSource(), null, null, null, 10))
+                        .then(CommandManager.argument("count", IntegerArgumentType.integer(1, 50))
+                            .executes(ctx -> executeAdminNearby(ctx.getSource(), null, null, null,
+                                IntegerArgumentType.getInteger(ctx, "count")))
+                            .then(CommandManager.argument("x", IntegerArgumentType.integer())
+                                .then(CommandManager.argument("y", IntegerArgumentType.integer())
+                                    .then(CommandManager.argument("z", IntegerArgumentType.integer())
+                                        .executes(ctx -> executeAdminNearby(ctx.getSource(),
+                                            IntegerArgumentType.getInteger(ctx, "x"),
+                                            IntegerArgumentType.getInteger(ctx, "y"),
+                                            IntegerArgumentType.getInteger(ctx, "z"),
+                                            IntegerArgumentType.getInteger(ctx, "count"))))))))
                     .then(CommandManager.literal("list")
                         .then(CommandManager.argument("player", StringArgumentType.word())
                             .executes(ctx -> executeAdminList(ctx.getSource(),
@@ -368,6 +403,18 @@ public class SpCommand {
                                         StringArgumentType.getString(ctx, "plot"),
                                         "exit",
                                         StringArgumentType.getString(ctx, "message")))))))
+                    .then(CommandManager.literal("setrank")
+                        .then(CommandManager.argument("player", StringArgumentType.word())
+                            .then(CommandManager.argument("tag", StringArgumentType.word())
+                                .executes(ctx -> executeAdminSetRank(ctx.getSource(),
+                                    StringArgumentType.getString(ctx, "player"),
+                                    StringArgumentType.getString(ctx, "tag"), true)))))
+                    .then(CommandManager.literal("removerank")
+                        .then(CommandManager.argument("player", StringArgumentType.word())
+                            .then(CommandManager.argument("tag", StringArgumentType.word())
+                                .executes(ctx -> executeAdminSetRank(ctx.getSource(),
+                                    StringArgumentType.getString(ctx, "player"),
+                                    StringArgumentType.getString(ctx, "tag"), false)))))
                     .then(CommandManager.literal("reload")
                         .executes(ctx -> executeAdminReload(ctx.getSource()))))
             );
@@ -548,6 +595,14 @@ public class SpCommand {
         if (!plot.getOwnerId().equals(player.getUuid())) {
             player.sendMessage(Text.translatable("sp.error.not_owner").formatted(Formatting.RED), false); return 0;
         }
+        // Rank check
+        SecurePlotsConfig cfg = SecurePlotsConfig.INSTANCE;
+        if (cfg != null) {
+            ResolvedPerks perks = cfg.resolvePerks(player);
+            if (!perks.canRename) {
+                player.sendMessage(Text.translatable("sp.rank.no_perm", "rename").formatted(Formatting.RED), false); return 0;
+            }
+        }
         return doRename(player, manager, plot, newName);
     }
 
@@ -684,6 +739,15 @@ public class SpCommand {
         if (plot == null) { player.sendMessage(Text.translatable("sp.error.not_in_plot").formatted(Formatting.RED), false); return 0; }
         if (!plot.getOwnerId().equals(player.getUuid())) {
             player.sendMessage(Text.translatable("sp.error.not_owner").formatted(Formatting.RED), false); return 0;
+        }
+        {
+            SecurePlotsConfig _cfg = SecurePlotsConfig.INSTANCE;
+            if (_cfg != null) {
+                ResolvedPerks _perks = _cfg.resolvePerks(player);
+                if (!_perks.canUpgrade) {
+                    player.sendMessage(Text.translatable("sp.rank.no_perm", "upgrade").formatted(Formatting.RED), false); return 0;
+                }
+            }
         }
         PlotSize next = plot.getSize().next();
         if (next == null) { player.sendMessage(Text.translatable("sp.upgrade.max_level").formatted(Formatting.RED), false); return 0; }
@@ -938,6 +1002,12 @@ public class SpCommand {
         if (player == null) return 0;
         PlotData plot = getOwnedPlotAt(player);
         if (plot == null) return 0;
+        {
+            SecurePlotsConfig _cfg = SecurePlotsConfig.INSTANCE;
+            if (_cfg != null && !_cfg.resolvePerks(player).canSetParticles) {
+                player.sendMessage(Text.translatable("sp.rank.no_perm", "particles").formatted(Formatting.RED), false); return 0;
+            }
+        }
         String value = type.equalsIgnoreCase("clear") || type.equalsIgnoreCase("none") ? ""
             : (type.contains(":") ? type : "minecraft:" + type);
         plot.setParticleEffect(value);
@@ -982,6 +1052,12 @@ public class SpCommand {
         if (player == null) return 0;
         PlotData plot = getOwnedPlotAt(player);
         if (plot == null) return 0;
+        {
+            SecurePlotsConfig _cfg = SecurePlotsConfig.INSTANCE;
+            if (_cfg != null && !_cfg.resolvePerks(player).canSetMusic) {
+                player.sendMessage(Text.translatable("sp.rank.no_perm", "music").formatted(Formatting.RED), false); return 0;
+            }
+        }
         String value = soundId.equalsIgnoreCase("clear") || soundId.equalsIgnoreCase("none") ? "" : soundId;
         plot.setMusicSound(value);
         PlotManager.getOrCreate(player.getServerWorld()).markDirty();
@@ -1001,6 +1077,120 @@ public class SpCommand {
         player.sendMessage(value.isEmpty()
             ? Text.literal("§a✔ " + (isEnter ? "Enter" : "Exit") + " message cleared.")
             : Text.translatable("sp.message.updated", value).formatted(Formatting.GREEN), false);
+        return 1;
+    }
+
+    // ── /sp admin listall ────────────────────────────────────────────────────
+
+    private static final int PAGE_SIZE = 10;
+
+    private static int executeAdminListAll(ServerCommandSource source, int page, String filter) {
+        ServerPlayerEntity admin = source.getPlayer();
+        if (admin == null) return 0;
+        PlotManager manager = PlotManager.getOrCreate(admin.getServerWorld());
+        List<PlotData> all = manager.getAllPlots();
+        if (all.isEmpty()) { admin.sendMessage(Text.literal("§7No plots on this server."), false); return 0; }
+
+        // Sort by owner name then plot name
+        all.sort(Comparator.comparing(PlotData::getOwnerName).thenComparing(PlotData::getPlotName));
+
+        int total = all.size();
+        int pages  = (int) Math.ceil(total / (double) PAGE_SIZE);
+        int p      = Math.max(1, Math.min(page, pages));
+        int start  = (p - 1) * PAGE_SIZE;
+        int end    = Math.min(start + PAGE_SIZE, total);
+
+        admin.sendMessage(Text.literal("§6🛡 All plots — page §e" + p + "§6/§e" + pages + " §8(total: " + total + ")").formatted(Formatting.BOLD), false);
+        for (int i = start; i < end; i++) {
+            PlotData pd = all.get(i);
+            BlockPos  c  = pd.getCenter();
+            admin.sendMessage(Text.literal(
+                "  §7" + (i + 1) + ". §f" + pd.getPlotName() +
+                " §8[" + pd.getSize().getDisplayName() + "] " +
+                "§7owner: §a" + pd.getOwnerName() +
+                " §8@ " + c.getX() + ", " + c.getY() + ", " + c.getZ()), false);
+        }
+        if (pages > 1)
+            admin.sendMessage(Text.literal("§8Use §e/sp admin listall " + (p + 1) + " §8for next page."), false);
+        return 1;
+    }
+
+    // ── /sp admin search <player> [page] ─────────────────────────────────────
+
+    private static int executeAdminSearch(ServerCommandSource source, String ownerName, int page) {
+        ServerPlayerEntity admin = source.getPlayer();
+        if (admin == null) return 0;
+        UUID ownerUuid = resolveUuid(source, ownerName);
+        if (ownerUuid == null) {
+            admin.sendMessage(Text.translatable("sp.add.player_not_found", ownerName).formatted(Formatting.RED), false);
+            return 0;
+        }
+        List<PlotData> plots = PlotManager.getOrCreate(admin.getServerWorld()).getPlayerPlots(ownerUuid);
+        if (plots.isEmpty()) { admin.sendMessage(Text.literal("§7" + ownerName + " has no plots."), false); return 0; }
+
+        int total = plots.size();
+        int pages  = (int) Math.ceil(total / (double) PAGE_SIZE);
+        int p      = Math.max(1, Math.min(page, pages));
+        int start  = (p - 1) * PAGE_SIZE;
+        int end    = Math.min(start + PAGE_SIZE, total);
+
+        admin.sendMessage(Text.literal("§6🛡 Plots of §e" + ownerName + " §8(§e" + total + "§8) — page " + p + "/" + pages).formatted(Formatting.BOLD), false);
+        for (int i = start; i < end; i++) {
+            PlotData pd = plots.get(i);
+            BlockPos  c  = pd.getCenter();
+            admin.sendMessage(Text.literal(
+                "  " + (i + 1) + ". §f" + pd.getPlotName() +
+                " §8[" + pd.getSize().getDisplayName() + "]" +
+                " §8@ " + c.getX() + ", " + c.getY() + ", " + c.getZ()), false);
+        }
+        if (pages > 1)
+            admin.sendMessage(Text.literal("§8Use §e/sp admin search " + ownerName + " " + (p + 1) + " §8for next page."), false);
+        return 1;
+    }
+
+    // ── /sp admin nearby [count] [x y z] ─────────────────────────────────────
+
+    private static int executeAdminNearby(ServerCommandSource source,
+                                          Integer ox, Integer oy, Integer oz, int count) {
+        ServerPlayerEntity admin = source.getPlayer();
+        if (admin == null) return 0;
+
+        // Use given coords or fall back to admin's position
+        final double refX, refZ;
+        if (ox != null && oz != null) {
+            refX = ox; refZ = oz;
+        } else {
+            refX = admin.getX(); refZ = admin.getZ();
+        }
+
+        PlotManager manager = PlotManager.getOrCreate(admin.getServerWorld());
+        List<PlotData> all  = manager.getAllPlots();
+        if (all.isEmpty()) { admin.sendMessage(Text.literal("§7No plots on this server."), false); return 0; }
+
+        // Sort by 2D distance (XZ) to the reference point
+        all.sort(Comparator.comparingDouble(pd -> {
+            double dx = pd.getCenter().getX() - refX;
+            double dz = pd.getCenter().getZ() - refZ;
+            return dx * dx + dz * dz;
+        }));
+
+        int shown = Math.min(count, all.size());
+        String origin = (ox != null && oz != null)
+            ? "§8coords §e" + ox + ", " + (oy != null ? oy : "~") + ", " + oz
+            : "§8your position";
+        admin.sendMessage(Text.literal("§6🛡 " + shown + " nearest plot(s) to " + origin).formatted(Formatting.BOLD), false);
+
+        for (int i = 0; i < shown; i++) {
+            PlotData pd = all.get(i);
+            BlockPos  c  = pd.getCenter();
+            int dist = (int) Math.sqrt(Math.pow(c.getX() - refX, 2) + Math.pow(c.getZ() - refZ, 2));
+            admin.sendMessage(Text.literal(
+                "  " + (i + 1) + ". §f" + pd.getPlotName() +
+                " §8[" + pd.getSize().getDisplayName() + "]" +
+                " §7owner: §a" + pd.getOwnerName() +
+                " §8@ " + c.getX() + ", " + c.getY() + ", " + c.getZ() +
+                " §8(§e" + dist + "m§8)"), false);
+        }
         return 1;
     }
 
@@ -1181,6 +1371,59 @@ public class SpCommand {
         Text msg = Text.literal("§a\u2714 SecurePlots config reloaded.");
         if (admin != null) admin.sendMessage(msg, false);
         else source.sendFeedback(() -> msg, false);
+        return 1;
+    }
+
+    // ── /sp myrank ────────────────────────────────────────────────────────────
+
+    private static int executeMyRank(ServerCommandSource source) {
+        ServerPlayerEntity player = source.getPlayer();
+        if (player == null) return 0;
+        SecurePlotsConfig cfg = SecurePlotsConfig.INSTANCE;
+        if (cfg == null) { player.sendMessage(Text.literal("§cConfig not loaded."), false); return 0; }
+
+        ResolvedPerks perks = cfg.resolvePerks(player);
+        int maxPlots = cfg.getMaxPlotsFor(player);
+
+        player.sendMessage(Text.literal("§e══ Your Plot Rank Perks ══"), false);
+        player.sendMessage(Text.literal("§7Max plots:    §f" + (maxPlots == 0 ? "unlimited" : maxPlots)), false);
+        player.sendMessage(Text.literal("§7Max tier:     §f" + perks.maxTier + " (" + cfg.getTierConfig(perks.maxTier).displayName + ")"), false);
+        player.sendMessage(Text.literal("§7Rename:       " + perkIcon(perks.canRename)), false);
+        player.sendMessage(Text.literal("§7Music:        " + perkIcon(perks.canSetMusic)), false);
+        player.sendMessage(Text.literal("§7Particles:    " + perkIcon(perks.canSetParticles)), false);
+        player.sendMessage(Text.literal("§7Weather:      " + perkIcon(perks.canSetWeather)), false);
+        player.sendMessage(Text.literal("§7Time:         " + perkIcon(perks.canSetTime)), false);
+        player.sendMessage(Text.literal("§7Enter/Exit:   " + perkIcon(perks.canSetEnterExit)), false);
+        player.sendMessage(Text.literal("§7Teleport:     " + perkIcon(perks.canTp)), false);
+        player.sendMessage(Text.literal("§7Fly:          " + perkIcon(perks.canFly)), false);
+        player.sendMessage(Text.literal("§7Upgrade:      " + perkIcon(perks.canUpgrade)), false);
+        player.sendMessage(Text.literal("§7Groups:       " + perkIcon(perks.canGroups)), false);
+        player.sendMessage(Text.literal("§7Rank protect: " + perkIcon(perks.hasRankProtection)), false);
+        return 1;
+    }
+
+    private static String perkIcon(boolean enabled) {
+        return enabled ? "§a✔" : "§c✗";
+    }
+
+    // ── /sp admin setrank / removerank ────────────────────────────────────────
+
+    private static int executeAdminSetRank(ServerCommandSource source, String targetName, String tag, boolean add) {
+        ServerPlayerEntity admin = source.getPlayer();
+        if (admin == null) return 0;
+        ServerPlayerEntity target = source.getServer().getPlayerManager().getPlayer(targetName);
+        if (target == null) {
+            if (admin != null) admin.sendMessage(Text.translatable("sp.add.player_not_found", targetName).formatted(Formatting.RED), false);
+            return 0;
+        }
+        if (add) {
+            target.addCommandTag(tag);
+            admin.sendMessage(Text.literal("§a✔ §fTag §e" + tag + " §fadded to §a" + targetName), false);
+            target.sendMessage(Text.literal("§aYou received the rank tag §e" + tag), false);
+        } else {
+            target.removeCommandTag(tag);
+            admin.sendMessage(Text.literal("§a✔ §fTag §e" + tag + " §fremoved from §c" + targetName), false);
+        }
         return 1;
     }
 
