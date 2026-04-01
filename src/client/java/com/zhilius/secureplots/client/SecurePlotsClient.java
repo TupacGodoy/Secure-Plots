@@ -21,12 +21,15 @@ import net.minecraft.client.sound.PositionedSoundInstance;
 import net.minecraft.sound.SoundEvents;
 import net.minecraft.util.math.BlockPos;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 public class SecurePlotsClient implements ClientModInitializer {
 
-    public static final List<BorderDisplay> activeBorders = new ArrayList<>();
+    // LinkedHashMap keyed by plot center BlockPos:
+    //  - O(1) lookup in findBorderByCenter() and remove-by-pos, vs O(n) with a List.
+    //  - Insertion-ordered iteration preserves render order.
+    public static final Map<BlockPos, BorderDisplay> activeBorders = new LinkedHashMap<>();
 
     // -------------------------------------------------------------------------
     // Inner class: BorderDisplay
@@ -151,7 +154,7 @@ public class SecurePlotsClient implements ClientModInitializer {
             (payload, ctx) -> {
                 BlockPos pos = payload.pos();
                 ctx.client().execute(() -> {
-                    activeBorders.removeIf(b -> b.data.getCenter().equals(pos));
+                    activeBorders.remove(pos);
                     PlotHologramClient.hide(pos);
                 });
             });
@@ -173,7 +176,8 @@ public class SecurePlotsClient implements ClientModInitializer {
         if (PlotBorderRendererConfig.current.hologramEnabled) {
             PlotHologramClient.show(data, data.getCenter(), 10_000);
         }
-        BorderDisplay existing = findBorderByCenter(data.getCenter());
+        // O(1) lookup via map key instead of O(n) linear scan
+        BorderDisplay existing = activeBorders.get(data.getCenter());
         if (existing != null) {
             if (existing.data.getSize().tier != data.getSize().tier) {
                 existing.upgrade(data);
@@ -182,17 +186,9 @@ public class SecurePlotsClient implements ClientModInitializer {
                 existing.refresh(data);
             }
         } else {
-            activeBorders.add(new BorderDisplay(data));
+            activeBorders.put(data.getCenter(), new BorderDisplay(data));
             playAppearSound(mc);
         }
-    }
-
-    /** Returns the first BorderDisplay whose center matches, or null. */
-    private static BorderDisplay findBorderByCenter(BlockPos center) {
-        for (BorderDisplay bd : activeBorders) {
-            if (bd.data.getCenter().equals(center)) return bd;
-        }
-        return null;
     }
 
     // -------------------------------------------------------------------------
@@ -214,8 +210,8 @@ public class SecurePlotsClient implements ClientModInitializer {
     private void registerWorldRenderer() {
         WorldRenderEvents.AFTER_TRANSLUCENT.register(context -> {
             if (activeBorders.isEmpty()) return; // skip entirely when no borders are active
-            activeBorders.removeIf(BorderDisplay::isExpired);
-            activeBorders.forEach(bd -> PlotBorderRenderer.render(context, bd));
+            activeBorders.values().removeIf(BorderDisplay::isExpired);
+            activeBorders.values().forEach(bd -> PlotBorderRenderer.render(context, bd));
         });
     }
 

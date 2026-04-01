@@ -36,6 +36,7 @@ import net.minecraft.util.Identifier;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
 
+import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -58,6 +59,12 @@ public class PlotAreaTracker {
     private static final Map<UUID, Boolean>  flyGranted   = new ConcurrentHashMap<>();
     private static final Map<UUID, Long>     savedTime    = new ConcurrentHashMap<>();
     private static final Map<UUID, String>   savedWeather = new ConcurrentHashMap<>();
+
+    // ── Registry lookup caches ────────────────────────────────────────────────
+    // Resolving Identifiers and doing Registries lookups on every tick is expensive.
+    // Cache results by their string key; null value means "invalid/not found".
+    private static final Map<String, ParticleEffect> particleCache = new HashMap<>();
+    private static final Map<String, SoundEvent>     soundCache    = new HashMap<>();
 
     private static int tick        = 0;
     private static int ambientTick = 0;
@@ -191,11 +198,15 @@ public class PlotAreaTracker {
     // ── Particles ─────────────────────────────────────────────────────────────
 
     private static ParticleEffect resolveParticle(String particleId) {
-        String normalized = particleId.contains(":") ? particleId : "minecraft:" + particleId;
-        Identifier rid = Identifier.tryParse(normalized);
-        if (rid == null) return null;
-        ParticleType<?> type = Registries.PARTICLE_TYPE.get(rid);
-        return type instanceof ParticleEffect effect ? effect : null;
+        // computeIfAbsent caches the result (including null for invalid IDs)
+        // so Identifier.tryParse + Registries.get() only run once per unique particle ID.
+        return particleCache.computeIfAbsent(particleId, id -> {
+            String normalized = id.contains(":") ? id : "minecraft:" + id;
+            Identifier rid = Identifier.tryParse(normalized);
+            if (rid == null) return null;
+            ParticleType<?> type = Registries.PARTICLE_TYPE.get(rid);
+            return type instanceof ParticleEffect effect ? effect : null;
+        });
     }
 
     private static void spawnEnterParticles(ServerWorld sw, ServerPlayerEntity player, String particleId) {
@@ -250,9 +261,11 @@ public class PlotAreaTracker {
 
     private static void playMusic(ServerPlayerEntity player, ServerWorld sw, String soundId, SecurePlotsConfig cfg) {
         try {
-            Identifier rid = Identifier.tryParse(soundId);
-            if (rid == null) return;
-            SoundEvent event = Registries.SOUND_EVENT.get(rid);
+            // Cache SoundEvent lookup — Registries.get() is not free, avoid on every enter.
+            SoundEvent event = soundCache.computeIfAbsent(soundId, id -> {
+                Identifier rid = Identifier.tryParse(id);
+                return rid != null ? Registries.SOUND_EVENT.get(rid) : null;
+            });
             if (event == null) return;
             float vol = cfg != null ? Math.max(0.1f, Math.min(cfg.musicVolume, 4.0f)) : 4.0f;
             sw.playSound(null, player.getX(), player.getY(), player.getZ(), event, SoundCategory.RECORDS, vol, 1.0f);
