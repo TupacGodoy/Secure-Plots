@@ -43,6 +43,7 @@ import net.minecraft.util.ActionResult;
 import net.minecraft.util.Formatting;
 import net.minecraft.util.hit.BlockHitResult;
 import net.minecraft.util.math.BlockPos;
+import net.minecraft.world.BlockView;
 import net.minecraft.world.World;
 
 import java.util.List;
@@ -149,13 +150,20 @@ public class PlotBlock extends BlockWithEntity {
     }
 
     @Override
+    public float calcBlockBreakingDelta(BlockState state, PlayerEntity player, net.minecraft.world.BlockView world, BlockPos pos) {
+        // Force a reasonable hardness (5f) regardless of what the config says
+        float hardness = 5f;
+        return player.getBlockBreakingSpeed(state) / hardness / 30f;
+    }
+
+    @Override
     public BlockState onBreak(World world, BlockPos pos, BlockState state, PlayerEntity player) {
         if (!world.isClient) {
             SecurePlotsConfig cfg = SecurePlotsConfig.INSTANCE;
             PlotManager manager   = PlotManager.getOrCreate((ServerWorld) world);
             PlotData data         = manager.getPlot(pos);
             if (data != null) {
-                int opLevel   = cfg != null ? cfg.adminOpLevel : 2;
+                int opLevel     = cfg != null ? cfg.adminOpLevel : 2;
                 boolean isOwner = data.getOwnerId().equals(player.getUuid());
                 boolean isAdmin = player.hasPermissionLevel(opLevel);
 

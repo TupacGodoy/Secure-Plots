@@ -30,8 +30,8 @@ public class ModBlocks {
 
     private static AbstractBlock.Settings buildSettings(MapColor color, int tier) {
         int   luminance      = 4 + tier;
-        float hardness       = 50f;
-        float blastResistance = 1200f;
+        float hardness       = 5f;
+        float blastResistance = 6f;
 
         SecurePlotsConfig cfg = SecurePlotsConfig.INSTANCE;
         if (cfg != null) {
@@ -45,8 +45,7 @@ public class ModBlocks {
         return AbstractBlock.Settings.create()
             .mapColor(color)
             .strength(hardness, blastResistance)
-            .luminance(state -> lum)
-            .requiresTool();
+            .luminance(state -> lum);
     }
 
     public static Block fromTier(int tier) {

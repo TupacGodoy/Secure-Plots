@@ -508,11 +508,11 @@ public class SecurePlotsConfig {
 
     private static List<TierConfig> createDefaultTiers() {
         return new ArrayList<>(Arrays.asList(
-            new TierConfig(0, "Bronze",    15,  4, 50f, 1200f),
-            new TierConfig(1, "Gold",      30,  5, 50f, 1200f),
-            new TierConfig(2, "Emerald",   50,  6, 50f, 1200f),
-            new TierConfig(3, "Diamond",   75,  7, 50f, 1200f),
-            new TierConfig(4, "Netherite", 100, 8, 50f, 1200f)
+            new TierConfig(0, "Bronze",    15,  4, 5f, 6f),
+            new TierConfig(1, "Gold",      30,  5, 5f, 6f),
+            new TierConfig(2, "Emerald",   50,  6, 5f, 6f),
+            new TierConfig(3, "Diamond",   75,  7, 5f, 6f),
+            new TierConfig(4, "Netherite", 100, 8, 5f, 6f)
         ));
     }
 

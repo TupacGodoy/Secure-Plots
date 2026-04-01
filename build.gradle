@@ -19,6 +19,7 @@ repositories {
 }
 
 loom {
+    accessWidenerPath = file("src/main/resources/secure-plots.accesswidener")  // ← esto
     splitEnvironmentSourceSets()
 
     mods {
