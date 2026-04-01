@@ -43,6 +43,7 @@ import net.minecraft.util.ActionResult;
 import net.minecraft.util.Formatting;
 import net.minecraft.util.hit.BlockHitResult;
 import net.minecraft.util.math.BlockPos;
+import net.minecraft.world.BlockView;
 import net.minecraft.world.World;
 
 import java.util.List;
@@ -145,8 +146,14 @@ public class PlotBlock extends BlockWithEntity {
                 .formatted(Formatting.GREEN, Formatting.BOLD), true);
 
         world.playSound(null, pos, SoundEvents.UI_TOAST_CHALLENGE_COMPLETE, SoundCategory.PLAYERS, 0.6f, 1.2f);
-        ModPackets.sendOpenPlotScreen(player, pos, data);
         ModPackets.sendShowPlotBorder(player, data);
+    }
+
+    @Override
+    public float calcBlockBreakingDelta(BlockState state, PlayerEntity player, net.minecraft.world.BlockView world, BlockPos pos) {
+        // Force a reasonable hardness (5f) regardless of what the config says
+        float hardness = 5f;
+        return player.getBlockBreakingSpeed(state) / hardness / 30f;
     }
 
     @Override
@@ -156,7 +163,7 @@ public class PlotBlock extends BlockWithEntity {
             PlotManager manager   = PlotManager.getOrCreate((ServerWorld) world);
             PlotData data         = manager.getPlot(pos);
             if (data != null) {
-                int opLevel   = cfg != null ? cfg.adminOpLevel : 2;
+                int opLevel     = cfg != null ? cfg.adminOpLevel : 2;
                 boolean isOwner = data.getOwnerId().equals(player.getUuid());
                 boolean isAdmin = player.hasPermissionLevel(opLevel);
 
