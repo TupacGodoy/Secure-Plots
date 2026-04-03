@@ -224,6 +224,10 @@ public class SpCommand {
                 // /sp pos2 — set second corner of selection
                 .then(CommandManager.literal("pos2")
                     .executes(ctx -> executePos2(ctx.getSource())))
+                // /sp protectedarea list — list public protected areas
+                .then(CommandManager.literal("protectedarea")
+                    .then(CommandManager.literal("list")
+                        .executes(ctx -> executePlayerListProtectedAreas(ctx.getSource()))))
                 // /sp plot particle|weather|time|music|enter|exit
                 .then(CommandManager.literal("plot")
                     .then(CommandManager.literal("particle")
@@ -528,7 +532,46 @@ public class SpCommand {
                                                 StringArgumentType.getString(ctx, "name"),
                                                 BoolArgumentType.getBool(ctx, "break"),
                                                 BoolArgumentType.getBool(ctx, "place"),
-                                                BoolArgumentType.getBool(ctx, "interact"))))))))))
+                                                BoolArgumentType.getBool(ctx, "interact"))))))))
+                        .then(CommandManager.literal("addgroup")
+                            .then(CommandManager.argument("area", StringArgumentType.word())
+                                .suggests((ctx, b) -> suggestProtectedAreas(b))
+                                .then(CommandManager.argument("group", StringArgumentType.word())
+                                    .executes(ctx -> executeAddProtectedAreaGroup(ctx.getSource(),
+                                        StringArgumentType.getString(ctx, "area"),
+                                        StringArgumentType.getString(ctx, "group"))))))
+                        .then(CommandManager.literal("removegroup")
+                            .then(CommandManager.argument("area", StringArgumentType.word())
+                                .suggests((ctx, b) -> suggestProtectedAreas(b))
+                                .then(CommandManager.argument("group", StringArgumentType.word())
+                                    .executes(ctx -> executeRemoveProtectedAreaGroup(ctx.getSource(),
+                                        StringArgumentType.getString(ctx, "area"),
+                                        StringArgumentType.getString(ctx, "group"))))))
+                        .then(CommandManager.literal("settemporal")
+                            .then(CommandManager.argument("name", StringArgumentType.word())
+                                .suggests((ctx, b) -> suggestProtectedAreas(b))
+                                .then(CommandManager.argument("durationMinutes", IntegerArgumentType.integer(1))
+                                    .executes(ctx -> executeSetTemporalArea(ctx.getSource(),
+                                        StringArgumentType.getString(ctx, "name"),
+                                        IntegerArgumentType.getInteger(ctx, "durationMinutes"))))))
+                        .then(CommandManager.literal("setnotifications")
+                            .then(CommandManager.argument("name", StringArgumentType.word())
+                                .suggests((ctx, b) -> suggestProtectedAreas(b))
+                                .then(CommandManager.argument("enabled", BoolArgumentType.bool())
+                                    .executes(ctx -> executeSetAreaNotifications(ctx.getSource(),
+                                        StringArgumentType.getString(ctx, "name"),
+                                        BoolArgumentType.getBool(ctx, "enabled"))))))
+                        .then(CommandManager.literal("setprotections")
+                            .then(CommandManager.argument("name", StringArgumentType.word())
+                                .suggests((ctx, b) -> suggestProtectedAreas(b))
+                                .then(CommandManager.argument("entities", BoolArgumentType.bool())
+                                    .then(CommandManager.argument("explosions", BoolArgumentType.bool())
+                                        .then(CommandManager.argument("liquids", BoolArgumentType.bool())
+                                            .executes(ctx -> executeSetAreaProtections(ctx.getSource(),
+                                                StringArgumentType.getString(ctx, "name"),
+                                                BoolArgumentType.getBool(ctx, "entities"),
+                                                BoolArgumentType.getBool(ctx, "explosions"),
+                                                BoolArgumentType.getBool(ctx, "liquids")))))))))
             );
         }
     }
@@ -609,76 +652,76 @@ public class SpCommand {
     private static int executeAdminHelp(ServerCommandSource source) {
         ServerPlayerEntity player = source.getPlayer();
         if (player == null) return 0;
-        player.sendMessage(Text.literal("§e§l=== SecurePlots Admin Help ===").formatted(Formatting.BOLD), false);
-        player.sendMessage(Text.literal("§7§oManage plots:"), false);
-        player.sendMessage(Text.literal("  §b/sp admin listall [page] §7- List all plots on server"), false);
-        player.sendMessage(Text.literal("  §b/sp admin search <player> [page] §7- Search player's plots"), false);
-        player.sendMessage(Text.literal("  §b/sp admin nearby [count] §7- List nearby plots"), false);
-        player.sendMessage(Text.literal("  §b/sp admin info <player> <plot> §7- Show plot info"), false);
-        player.sendMessage(Text.literal("  §b/sp admin tp <player> <plot> §7- Teleport to plot"), false);
-        player.sendMessage(Text.literal("  §b/sp admin delete <player> <plot> §7- Delete a plot"), false);
-        player.sendMessage(Text.literal("  §b/sp admin rename <player> <plot> <name> §7- Rename plot"), false);
-        player.sendMessage(Text.literal("  §b/sp admin setowner <newowner> §7- Change plot owner"), false);
-        player.sendMessage(Text.literal("  §b/sp admin upgrade <player> <plot> §7- Upgrade plot"), false);
-        player.sendMessage(Text.literal(""), false);
-        player.sendMessage(Text.literal("§7§oManage predefined areas:"), false);
-        player.sendMessage(Text.literal("  §b/sp admin savearea <name> [tier] [rank] §7- Save selection as area"), false);
-        player.sendMessage(Text.literal("  §b/sp admin setrank <player> <tag> §7- Give player rank tag"), false);
-        player.sendMessage(Text.literal("  §b/sp admin removerank <player> <tag> §7- Remove rank tag"), false);
-        player.sendMessage(Text.literal(""), false);
-        player.sendMessage(Text.literal("§7§oManage protected areas:"), false);
-        player.sendMessage(Text.literal("  §b/sp admin protectedarea create <name> §7- Create protected area from selection"), false);
-        player.sendMessage(Text.literal("  §b/sp admin protectedarea remove <name> §7- Remove protected area"), false);
-        player.sendMessage(Text.literal("  §b/sp admin protectedarea list §7- List all protected areas"), false);
-        player.sendMessage(Text.literal("  §b/sp admin protectedarea info <name> §7- Show protected area details"), false);
-        player.sendMessage(Text.literal("  §b/sp admin protectedarea toggle <name> §7- Enable/disable protected area"), false);
-        player.sendMessage(Text.literal("  §b/sp admin protectedarea addowner <area> <player> §7- Add area owner"), false);
-        player.sendMessage(Text.literal("  §b/sp admin protectedarea setflags <name> <break> <place> <interact> §7- Set protections"), false);
-        player.sendMessage(Text.literal(""), false);
-        player.sendMessage(Text.literal("§7§oPlot customization (admin):"), false);
-        player.sendMessage(Text.literal("  §b/sp admin particle/music/weather/time/enter/exit §7- Customize plot"), false);
-        player.sendMessage(Text.literal(""), false);
-        player.sendMessage(Text.literal("§7§oOther:"), false);
-        player.sendMessage(Text.literal("  §b/sp admin reload §7- Reload config"), false);
+        player.sendMessage(Text.literal("§e§l=== SecurePlots Admin Help ===").formatted(Formatting.BOLD));
+        player.sendMessage(Text.literal("§7§oManage plots:"));
+        player.sendMessage(Text.literal("  §b/sp admin listall [page] §7- List all plots on server"));
+        player.sendMessage(Text.literal("  §b/sp admin search <player> [page] §7- Search player's plots"));
+        player.sendMessage(Text.literal("  §b/sp admin nearby [count] §7- List nearby plots"));
+        player.sendMessage(Text.literal("  §b/sp admin info <player> <plot> §7- Show plot info"));
+        player.sendMessage(Text.literal("  §b/sp admin tp <player> <plot> §7- Teleport to plot"));
+        player.sendMessage(Text.literal("  §b/sp admin delete <player> <plot> §7- Delete a plot"));
+        player.sendMessage(Text.literal("  §b/sp admin rename <player> <plot> <name> §7- Rename plot"));
+        player.sendMessage(Text.literal("  §b/sp admin setowner <newowner> §7- Change plot owner"));
+        player.sendMessage(Text.literal("  §b/sp admin upgrade <player> <plot> §7- Upgrade plot"));
+        player.sendMessage(Text.literal(""));
+        player.sendMessage(Text.literal("§7§oManage predefined areas:"));
+        player.sendMessage(Text.literal("  §b/sp admin savearea <name> [tier] [rank] §7- Save selection as area"));
+        player.sendMessage(Text.literal("  §b/sp admin setrank <player> <tag> §7- Give player rank tag"));
+        player.sendMessage(Text.literal("  §b/sp admin removerank <player> <tag> §7- Remove rank tag"));
+        player.sendMessage(Text.literal(""));
+        player.sendMessage(Text.literal("§7§oManage protected areas:"));
+        player.sendMessage(Text.literal("  §b/sp admin protectedarea create <name> §7- Create protected area from selection"));
+        player.sendMessage(Text.literal("  §b/sp admin protectedarea remove <name> §7- Remove protected area"));
+        player.sendMessage(Text.literal("  §b/sp admin protectedarea list §7- List all protected areas"));
+        player.sendMessage(Text.literal("  §b/sp admin protectedarea info <name> §7- Show protected area details"));
+        player.sendMessage(Text.literal("  §b/sp admin protectedarea toggle <name> §7- Enable/disable protected area"));
+        player.sendMessage(Text.literal("  §b/sp admin protectedarea addowner <area> <player> §7- Add area owner"));
+        player.sendMessage(Text.literal("  §b/sp admin protectedarea setflags <name> <break> <place> <interact> §7- Set protections"));
+        player.sendMessage(Text.literal(""));
+        player.sendMessage(Text.literal("§7§oPlot customization (admin):"));
+        player.sendMessage(Text.literal("  §b/sp admin particle/music/weather/time/enter/exit §7- Customize plot"));
+        player.sendMessage(Text.literal(""));
+        player.sendMessage(Text.literal("§7§oOther:"));
+        player.sendMessage(Text.literal("  §b/sp admin reload §7- Reload config"));
         return 1;
     }
 
     private static int executeHelp(ServerCommandSource source) {
         ServerPlayerEntity player = source.getPlayer();
         if (player == null) return 0;
-        player.sendMessage(Text.literal("§e§l=== SecurePlots Help ===").formatted(Formatting.BOLD), false);
-        player.sendMessage(Text.literal("§7§oClaim/Create plots:"), false);
-        player.sendMessage(Text.literal("  §b/sp claim [tier] §7- Claim plot at current position"), false);
-        player.sendMessage(Text.literal("  §b/sp pos1 §7- Set first corner of selection"), false);
-        player.sendMessage(Text.literal("  §b/sp pos2 §7- Set second corner of selection"), false);
-        player.sendMessage(Text.literal("  §b/sp create [tier] §7- Create plot from selection"), false);
-        player.sendMessage(Text.literal("  §b/sp areas §7- List available predefined areas"), false);
-        player.sendMessage(Text.literal("  §b/sp claimarea <name> [tier] §7- Claim a predefined area"), false);
-        player.sendMessage(Text.literal(""), false);
-        player.sendMessage(Text.literal("§7§oManage your plots:"), false);
-        player.sendMessage(Text.literal("  §b/sp list §7- List your plots"), false);
-        player.sendMessage(Text.literal("  §b/sp info [plot] §7- Show plot info"), false);
-        player.sendMessage(Text.literal("  §b/sp rename <name> §7- Rename your plot"), false);
-        player.sendMessage(Text.literal("  §b/sp add <player> <plot|all> §7- Add member"), false);
-        player.sendMessage(Text.literal("  §b/sp remove <player> <plot|all> §7- Remove member"), false);
-        player.sendMessage(Text.literal("  §b/sp role <player> <member|admin> §7- Set role"), false);
-        player.sendMessage(Text.literal("  §b/sp tp [plot] §7- Teleport to plot"), false);
-        player.sendMessage(Text.literal("  §b/sp upgrade §7- Upgrade plot tier"), false);
-        player.sendMessage(Text.literal(""), false);
-        player.sendMessage(Text.literal("§7§oFlags & Permissions:"), false);
-        player.sendMessage(Text.literal("  §b/sp flag [flag] [value] §7- View/set plot flags"), false);
-        player.sendMessage(Text.literal("  §b/sp perm [player] [perm] [value] §7- Set permissions"), false);
-        player.sendMessage(Text.literal("  §b/sp group §7- Manage permission groups"), false);
-        player.sendMessage(Text.literal(""), false);
-        player.sendMessage(Text.literal("§7§oPlot customization:"), false);
-        player.sendMessage(Text.literal("  §b/sp plot particle <type> §7- Set particle effect"), false);
-        player.sendMessage(Text.literal("  §b/sp plot weather <type> §7- Set weather override"), false);
-        player.sendMessage(Text.literal("  §b/sp plot time <value> §7- Set time override"), false);
-        player.sendMessage(Text.literal("  §b/sp plot music <sound> §7- Set ambient music"), false);
-        player.sendMessage(Text.literal("  §b/sp plot enter <message> §7- Set enter message"), false);
-        player.sendMessage(Text.literal("  §b/sp plot exit <message> §7- Set exit message"), false);
-        player.sendMessage(Text.literal(""), false);
-        player.sendMessage(Text.literal("§7For admin commands, use §b/sp help admin"), false);
+        player.sendMessage(Text.literal("§e§l=== SecurePlots Help ===").formatted(Formatting.BOLD));
+        player.sendMessage(Text.literal("§7§oClaim/Create plots:"));
+        player.sendMessage(Text.literal("  §b/sp claim [tier] §7- Claim plot at current position"));
+        player.sendMessage(Text.literal("  §b/sp pos1 §7- Set first corner of selection"));
+        player.sendMessage(Text.literal("  §b/sp pos2 §7- Set second corner of selection"));
+        player.sendMessage(Text.literal("  §b/sp create [tier] §7- Create plot from selection"));
+        player.sendMessage(Text.literal("  §b/sp areas §7- List available predefined areas"));
+        player.sendMessage(Text.literal("  §b/sp claimarea <name> [tier] §7- Claim a predefined area"));
+        player.sendMessage(Text.literal(""));
+        player.sendMessage(Text.literal("§7§oManage your plots:"));
+        player.sendMessage(Text.literal("  §b/sp list §7- List your plots"));
+        player.sendMessage(Text.literal("  §b/sp info [plot] §7- Show plot info"));
+        player.sendMessage(Text.literal("  §b/sp rename <name> §7- Rename your plot"));
+        player.sendMessage(Text.literal("  §b/sp add <player> <plot|all> §7- Add member"));
+        player.sendMessage(Text.literal("  §b/sp remove <player> <plot|all> §7- Remove member"));
+        player.sendMessage(Text.literal("  §b/sp role <player> <member|admin> §7- Set role"));
+        player.sendMessage(Text.literal("  §b/sp tp [plot] §7- Teleport to plot"));
+        player.sendMessage(Text.literal("  §b/sp upgrade §7- Upgrade plot tier"));
+        player.sendMessage(Text.literal(""));
+        player.sendMessage(Text.literal("§7§oFlags & Permissions:"));
+        player.sendMessage(Text.literal("  §b/sp flag [flag] [value] §7- View/set plot flags"));
+        player.sendMessage(Text.literal("  §b/sp perm [player] [perm] [value] §7- Set permissions"));
+        player.sendMessage(Text.literal("  §b/sp group §7- Manage permission groups"));
+        player.sendMessage(Text.literal(""));
+        player.sendMessage(Text.literal("§7§oPlot customization:"));
+        player.sendMessage(Text.literal("  §b/sp plot particle <type> §7- Set particle effect"));
+        player.sendMessage(Text.literal("  §b/sp plot weather <type> §7- Set weather override"));
+        player.sendMessage(Text.literal("  §b/sp plot time <value> §7- Set time override"));
+        player.sendMessage(Text.literal("  §b/sp plot music <sound> §7- Set ambient music"));
+        player.sendMessage(Text.literal("  §b/sp plot enter <message> §7- Set enter message"));
+        player.sendMessage(Text.literal("  §b/sp plot exit <message> §7- Set exit message"));
+        player.sendMessage(Text.literal(""));
+        player.sendMessage(Text.literal("§7For admin commands, use §b/sp help admin"));
         return 1;
     }
 
@@ -687,22 +730,22 @@ public class SpCommand {
     private static int executeParticleHelp(ServerCommandSource source) {
         ServerPlayerEntity player = source.getPlayer();
         if (player == null) return 0;
-        player.sendMessage(Text.translatable("sp.help.plot_particle_header"), false);
-        player.sendMessage(Text.translatable("sp.help.plot_particle_usage"), false);
-        player.sendMessage(Text.translatable("sp.help.plot_particle_hint"), false);
-        for (String p : COMMON_PARTICLES) if (!p.equals("clear")) player.sendMessage(Text.literal("  §a" + p), false);
+        player.sendMessage(Text.translatable("sp.help.plot_particle_header"));
+        player.sendMessage(Text.translatable("sp.help.plot_particle_usage"));
+        player.sendMessage(Text.translatable("sp.help.plot_particle_hint"));
+        for (String p : COMMON_PARTICLES) if (!p.equals("clear")) player.sendMessage(Text.literal("  §a" + p));
         return 1;
     }
 
     private static int executeMusicHelp(ServerCommandSource source) {
         ServerPlayerEntity player = source.getPlayer();
         if (player == null) return 0;
-        player.sendMessage(Text.translatable("sp.help.plot_music_header"), false);
-        player.sendMessage(Text.translatable("sp.help.plot_music_usage"), false);
-        player.sendMessage(Text.translatable("sp.help.plot_music_discs"), false);
-        for (String s : COMMON_MUSIC) if (s.contains("music_disc")) player.sendMessage(Text.literal("  §b" + s), false);
-        player.sendMessage(Text.translatable("sp.help.plot_music_bg"), false);
-        for (String s : COMMON_MUSIC) if (s.contains("music.") && !s.equals("clear")) player.sendMessage(Text.literal("  §b" + s), false);
+        player.sendMessage(Text.translatable("sp.help.plot_music_header"));
+        player.sendMessage(Text.translatable("sp.help.plot_music_usage"));
+        player.sendMessage(Text.translatable("sp.help.plot_music_discs"));
+        for (String s : COMMON_MUSIC) if (s.contains("music_disc")) player.sendMessage(Text.literal("  §b" + s));
+        player.sendMessage(Text.translatable("sp.help.plot_music_bg"));
+        for (String s : COMMON_MUSIC) if (s.contains("music.") && !s.equals("clear")) player.sendMessage(Text.literal("  §b" + s));
         return 1;
     }
 
@@ -716,12 +759,18 @@ public class SpCommand {
         ServerPlayerEntity player = source.getPlayer();
         if (player == null) return 0;
 
-        player.sendMessage(Text.literal("§e══ Create Plot — Selection Mode ══").formatted(Formatting.BOLD), false);
-        player.sendMessage(Text.literal("§71. Use §b/sp pos1 §7to set the first corner"), false);
-        player.sendMessage(Text.literal("§72. Use §b/sp pos2 §7to set the second corner"), false);
-        player.sendMessage(Text.literal("§73. Use §b/sp create <tier> §7to finalize"), false);
-        player.sendMessage(Text.literal("§7Tip: You can also use §b/sp claim [tier] §7to claim at current position"), false);
+        player.sendMessage(Text.literal("§e══ Create Plot — Selection Mode ══").formatted(Formatting.BOLD));
+        player.sendMessage(Text.literal("§71. Use §b/sp pos1 §7to set the first corner"));
+        player.sendMessage(Text.literal("§72. Use §b/sp pos2 §7to set the second corner"));
+        player.sendMessage(Text.literal("§73. Use §b/sp create <tier> §7to finalize"));
+        player.sendMessage(Text.literal("§7Tip: You can also use §b/sp claim [tier] §7to claim at current position"));
         return 1;
+    }
+
+    private static int executeCreateWithTier(ServerCommandSource source, String tier) {
+        ServerPlayerEntity player = source.getPlayer();
+        if (player == null) return 0;
+        return executeCreateWithSelection(player, tier);
     }
 
     // ── /sp pos1 / pos2 — selection helpers ───────────────────────────────────
@@ -731,7 +780,7 @@ public class SpCommand {
         if (player == null) return 0;
         BlockPos pos = player.getBlockPos();
         SELECTION_POS1.put(player.getUuid(), pos);
-        player.sendMessage(Text.literal("§a✓ Position 1 set: §f" + pos.getX() + ", " + pos.getY() + ", " + pos.getZ()), false);
+        player.sendMessage(Text.literal("§a✓ Position 1 set: §f" + pos.getX() + ", " + pos.getY() + ", " + pos.getZ()));
         spawnSelectionParticles(player.getWorld(), pos, 10);
         return 1;
     }
@@ -741,12 +790,12 @@ public class SpCommand {
         if (player == null) return 0;
         BlockPos pos1 = SELECTION_POS1.get(player.getUuid());
         if (pos1 == null) {
-            player.sendMessage(Text.literal("§c✗ Set position 1 first with §b/sp pos1"), false);
+            player.sendMessage(Text.literal("§c✗ Set position 1 first with §b/sp pos1"));
             return 0;
         }
         BlockPos pos2 = player.getBlockPos();
-        player.sendMessage(Text.literal("§a✓ Position 2 set: §f" + pos2.getX() + ", " + pos2.getY() + ", " + pos2.getZ()), false);
-        player.sendMessage(Text.literal("§eSelection: §f" + pos1.getX() + "," + pos1.getY() + "," + pos1.getZ() + " §7→ §f" + pos2.getX() + "," + pos2.getY() + "," + pos2.getZ()), false);
+        player.sendMessage(Text.literal("§a✓ Position 2 set: §f" + pos2.getX() + ", " + pos2.getY() + ", " + pos2.getZ()));
+        player.sendMessage(Text.literal("§eSelection: §f" + pos1.getX() + "," + pos1.getY() + "," + pos1.getZ() + " §7→ §f" + pos2.getX() + "," + pos2.getY() + "," + pos2.getZ()));
         spawnSelectionParticles(player.getWorld(), pos2, 10);
         spawnSelectionOutlineParticles(player.getWorld(), pos1, pos2);
         return 1;
@@ -762,7 +811,7 @@ public class SpCommand {
         BlockPos pos1 = parsePosition(pos1Str, player);
         BlockPos pos2 = parsePosition(pos2Str, player);
         if (pos1 == null || pos2 == null) {
-            player.sendMessage(Text.literal("§c✗ Invalid positions. Use format: x y z or ~ ~ ~"), false);
+            player.sendMessage(Text.literal("§c✗ Invalid positions. Use format: x y z or ~ ~ ~"));
             return 0;
         }
 
@@ -772,7 +821,7 @@ public class SpCommand {
     private static int executeCreateWithSelection(ServerPlayerEntity player, String tierStr) {
         BlockPos pos1 = SELECTION_POS1.get(player.getUuid());
         if (pos1 == null) {
-            player.sendMessage(Text.literal("§c✗ No selection. Use §b/sp pos1 §7and §b/sp pos2§7, or use §b/sp claim"), false);
+            player.sendMessage(Text.literal("§c✗ No selection. Use §b/sp pos1 §7and §b/sp pos2§7, or use §b/sp claim"));
             return 0;
         }
         BlockPos pos2 = player.getBlockPos();
@@ -804,20 +853,20 @@ public class SpCommand {
 
         // Check if the selected size fits the tier
         if (requiredRadius > targetSize.getRadius()) {
-            player.sendMessage(Text.literal("§c✗ Selection too large for " + targetSize.getDisplayName() + " tier (max: " + targetSize.getRadius() + "x" + targetSize.getRadius() + ")"), false);
-            player.sendMessage(Text.literal("§7Required: " + requiredRadius + "x" + requiredRadius), false);
+            player.sendMessage(Text.literal("§c✗ Selection too large for " + targetSize.getDisplayName() + " tier (max: " + targetSize.getRadius() + "x" + targetSize.getRadius() + ")"));
+            player.sendMessage(Text.literal("§7Required: " + requiredRadius + "x" + requiredRadius));
             return 0;
         }
 
         // Check if player can place here
         if (!manager.canPlace(center, targetSize)) {
-            player.sendMessage(Text.literal("§c✗ Cannot place plot here — overlaps with another plot"), false);
+            player.sendMessage(Text.literal("§c✗ Cannot place plot here — overlaps with another plot"));
             return 0;
         }
 
         // Check structure collision
         if (!canPlaceAtStructure(player, center, targetSize)) {
-            player.sendMessage(Text.literal("§c✗ Cannot place plot here — collides with a structure"), false);
+            player.sendMessage(Text.literal("§c✗ Cannot place plot here — collides with a structure"));
             return 0;
         }
 
@@ -826,9 +875,9 @@ public class SpCommand {
         PlotData plot = new PlotData(player.getUuid(), player.getName().getString(), center, targetSize, currentTick);
         manager.addPlot(plot);
 
-        player.sendMessage(Text.literal("§a✓ Plot created: §e\"" + plot.getPlotName() + "\""), false);
-        player.sendMessage(Text.literal("§7Center: §f" + center.getX() + ", " + center.getY() + ", " + center.getZ()), false);
-        player.sendMessage(Text.literal("§7Size: §f" + targetSize.getRadius() + "x" + targetSize.getRadius() + " (" + targetSize.getDisplayName() + ")"), false);
+        player.sendMessage(Text.literal("§a✓ Plot created: §e\"" + plot.getPlotName() + "\""));
+        player.sendMessage(Text.literal("§7Center: §f" + center.getX() + ", " + center.getY() + ", " + center.getZ()));
+        player.sendMessage(Text.literal("§7Size: §f" + targetSize.getRadius() + "x" + targetSize.getRadius() + " (" + targetSize.getDisplayName() + ")"));
 
         // Place the plot block
         ((ServerWorld) player.getWorld()).setBlockState(center, ModBlocks.fromTier(targetSize.tier).getDefaultState());
@@ -849,7 +898,7 @@ public class SpCommand {
         // Check if already in a plot
         PlotData existing = manager.getPlotAt(center);
         if (existing != null) {
-            player.sendMessage(Text.literal("§c✗ Already inside plot §e\"" + existing.getPlotName() + "\""), false);
+            player.sendMessage(Text.literal("§c✗ Already inside plot §e\"" + existing.getPlotName() + "\""));
             return 0;
         }
 
@@ -859,12 +908,12 @@ public class SpCommand {
 
         // Check placement
         if (!manager.canPlace(center, size)) {
-            player.sendMessage(Text.literal("§c✗ Cannot place plot here — too close to another plot"), false);
+            player.sendMessage(Text.literal("§c✗ Cannot place plot here — too close to another plot"));
             return 0;
         }
 
         if (!canPlaceAtStructure(player, center, size)) {
-            player.sendMessage(Text.literal("§c✗ Cannot place plot here — collides with a structure"), false);
+            player.sendMessage(Text.literal("§c✗ Cannot place plot here — collides with a structure"));
             return 0;
         }
 
@@ -873,9 +922,9 @@ public class SpCommand {
         PlotData plot = new PlotData(player.getUuid(), player.getName().getString(), center, size, currentTick);
         manager.addPlot(plot);
 
-        player.sendMessage(Text.literal("§a✓ Plot claimed: §e\"" + plot.getPlotName() + "\""), false);
-        player.sendMessage(Text.literal("§7Center: §f" + center.getX() + ", " + center.getY() + ", " + center.getZ()), false);
-        player.sendMessage(Text.literal("§7Size: §f" + size.getRadius() + "x" + size.getRadius() + " (" + size.getDisplayName() + ")"), false);
+        player.sendMessage(Text.literal("§a✓ Plot claimed: §e\"" + plot.getPlotName() + "\""));
+        player.sendMessage(Text.literal("§7Center: §f" + center.getX() + ", " + center.getY() + ", " + center.getZ()));
+        player.sendMessage(Text.literal("§7Size: §f" + size.getRadius() + "x" + size.getRadius() + " (" + size.getDisplayName() + ")"));
 
         // Place the plot block
         ((ServerWorld) player.getWorld()).setBlockState(center, ModBlocks.fromTier(size.tier).getDefaultState());
@@ -919,8 +968,8 @@ public class SpCommand {
         try {
             return PlotSize.valueOf(tierStr.toUpperCase());
         } catch (IllegalArgumentException e) {
-            player.sendMessage(Text.literal("§c✗ Unknown tier: §e" + tierStr), false);
-            player.sendMessage(Text.literal("§7Valid tiers: bronze(0), gold(1), emerald(2), diamond(3), netherite(4)"), false);
+            player.sendMessage(Text.literal("§c✗ Unknown tier: §e" + tierStr));
+            player.sendMessage(Text.literal("§7Valid tiers: bronze(0), gold(1), emerald(2), diamond(3), netherite(4)"));
             return null;
         }
     }
@@ -943,13 +992,13 @@ public class SpCommand {
         if (player == null) return 0;
         PlotData nearest = getNearestOwnedPlot(player, PlotManager.getOrCreate(player.getServerWorld()));
         if (nearest == null) {
-            player.sendMessage(Text.translatable("sp.error.no_plots").formatted(Formatting.RED), false);
+            player.sendMessage(Text.translatable("sp.error.no_plots").formatted(Formatting.RED));
             return 0;
         }
         ModPackets.sendShowPlotBorder(player, nearest);
         player.sendMessage(Text.translatable("sp.view.showing",
             Text.literal(nearest.getPlotName()).formatted(Formatting.YELLOW),
-            Text.literal(nearest.getSize().getRadius() + "x" + nearest.getSize().getRadius()).formatted(Formatting.AQUA)), false);
+            Text.literal(nearest.getSize().getRadius() + "x" + nearest.getSize().getRadius()).formatted(Formatting.AQUA)));
         return 1;
     }
 
@@ -960,10 +1009,10 @@ public class SpCommand {
         if (player == null) return 0;
         List<PlotData> plots = PlotManager.getOrCreate(player.getServerWorld()).getPlayerPlots(player.getUuid());
         if (plots.isEmpty()) {
-            player.sendMessage(Text.translatable("sp.error.no_plots").formatted(Formatting.RED), false);
+            player.sendMessage(Text.translatable("sp.error.no_plots").formatted(Formatting.RED));
             return 0;
         }
-        player.sendMessage(Text.translatable("sp.list.header", plots.size()).formatted(Formatting.YELLOW, Formatting.BOLD), false);
+        player.sendMessage(Text.translatable("sp.list.header", plots.size()).formatted(Formatting.YELLOW, Formatting.BOLD));
         for (int i = 0; i < plots.size(); i++) {
             PlotData p = plots.get(i);
             BlockPos c = p.getCenter();
@@ -973,7 +1022,7 @@ public class SpCommand {
                     .append(Text.literal(p.getPlotName()).formatted(Formatting.WHITE))
                     .append(Text.literal(" [" + p.getSize().getDisplayName() + "]").formatted(getTierFormatting(p.getSize().tier)))
                     .append(Text.literal("  " + c.getX() + ", " + c.getY() + ", " + c.getZ()).formatted(Formatting.DARK_GRAY))
-                    .append(Text.literal(tpFlag)), false);
+                    .append(Text.literal(tpFlag)));
         }
         return 1;
     }
@@ -987,7 +1036,7 @@ public class SpCommand {
         PlotData plot;
         if (plotArg == null) {
             plot = manager.getPlotAt(player.getBlockPos());
-            if (plot == null) { player.sendMessage(Text.translatable("sp.error.not_in_plot").formatted(Formatting.RED), false); return 0; }
+            if (plot == null) { player.sendMessage(Text.translatable("sp.error.not_in_plot").formatted(Formatting.RED)); return 0; }
         } else {
             List<PlotData> resolved = resolvePlots(manager.getPlayerPlots(player.getUuid()), plotArg, player);
             if (resolved == null || resolved.isEmpty()) return 0;
@@ -1004,16 +1053,16 @@ public class SpCommand {
         if (player == null) return 0;
         PlotManager manager = PlotManager.getOrCreate(player.getServerWorld());
         PlotData plot = manager.getPlotAt(player.getBlockPos());
-        if (plot == null) { player.sendMessage(Text.translatable("sp.rename.not_inside").formatted(Formatting.RED), false); return 0; }
+        if (plot == null) { player.sendMessage(Text.translatable("sp.rename.not_inside").formatted(Formatting.RED)); return 0; }
         if (!plot.getOwnerId().equals(player.getUuid())) {
-            player.sendMessage(Text.translatable("sp.error.not_owner").formatted(Formatting.RED), false); return 0;
+            player.sendMessage(Text.translatable("sp.error.not_owner").formatted(Formatting.RED)); return 0;
         }
         // Rank check
         SecurePlotsConfig cfg = SecurePlotsConfig.INSTANCE;
         if (cfg != null) {
             ResolvedPerks perks = cfg.resolvePerks(player);
             if (!perks.canRename) {
-                player.sendMessage(Text.translatable("sp.rank.no_perm", "rename").formatted(Formatting.RED), false); return 0;
+                player.sendMessage(Text.translatable("sp.rank.no_perm", "rename").formatted(Formatting.RED)); return 0;
             }
         }
         return doRename(player, manager, plot, newName);
@@ -1026,7 +1075,7 @@ public class SpCommand {
         if (player == null) return 0;
         PlotManager manager = PlotManager.getOrCreate(player.getServerWorld());
         List<PlotData> owned = manager.getPlayerPlots(player.getUuid());
-        if (owned.isEmpty()) { player.sendMessage(Text.translatable("sp.error.no_plots").formatted(Formatting.RED), false); return 0; }
+        if (owned.isEmpty()) { player.sendMessage(Text.translatable("sp.error.no_plots").formatted(Formatting.RED)); return 0; }
 
         UUID targetUuid = null; String resolvedName = targetName;
         ServerPlayerEntity online = source.getServer().getPlayerManager().getPlayer(targetName);
@@ -1035,19 +1084,19 @@ public class SpCommand {
             Optional<GameProfile> profile = source.getServer().getUserCache().findByName(targetName);
             if (profile.isPresent()) { targetUuid = profile.get().getId(); resolvedName = profile.get().getName(); }
         }
-        if (targetUuid == null) { player.sendMessage(Text.translatable("sp.add.player_not_found", targetName).formatted(Formatting.RED), false); return 0; }
-        if (targetUuid.equals(player.getUuid())) { player.sendMessage(Text.translatable("sp.add.self").formatted(Formatting.RED), false); return 0; }
+        if (targetUuid == null) { player.sendMessage(Text.translatable("sp.add.player_not_found", targetName).formatted(Formatting.RED)); return 0; }
+        if (targetUuid.equals(player.getUuid())) { player.sendMessage(Text.translatable("sp.add.self").formatted(Formatting.RED)); return 0; }
 
         List<PlotData> targets = resolvePlots(owned, plotArg, player);
         if (targets == null) return 0;
         int added = 0;
         final UUID fUuid = targetUuid; final String fName = resolvedName;
         for (PlotData p : targets) if (p.getRoleOf(fUuid) == PlotData.Role.VISITOR) { p.addMember(fUuid, fName, PlotData.Role.MEMBER); added++; }
-        if (added == 0) { player.sendMessage(Text.translatable("sp.add.already_member", resolvedName).formatted(Formatting.YELLOW), false); return 0; }
+        if (added == 0) { player.sendMessage(Text.translatable("sp.add.already_member", resolvedName).formatted(Formatting.YELLOW)); return 0; }
         manager.markDirty();
         String desc = targets.size() == 1 ? "\"" + targets.get(0).getPlotName() + "\"" : targets.size() + " plots";
-        player.sendMessage(Text.translatable("sp.add.success", resolvedName, desc).formatted(Formatting.GREEN), false);
-        if (online != null) online.sendMessage(Text.translatable("sp.add.notified", desc, player.getName().getString()).formatted(Formatting.GREEN), false);
+        player.sendMessage(Text.translatable("sp.add.success", resolvedName, desc).formatted(Formatting.GREEN));
+        if (online != null) online.sendMessage(Text.translatable("sp.add.notified", desc, player.getName().getString()).formatted(Formatting.GREEN));
         return 1;
     }
 
@@ -1058,19 +1107,19 @@ public class SpCommand {
         if (player == null) return 0;
         PlotManager manager = PlotManager.getOrCreate(player.getServerWorld());
         List<PlotData> owned = manager.getPlayerPlots(player.getUuid());
-        if (owned.isEmpty()) { player.sendMessage(Text.translatable("sp.error.no_plots").formatted(Formatting.RED), false); return 0; }
+        if (owned.isEmpty()) { player.sendMessage(Text.translatable("sp.error.no_plots").formatted(Formatting.RED)); return 0; }
         List<PlotData> targets = resolvePlots(owned, plotArg, player);
         if (targets == null) return 0;
         UUID targetUuid = null;
         for (PlotData plot : targets) { targetUuid = findMemberUuid(plot, targetName); if (targetUuid != null) break; }
-        if (targetUuid == null) { player.sendMessage(Text.translatable("sp.remove.not_member", targetName).formatted(Formatting.RED), false); return 0; }
+        if (targetUuid == null) { player.sendMessage(Text.translatable("sp.remove.not_member", targetName).formatted(Formatting.RED)); return 0; }
         final UUID fUuid = targetUuid;
         for (PlotData plot : targets) if (plot.getMembers().containsKey(fUuid)) plot.removeMember(fUuid);
         manager.markDirty();
         String desc = targets.size() == 1 ? "\"" + targets.get(0).getPlotName() + "\"" : targets.size() + " plots";
-        player.sendMessage(Text.translatable("sp.remove.success", targetName, desc).formatted(Formatting.GREEN), false);
+        player.sendMessage(Text.translatable("sp.remove.success", targetName, desc).formatted(Formatting.GREEN));
         ServerPlayerEntity onlineTarget = source.getServer().getPlayerManager().getPlayer(fUuid);
-        if (onlineTarget != null) onlineTarget.sendMessage(Text.translatable("sp.remove.notified", desc, player.getName().getString()).formatted(Formatting.RED), false);
+        if (onlineTarget != null) onlineTarget.sendMessage(Text.translatable("sp.remove.notified", desc, player.getName().getString()).formatted(Formatting.RED));
         return 1;
     }
 
@@ -1081,23 +1130,23 @@ public class SpCommand {
         if (player == null) return 0;
         PlotManager manager = PlotManager.getOrCreate(player.getServerWorld());
         PlotData plot = manager.getPlotAt(player.getBlockPos());
-        if (plot == null) { player.sendMessage(Text.translatable("sp.error.not_in_plot").formatted(Formatting.RED), false); return 0; }
+        if (plot == null) { player.sendMessage(Text.translatable("sp.error.not_in_plot").formatted(Formatting.RED)); return 0; }
         if (!plot.hasPermission(player.getUuid(), PlotData.Permission.MANAGE_PERMS) && !player.getCommandTags().contains(adminTag())) {
-            player.sendMessage(Text.translatable("sp.error.no_perm_perm").formatted(Formatting.RED), false); return 0;
+            player.sendMessage(Text.translatable("sp.error.no_perm_perm").formatted(Formatting.RED)); return 0;
         }
         PlotData.Role newRole;
         try { newRole = PlotData.Role.valueOf(roleName.toUpperCase()); }
         catch (IllegalArgumentException e) {
-            player.sendMessage(Text.literal("§c✗ Invalid role. Use: member or admin").formatted(Formatting.RED), false); return 0;
+            player.sendMessage(Text.literal("§c✗ Invalid role. Use: member or admin").formatted(Formatting.RED)); return 0;
         }
         if (newRole == PlotData.Role.OWNER || newRole == PlotData.Role.VISITOR) {
-            player.sendMessage(Text.literal("§c✗ Role must be 'member' or 'admin'.").formatted(Formatting.RED), false); return 0;
+            player.sendMessage(Text.literal("§c✗ Role must be 'member' or 'admin'.").formatted(Formatting.RED)); return 0;
         }
         UUID targetUuid = findMemberUuid(plot, targetName);
-        if (targetUuid == null) { player.sendMessage(Text.translatable("sp.perm.not_member", targetName).formatted(Formatting.RED), false); return 0; }
+        if (targetUuid == null) { player.sendMessage(Text.translatable("sp.perm.not_member", targetName).formatted(Formatting.RED)); return 0; }
         plot.getMembers().put(targetUuid, newRole);
         manager.markDirty();
-        player.sendMessage(Text.literal("§a✔ §f" + targetName + " §ais now §f" + newRole.name().toLowerCase() + " §ain §e\"" + plot.getPlotName() + "\""), false);
+        player.sendMessage(Text.literal("§a✔ §f" + targetName + " §ais now §f" + newRole.name().toLowerCase() + " §ain §e\"" + plot.getPlotName() + "\""));
         return 1;
     }
 
@@ -1107,7 +1156,7 @@ public class SpCommand {
         ServerPlayerEntity player = source.getPlayer();
         if (player == null) return 0;
         if (SecurePlotsConfig.INSTANCE != null && !SecurePlotsConfig.INSTANCE.enablePlotTeleport) {
-            player.sendMessage(Text.translatable("sp.tp.not_found").formatted(Formatting.RED), false); return 0;
+            player.sendMessage(Text.translatable("sp.tp.not_found").formatted(Formatting.RED)); return 0;
         }
         PlotManager manager = PlotManager.getOrCreate(player.getServerWorld());
         PlotData plot = null;
@@ -1120,19 +1169,19 @@ public class SpCommand {
             if (resolved != null && !resolved.isEmpty()) { plot = resolved.get(0); }
             else { for (PlotData p : manager.getAllPlots()) if (p.getPlotName().equalsIgnoreCase(plotArg) && p.hasFlag(PlotData.Flag.ALLOW_TP)) { plot = p; break; } }
         }
-        if (plot == null) { player.sendMessage(Text.translatable("sp.tp.not_found").formatted(Formatting.RED), false); return 0; }
+        if (plot == null) { player.sendMessage(Text.translatable("sp.tp.not_found").formatted(Formatting.RED)); return 0; }
         boolean isOwner  = plot.getOwnerId().equals(player.getUuid());
         boolean isMember = plot.getRoleOf(player.getUuid()) != PlotData.Role.VISITOR;
         boolean tpPublic = plot.hasFlag(PlotData.Flag.ALLOW_TP);
         boolean isAdmin  = player.getCommandTags().contains(adminTag());
         if (!isOwner && !isMember && !tpPublic && !isAdmin) {
-            player.sendMessage(Text.translatable("sp.tp.not_allowed", plot.getPlotName()).formatted(Formatting.RED), false); return 0;
+            player.sendMessage(Text.translatable("sp.tp.not_allowed", plot.getPlotName()).formatted(Formatting.RED)); return 0;
         }
         if (!(player.getWorld() instanceof ServerWorld sw)) return 0;
         BlockPos c = plot.getCenter();
         double tpY = sw.getTopPosition(Heightmap.Type.MOTION_BLOCKING_NO_LEAVES, c).getY();
         player.teleport(sw, c.getX() + 0.5, tpY, c.getZ() + 0.5, Set.of(), player.getYaw(), player.getPitch());
-        player.sendMessage(Text.translatable("sp.tp.success", plot.getPlotName()).formatted(Formatting.GREEN), false);
+        player.sendMessage(Text.translatable("sp.tp.success", plot.getPlotName()).formatted(Formatting.GREEN));
         sw.playSound(null, player.getBlockPos(), SoundEvents.ENTITY_ENDERMAN_TELEPORT, SoundCategory.PLAYERS, 1f, 1f);
         return 1;
     }
@@ -1144,26 +1193,26 @@ public class SpCommand {
         if (player == null) return 0;
         SecurePlotsConfig cfg = SecurePlotsConfig.INSTANCE;
         if (cfg != null && !cfg.enableUpgrades) {
-            player.sendMessage(Text.literal("§c✗ Upgrades are disabled on this server."), false); return 0;
+            player.sendMessage(Text.literal("§c✗ Upgrades are disabled on this server.")); return 0;
         }
         if (!(player.getWorld() instanceof ServerWorld sw)) return 0;
         PlotManager manager = PlotManager.getOrCreate(sw);
         PlotData plot = manager.getPlotAt(player.getBlockPos());
-        if (plot == null) { player.sendMessage(Text.translatable("sp.error.not_in_plot").formatted(Formatting.RED), false); return 0; }
+        if (plot == null) { player.sendMessage(Text.translatable("sp.error.not_in_plot").formatted(Formatting.RED)); return 0; }
         if (!plot.getOwnerId().equals(player.getUuid())) {
-            player.sendMessage(Text.translatable("sp.error.not_owner").formatted(Formatting.RED), false); return 0;
+            player.sendMessage(Text.translatable("sp.error.not_owner").formatted(Formatting.RED)); return 0;
         }
         {
             SecurePlotsConfig _cfg = SecurePlotsConfig.INSTANCE;
             if (_cfg != null) {
                 ResolvedPerks _perks = _cfg.resolvePerks(player);
                 if (!_perks.canUpgrade) {
-                    player.sendMessage(Text.translatable("sp.rank.no_perm", "upgrade").formatted(Formatting.RED), false); return 0;
+                    player.sendMessage(Text.translatable("sp.rank.no_perm", "upgrade").formatted(Formatting.RED)); return 0;
                 }
             }
         }
         PlotSize next = plot.getSize().next();
-        if (next == null) { player.sendMessage(Text.translatable("sp.upgrade.max_level").formatted(Formatting.RED), false); return 0; }
+        if (next == null) { player.sendMessage(Text.translatable("sp.upgrade.max_level").formatted(Formatting.RED)); return 0; }
 
         // Check and consume materials
         SecurePlotsConfig.UpgradeCost cost = cfg != null ? cfg.getUpgradeCost(plot.getSize().tier) : null;
@@ -1171,7 +1220,7 @@ public class SpCommand {
             for (var ic : cost.items) {
                 var item = Registries.ITEM.get(net.minecraft.util.Identifier.of(ic.itemId));
                 if (countItem(player, item) < ic.amount) {
-                    player.sendMessage(Text.literal("§c✗ You don't have enough " + ic.itemId + " (" + ic.amount + " needed)."), false);
+                    player.sendMessage(Text.literal("§c✗ You don't have enough " + ic.itemId + " (" + ic.amount + " needed)."));
                     return 0;
                 }
             }
@@ -1182,7 +1231,7 @@ public class SpCommand {
         plot.setSize(next);
         sw.setBlockState(plot.getCenter(), ModBlocks.fromTier(next.tier).getDefaultState());
         manager.markDirty();
-        player.sendMessage(Text.translatable("sp.upgrade.success", next.getDisplayName(), next.getRadius(), next.getRadius()).formatted(Formatting.GREEN), false);
+        player.sendMessage(Text.translatable("sp.upgrade.success", next.getDisplayName(), next.getRadius(), next.getRadius()).formatted(Formatting.GREEN));
         ModPackets.sendShowPlotBorder(player, plot);
         return 1;
     }
@@ -1192,9 +1241,9 @@ public class SpCommand {
     private static int executeFlagList(ServerCommandSource source) {
         ServerPlayerEntity player = source.getPlayer();
         if (player == null) return 0;
-        player.sendMessage(Text.translatable("sp.flag.list_header"), false);
-        for (PlotData.Flag f : PlotData.Flag.values()) player.sendMessage(Text.literal("  §7" + f.name().toLowerCase()), false);
-        player.sendMessage(Text.translatable("sp.flag.usage"), false);
+        player.sendMessage(Text.translatable("sp.flag.list_header"));
+        for (PlotData.Flag f : PlotData.Flag.values()) player.sendMessage(Text.literal("  §7" + f.name().toLowerCase()));
+        player.sendMessage(Text.translatable("sp.flag.usage"));
         return 1;
     }
 
@@ -1204,8 +1253,8 @@ public class SpCommand {
         PlotData.Flag flag = parseFlag(player, flagName);
         if (flag == null) return 0;
         PlotData plot = PlotManager.getOrCreate(player.getServerWorld()).getPlotAt(player.getBlockPos());
-        if (plot == null) { player.sendMessage(Text.translatable("sp.error.not_in_plot").formatted(Formatting.RED), false); return 0; }
-        player.sendMessage(Text.translatable("sp.flag.info", flag.name().toLowerCase(), plot.getPlotName(), plot.hasFlag(flag) ? "§a[ON]" : "§c[OFF]"), false);
+        if (plot == null) { player.sendMessage(Text.translatable("sp.error.not_in_plot").formatted(Formatting.RED)); return 0; }
+        player.sendMessage(Text.translatable("sp.flag.info", flag.name().toLowerCase(), plot.getPlotName(), plot.hasFlag(flag) ? "§a[ON]" : "§c[OFF]"));
         return 1;
     }
 
@@ -1218,11 +1267,11 @@ public class SpCommand {
         PlotData plot = resolveSinglePlot(player, manager, plotArg);
         if (plot == null) return 0;
         if (!plot.hasPermission(player.getUuid(), PlotData.Permission.MANAGE_FLAGS) && !player.getCommandTags().contains(adminTag())) {
-            player.sendMessage(Text.translatable("sp.error.no_flag_perm").formatted(Formatting.RED), false); return 0;
+            player.sendMessage(Text.translatable("sp.error.no_flag_perm").formatted(Formatting.RED)); return 0;
         }
         plot.setFlag(flag, value);
         manager.markDirty();
-        player.sendMessage(Text.translatable("sp.flag.set", flag.name().toLowerCase(), value ? "enabled" : "disabled", plot.getPlotName()).formatted(Formatting.GREEN), false);
+        player.sendMessage(Text.translatable("sp.flag.set", flag.name().toLowerCase(), value ? "enabled" : "disabled", plot.getPlotName()).formatted(Formatting.GREEN));
         return 1;
     }
 
@@ -1231,9 +1280,9 @@ public class SpCommand {
     private static int executePermList(ServerCommandSource source) {
         ServerPlayerEntity player = source.getPlayer();
         if (player == null) return 0;
-        player.sendMessage(Text.translatable("sp.perm.list_header"), false);
-        for (PlotData.Permission p : PlotData.Permission.values()) player.sendMessage(Text.literal("  §7" + p.name().toLowerCase()), false);
-        player.sendMessage(Text.translatable("sp.perm.usage"), false);
+        player.sendMessage(Text.translatable("sp.perm.list_header"));
+        for (PlotData.Permission p : PlotData.Permission.values()) player.sendMessage(Text.literal("  §7" + p.name().toLowerCase()));
+        player.sendMessage(Text.translatable("sp.perm.usage"));
         return 1;
     }
 
@@ -1243,10 +1292,10 @@ public class SpCommand {
         PlotData.Permission perm = parsePerm(player, permName);
         if (perm == null) return 0;
         PlotData plot = PlotManager.getOrCreate(player.getServerWorld()).getPlotAt(player.getBlockPos());
-        if (plot == null) { player.sendMessage(Text.translatable("sp.error.not_in_plot").formatted(Formatting.RED), false); return 0; }
+        if (plot == null) { player.sendMessage(Text.translatable("sp.error.not_in_plot").formatted(Formatting.RED)); return 0; }
         UUID targetUuid = findMemberUuid(plot, targetName);
-        if (targetUuid == null) { player.sendMessage(Text.translatable("sp.perm.not_member", targetName).formatted(Formatting.RED), false); return 0; }
-        player.sendMessage(Text.translatable("sp.perm.show", targetName, perm.name().toLowerCase(), plot.hasPermission(targetUuid, perm) ? "§a\u2714" : "§c\u2717"), false);
+        if (targetUuid == null) { player.sendMessage(Text.translatable("sp.perm.not_member", targetName).formatted(Formatting.RED)); return 0; }
+        player.sendMessage(Text.translatable("sp.perm.show", targetName, perm.name().toLowerCase(), plot.hasPermission(targetUuid, perm) ? "§a\u2714" : "§c\u2717"));
         return 1;
     }
 
@@ -1259,13 +1308,13 @@ public class SpCommand {
         PlotData plot = resolveSinglePlot(player, manager, plotArg);
         if (plot == null) return 0;
         if (!plot.hasPermission(player.getUuid(), PlotData.Permission.MANAGE_PERMS) && !player.getCommandTags().contains(adminTag())) {
-            player.sendMessage(Text.translatable("sp.error.no_perm_perm").formatted(Formatting.RED), false); return 0;
+            player.sendMessage(Text.translatable("sp.error.no_perm_perm").formatted(Formatting.RED)); return 0;
         }
         UUID targetUuid = findMemberUuid(plot, targetName);
-        if (targetUuid == null) { player.sendMessage(Text.translatable("sp.perm.not_member_in", targetName, plot.getPlotName()).formatted(Formatting.RED), false); return 0; }
+        if (targetUuid == null) { player.sendMessage(Text.translatable("sp.perm.not_member_in", targetName, plot.getPlotName()).formatted(Formatting.RED)); return 0; }
         plot.setPermission(targetUuid, perm, value);
         manager.markDirty();
-        player.sendMessage(Text.translatable("sp.perm.set", perm.name().toLowerCase(), value ? "enabled" : "disabled", targetName).formatted(Formatting.GREEN), false);
+        player.sendMessage(Text.translatable("sp.perm.set", perm.name().toLowerCase(), value ? "enabled" : "disabled", targetName).formatted(Formatting.GREEN));
         return 1;
     }
 
@@ -1276,9 +1325,9 @@ public class SpCommand {
         if (player == null) return 0;
         PlotManager manager = PlotManager.getOrCreate(player.getServerWorld());
         PlotData plot = manager.getPlotAt(player.getBlockPos());
-        if (plot == null) { player.sendMessage(Text.translatable("sp.error.not_in_plot").formatted(Formatting.RED), false); return 0; }
+        if (plot == null) { player.sendMessage(Text.translatable("sp.error.not_in_plot").formatted(Formatting.RED)); return 0; }
         if (!plot.hasPermission(player.getUuid(), PlotData.Permission.MANAGE_FLAGS) && !player.getCommandTags().contains(adminTag())) {
-            player.sendMessage(Text.translatable("sp.error.no_fly_perm").formatted(Formatting.RED), false); return 0;
+            player.sendMessage(Text.translatable("sp.error.no_fly_perm").formatted(Formatting.RED)); return 0;
         }
         return applyFlyChange(player, manager, plot, value != null ? value : !plot.hasFlag(PlotData.Flag.ALLOW_FLY));
     }
@@ -1290,7 +1339,7 @@ public class SpCommand {
         PlotData plot = resolveSinglePlot(player, manager, plotArg);
         if (plot == null) return 0;
         if (!plot.hasPermission(player.getUuid(), PlotData.Permission.MANAGE_FLAGS) && !player.getCommandTags().contains(adminTag())) {
-            player.sendMessage(Text.translatable("sp.error.no_fly_perm").formatted(Formatting.RED), false); return 0;
+            player.sendMessage(Text.translatable("sp.error.no_fly_perm").formatted(Formatting.RED)); return 0;
         }
         return applyFlyChange(player, manager, plot, value);
     }
@@ -1299,7 +1348,7 @@ public class SpCommand {
         plot.setFlag(PlotData.Flag.ALLOW_FLY, enable);
         for (UUID uuid : plot.getMembers().keySet()) plot.setPermission(uuid, PlotData.Permission.FLY, enable);
         manager.markDirty();
-        player.sendMessage(Text.translatable("sp.fly.set", enable ? "enabled" : "disabled", plot.getPlotName()).formatted(Formatting.GREEN), false);
+        player.sendMessage(Text.translatable("sp.fly.set", enable ? "enabled" : "disabled", plot.getPlotName()).formatted(Formatting.GREEN));
         return 1;
     }
 
@@ -1309,17 +1358,17 @@ public class SpCommand {
         ServerPlayerEntity player = source.getPlayer();
         if (player == null) return 0;
         if (SecurePlotsConfig.INSTANCE != null && !SecurePlotsConfig.INSTANCE.enablePermissionGroups) {
-            player.sendMessage(Text.translatable("sp.error.no_group_perm").formatted(Formatting.RED), false); return 0;
+            player.sendMessage(Text.translatable("sp.error.no_group_perm").formatted(Formatting.RED)); return 0;
         }
         PlotData plot = PlotManager.getOrCreate(player.getServerWorld()).getPlotAt(player.getBlockPos());
-        if (plot == null) { player.sendMessage(Text.translatable("sp.error.not_in_plot").formatted(Formatting.RED), false); return 0; }
-        if (plot.getGroups().isEmpty()) { player.sendMessage(Text.translatable("sp.group.empty"), false); }
+        if (plot == null) { player.sendMessage(Text.translatable("sp.error.not_in_plot").formatted(Formatting.RED)); return 0; }
+        if (plot.getGroups().isEmpty()) { player.sendMessage(Text.translatable("sp.group.empty")); }
         else {
-            player.sendMessage(Text.translatable("sp.group.list_header", plot.getPlotName()), false);
+            player.sendMessage(Text.translatable("sp.group.list_header", plot.getPlotName()));
             for (PlotData.PermissionGroup g : plot.getGroups())
-                player.sendMessage(Text.literal("  §d" + g.name + " §8\u2014 " + g.members.size() + " members, " + g.permissions.size() + " perms"), false);
+                player.sendMessage(Text.literal("  §d" + g.name + " §8\u2014 " + g.members.size() + " members, " + g.permissions.size() + " perms"));
         }
-        player.sendMessage(Text.translatable("sp.group.usage"), false);
+        player.sendMessage(Text.translatable("sp.group.usage"));
         return 1;
     }
 
@@ -1327,18 +1376,18 @@ public class SpCommand {
         ServerPlayerEntity player = source.getPlayer();
         if (player == null) return 0;
         if (SecurePlotsConfig.INSTANCE != null && !SecurePlotsConfig.INSTANCE.enablePermissionGroups) {
-            player.sendMessage(Text.translatable("sp.error.no_group_perm").formatted(Formatting.RED), false); return 0;
+            player.sendMessage(Text.translatable("sp.error.no_group_perm").formatted(Formatting.RED)); return 0;
         }
         PlotManager manager = PlotManager.getOrCreate(player.getServerWorld());
         PlotData plot = manager.getPlotAt(player.getBlockPos());
-        if (plot == null) { player.sendMessage(Text.translatable("sp.error.not_in_plot").formatted(Formatting.RED), false); return 0; }
+        if (plot == null) { player.sendMessage(Text.translatable("sp.error.not_in_plot").formatted(Formatting.RED)); return 0; }
         if (!plot.hasPermission(player.getUuid(), PlotData.Permission.MANAGE_GROUPS) && !player.getCommandTags().contains(adminTag())) {
-            player.sendMessage(Text.translatable("sp.error.no_group_perm").formatted(Formatting.RED), false); return 0;
+            player.sendMessage(Text.translatable("sp.error.no_group_perm").formatted(Formatting.RED)); return 0;
         }
-        if (plot.getGroup(groupName) != null) { player.sendMessage(Text.translatable("sp.group.already_exists").formatted(Formatting.YELLOW), false); return 0; }
+        if (plot.getGroup(groupName) != null) { player.sendMessage(Text.translatable("sp.group.already_exists").formatted(Formatting.YELLOW)); return 0; }
         plot.getOrCreateGroup(groupName);
         manager.markDirty();
-        player.sendMessage(Text.translatable("sp.group.created", groupName).formatted(Formatting.GREEN), false);
+        player.sendMessage(Text.translatable("sp.group.created", groupName).formatted(Formatting.GREEN));
         return 1;
     }
 
@@ -1347,13 +1396,13 @@ public class SpCommand {
         if (player == null) return 0;
         PlotManager manager = PlotManager.getOrCreate(player.getServerWorld());
         PlotData plot = manager.getPlotAt(player.getBlockPos());
-        if (plot == null) { player.sendMessage(Text.translatable("sp.error.not_in_plot").formatted(Formatting.RED), false); return 0; }
+        if (plot == null) { player.sendMessage(Text.translatable("sp.error.not_in_plot").formatted(Formatting.RED)); return 0; }
         if (!plot.hasPermission(player.getUuid(), PlotData.Permission.MANAGE_GROUPS) && !player.getCommandTags().contains(adminTag())) {
-            player.sendMessage(Text.translatable("sp.error.no_group_perm").formatted(Formatting.RED), false); return 0;
+            player.sendMessage(Text.translatable("sp.error.no_group_perm").formatted(Formatting.RED)); return 0;
         }
-        if (!plot.removeGroup(groupName)) { player.sendMessage(Text.translatable("sp.group.not_found", groupName).formatted(Formatting.RED), false); return 0; }
+        if (!plot.removeGroup(groupName)) { player.sendMessage(Text.translatable("sp.group.not_found", groupName).formatted(Formatting.RED)); return 0; }
         manager.markDirty();
-        player.sendMessage(Text.translatable("sp.group.deleted", groupName).formatted(Formatting.GREEN), false);
+        player.sendMessage(Text.translatable("sp.group.deleted", groupName).formatted(Formatting.GREEN));
         return 1;
     }
 
@@ -1362,15 +1411,15 @@ public class SpCommand {
         if (player == null) return 0;
         PlotManager manager = PlotManager.getOrCreate(player.getServerWorld());
         PlotData plot = manager.getPlotAt(player.getBlockPos());
-        if (plot == null) { player.sendMessage(Text.translatable("sp.error.not_in_plot").formatted(Formatting.RED), false); return 0; }
+        if (plot == null) { player.sendMessage(Text.translatable("sp.error.not_in_plot").formatted(Formatting.RED)); return 0; }
         PlotData.PermissionGroup group = plot.getGroup(groupName);
-        if (group == null) { player.sendMessage(Text.translatable("sp.group.not_found", groupName).formatted(Formatting.RED), false); return 0; }
+        if (group == null) { player.sendMessage(Text.translatable("sp.group.not_found", groupName).formatted(Formatting.RED)); return 0; }
         UUID targetUuid = findMemberUuid(plot, targetName);
-        if (targetUuid == null) { player.sendMessage(Text.translatable("sp.group.member_not_found", targetName).formatted(Formatting.RED), false); return 0; }
-        if (group.members.contains(targetUuid)) { player.sendMessage(Text.translatable("sp.group.already_in_group", targetName).formatted(Formatting.YELLOW), false); return 0; }
+        if (targetUuid == null) { player.sendMessage(Text.translatable("sp.group.member_not_found", targetName).formatted(Formatting.RED)); return 0; }
+        if (group.members.contains(targetUuid)) { player.sendMessage(Text.translatable("sp.group.already_in_group", targetName).formatted(Formatting.YELLOW)); return 0; }
         group.members.add(targetUuid);
         manager.markDirty();
-        player.sendMessage(Text.translatable("sp.group.member_added", targetName, groupName).formatted(Formatting.GREEN), false);
+        player.sendMessage(Text.translatable("sp.group.member_added", targetName, groupName).formatted(Formatting.GREEN));
         return 1;
     }
 
@@ -1379,13 +1428,13 @@ public class SpCommand {
         if (player == null) return 0;
         PlotManager manager = PlotManager.getOrCreate(player.getServerWorld());
         PlotData plot = manager.getPlotAt(player.getBlockPos());
-        if (plot == null) { player.sendMessage(Text.translatable("sp.error.not_in_plot").formatted(Formatting.RED), false); return 0; }
+        if (plot == null) { player.sendMessage(Text.translatable("sp.error.not_in_plot").formatted(Formatting.RED)); return 0; }
         PlotData.PermissionGroup group = plot.getGroup(groupName);
-        if (group == null) { player.sendMessage(Text.translatable("sp.group.not_found", groupName).formatted(Formatting.RED), false); return 0; }
+        if (group == null) { player.sendMessage(Text.translatable("sp.group.not_found", groupName).formatted(Formatting.RED)); return 0; }
         UUID targetUuid = findMemberUuid(plot, targetName);
-        if (targetUuid == null || !group.members.remove(targetUuid)) { player.sendMessage(Text.translatable("sp.group.not_in_group", targetName).formatted(Formatting.YELLOW), false); return 0; }
+        if (targetUuid == null || !group.members.remove(targetUuid)) { player.sendMessage(Text.translatable("sp.group.not_in_group", targetName).formatted(Formatting.YELLOW)); return 0; }
         manager.markDirty();
-        player.sendMessage(Text.translatable("sp.group.member_removed", targetName, groupName).formatted(Formatting.GREEN), false);
+        player.sendMessage(Text.translatable("sp.group.member_removed", targetName, groupName).formatted(Formatting.GREEN));
         return 1;
     }
 
@@ -1396,15 +1445,15 @@ public class SpCommand {
         if (perm == null) return 0;
         PlotManager manager = PlotManager.getOrCreate(player.getServerWorld());
         PlotData plot = manager.getPlotAt(player.getBlockPos());
-        if (plot == null) { player.sendMessage(Text.translatable("sp.error.not_in_plot").formatted(Formatting.RED), false); return 0; }
+        if (plot == null) { player.sendMessage(Text.translatable("sp.error.not_in_plot").formatted(Formatting.RED)); return 0; }
         if (!plot.hasPermission(player.getUuid(), PlotData.Permission.MANAGE_GROUPS) && !player.getCommandTags().contains(adminTag())) {
-            player.sendMessage(Text.translatable("sp.error.no_group_perm").formatted(Formatting.RED), false); return 0;
+            player.sendMessage(Text.translatable("sp.error.no_group_perm").formatted(Formatting.RED)); return 0;
         }
         PlotData.PermissionGroup group = plot.getGroup(groupName);
-        if (group == null) { player.sendMessage(Text.translatable("sp.group.not_found", groupName).formatted(Formatting.RED), false); return 0; }
+        if (group == null) { player.sendMessage(Text.translatable("sp.group.not_found", groupName).formatted(Formatting.RED)); return 0; }
         if (value) group.permissions.add(perm); else group.permissions.remove(perm);
         manager.markDirty();
-        player.sendMessage(Text.translatable("sp.group.perm_set", perm.name().toLowerCase(), value ? "enabled" : "disabled", groupName).formatted(Formatting.GREEN), false);
+        player.sendMessage(Text.translatable("sp.group.perm_set", perm.name().toLowerCase(), value ? "enabled" : "disabled", groupName).formatted(Formatting.GREEN));
         return 1;
     }
 
@@ -1418,7 +1467,7 @@ public class SpCommand {
         {
             SecurePlotsConfig _cfg = SecurePlotsConfig.INSTANCE;
             if (_cfg != null && !_cfg.resolvePerks(player).canSetParticles) {
-                player.sendMessage(Text.translatable("sp.rank.no_perm", "particles").formatted(Formatting.RED), false); return 0;
+                player.sendMessage(Text.translatable("sp.rank.no_perm", "particles").formatted(Formatting.RED)); return 0;
             }
         }
         String value = type.equalsIgnoreCase("clear") || type.equalsIgnoreCase("none") ? ""
@@ -1426,7 +1475,7 @@ public class SpCommand {
         plot.setParticleEffect(value);
         PlotManager.getOrCreate(player.getServerWorld()).markDirty();
         player.sendMessage(value.isEmpty() ? Text.translatable("sp.plot.particle_cleared").formatted(Formatting.GREEN)
-            : Text.translatable("sp.plot.particle_set", value).formatted(Formatting.GREEN), false);
+            : Text.translatable("sp.plot.particle_set", value).formatted(Formatting.GREEN));
         return 1;
     }
 
@@ -1437,12 +1486,12 @@ public class SpCommand {
         if (plot == null) return 0;
         String value = type.equalsIgnoreCase("clear") || type.equalsIgnoreCase("none") ? "" : type.toUpperCase();
         if (!value.isEmpty() && !value.equals("CLEAR") && !value.equals("RAIN") && !value.equals("THUNDER")) {
-            player.sendMessage(Text.translatable("sp.plot.weather_invalid").formatted(Formatting.RED), false); return 0;
+            player.sendMessage(Text.translatable("sp.plot.weather_invalid").formatted(Formatting.RED)); return 0;
         }
         plot.setWeatherType(value);
         PlotManager.getOrCreate(player.getServerWorld()).markDirty();
         player.sendMessage(value.isEmpty() ? Text.translatable("sp.plot.weather_cleared").formatted(Formatting.GREEN)
-            : Text.translatable("sp.plot.weather_set", value.toLowerCase()).formatted(Formatting.GREEN), false);
+            : Text.translatable("sp.plot.weather_set", value.toLowerCase()).formatted(Formatting.GREEN));
         return 1;
     }
 
@@ -1456,7 +1505,7 @@ public class SpCommand {
         plot.setPlotTime(ticks);
         PlotManager.getOrCreate(player.getServerWorld()).markDirty();
         player.sendMessage(ticks < 0 ? Text.translatable("sp.plot.time_cleared").formatted(Formatting.GREEN)
-            : Text.translatable("sp.plot.time_set", ticks).formatted(Formatting.GREEN), false);
+            : Text.translatable("sp.plot.time_set", ticks).formatted(Formatting.GREEN));
         return 1;
     }
 
@@ -1468,14 +1517,14 @@ public class SpCommand {
         {
             SecurePlotsConfig _cfg = SecurePlotsConfig.INSTANCE;
             if (_cfg != null && !_cfg.resolvePerks(player).canSetMusic) {
-                player.sendMessage(Text.translatable("sp.rank.no_perm", "music").formatted(Formatting.RED), false); return 0;
+                player.sendMessage(Text.translatable("sp.rank.no_perm", "music").formatted(Formatting.RED)); return 0;
             }
         }
         String value = soundId.equalsIgnoreCase("clear") || soundId.equalsIgnoreCase("none") ? "" : soundId;
         plot.setMusicSound(value);
         PlotManager.getOrCreate(player.getServerWorld()).markDirty();
         player.sendMessage(value.isEmpty() ? Text.translatable("sp.plot.music_cleared").formatted(Formatting.GREEN)
-            : Text.translatable("sp.plot.music_set", value).formatted(Formatting.GREEN), false);
+            : Text.translatable("sp.plot.music_set", value).formatted(Formatting.GREEN));
         return 1;
     }
 
@@ -1489,7 +1538,7 @@ public class SpCommand {
         PlotManager.getOrCreate(player.getServerWorld()).markDirty();
         player.sendMessage(value.isEmpty()
             ? Text.literal("§a✔ " + (isEnter ? "Enter" : "Exit") + " message cleared.")
-            : Text.translatable("sp.message.updated", value).formatted(Formatting.GREEN), false);
+            : Text.translatable("sp.message.updated", value).formatted(Formatting.GREEN));
         return 1;
     }
 
@@ -1502,7 +1551,7 @@ public class SpCommand {
         if (admin == null) return 0;
         PlotManager manager = PlotManager.getOrCreate(admin.getServerWorld());
         List<PlotData> all = manager.getAllPlots();
-        if (all.isEmpty()) { admin.sendMessage(Text.literal("§7No plots on this server."), false); return 0; }
+        if (all.isEmpty()) { admin.sendMessage(Text.literal("§7No plots on this server.")); return 0; }
 
         // Sort by owner name then plot name
         all.sort(Comparator.comparing(PlotData::getOwnerName).thenComparing(PlotData::getPlotName));
@@ -1513,7 +1562,7 @@ public class SpCommand {
         int start  = (p - 1) * PAGE_SIZE;
         int end    = Math.min(start + PAGE_SIZE, total);
 
-        admin.sendMessage(Text.literal("§6🛡 All plots — page §e" + p + "§6/§e" + pages + " §8(total: " + total + ")").formatted(Formatting.BOLD), false);
+        admin.sendMessage(Text.literal("§6🛡 All plots — page §e" + p + "§6/§e" + pages + " §8(total: " + total + ")").formatted(Formatting.BOLD));
         for (int i = start; i < end; i++) {
             PlotData pd = all.get(i);
             BlockPos  c  = pd.getCenter();
@@ -1521,10 +1570,10 @@ public class SpCommand {
                 "  §7" + (i + 1) + ". §f" + pd.getPlotName() +
                 " §8[" + pd.getSize().getDisplayName() + "] " +
                 "§7owner: §a" + pd.getOwnerName() +
-                " §8@ " + c.getX() + ", " + c.getY() + ", " + c.getZ()), false);
+                " §8@ " + c.getX() + ", " + c.getY() + ", " + c.getZ()));
         }
         if (pages > 1)
-            admin.sendMessage(Text.literal("§8Use §e/sp admin listall " + (p + 1) + " §8for next page."), false);
+            admin.sendMessage(Text.literal("§8Use §e/sp admin listall " + (p + 1) + " §8for next page."));
         return 1;
     }
 
@@ -1535,11 +1584,11 @@ public class SpCommand {
         if (admin == null) return 0;
         UUID ownerUuid = resolveUuid(source, ownerName);
         if (ownerUuid == null) {
-            admin.sendMessage(Text.translatable("sp.add.player_not_found", ownerName).formatted(Formatting.RED), false);
+            admin.sendMessage(Text.translatable("sp.add.player_not_found", ownerName).formatted(Formatting.RED));
             return 0;
         }
         List<PlotData> plots = PlotManager.getOrCreate(admin.getServerWorld()).getPlayerPlots(ownerUuid);
-        if (plots.isEmpty()) { admin.sendMessage(Text.literal("§7" + ownerName + " has no plots."), false); return 0; }
+        if (plots.isEmpty()) { admin.sendMessage(Text.literal("§7" + ownerName + " has no plots.")); return 0; }
 
         int total = plots.size();
         int pages  = (int) Math.ceil(total / (double) PAGE_SIZE);
@@ -1547,17 +1596,17 @@ public class SpCommand {
         int start  = (p - 1) * PAGE_SIZE;
         int end    = Math.min(start + PAGE_SIZE, total);
 
-        admin.sendMessage(Text.literal("§6🛡 Plots of §e" + ownerName + " §8(§e" + total + "§8) — page " + p + "/" + pages).formatted(Formatting.BOLD), false);
+        admin.sendMessage(Text.literal("§6🛡 Plots of §e" + ownerName + " §8(§e" + total + "§8) — page " + p + "/" + pages).formatted(Formatting.BOLD));
         for (int i = start; i < end; i++) {
             PlotData pd = plots.get(i);
             BlockPos  c  = pd.getCenter();
             admin.sendMessage(Text.literal(
                 "  " + (i + 1) + ". §f" + pd.getPlotName() +
                 " §8[" + pd.getSize().getDisplayName() + "]" +
-                " §8@ " + c.getX() + ", " + c.getY() + ", " + c.getZ()), false);
+                " §8@ " + c.getX() + ", " + c.getY() + ", " + c.getZ()));
         }
         if (pages > 1)
-            admin.sendMessage(Text.literal("§8Use §e/sp admin search " + ownerName + " " + (p + 1) + " §8for next page."), false);
+            admin.sendMessage(Text.literal("§8Use §e/sp admin search " + ownerName + " " + (p + 1) + " §8for next page."));
         return 1;
     }
 
@@ -1578,7 +1627,7 @@ public class SpCommand {
 
         PlotManager manager = PlotManager.getOrCreate(admin.getServerWorld());
         List<PlotData> all  = manager.getAllPlots();
-        if (all.isEmpty()) { admin.sendMessage(Text.literal("§7No plots on this server."), false); return 0; }
+        if (all.isEmpty()) { admin.sendMessage(Text.literal("§7No plots on this server.")); return 0; }
 
         // Sort by 2D distance (XZ) to the reference point
         all.sort(Comparator.comparingDouble(pd -> {
@@ -1591,7 +1640,7 @@ public class SpCommand {
         String origin = (ox != null && oz != null)
             ? "§8coords §e" + ox + ", " + (oy != null ? oy : "~") + ", " + oz
             : "§8your position";
-        admin.sendMessage(Text.literal("§6🛡 " + shown + " nearest plot(s) to " + origin).formatted(Formatting.BOLD), false);
+        admin.sendMessage(Text.literal("§6🛡 " + shown + " nearest plot(s) to " + origin).formatted(Formatting.BOLD));
 
         for (int i = 0; i < shown; i++) {
             PlotData pd = all.get(i);
@@ -1602,7 +1651,7 @@ public class SpCommand {
                 " §8[" + pd.getSize().getDisplayName() + "]" +
                 " §7owner: §a" + pd.getOwnerName() +
                 " §8@ " + c.getX() + ", " + c.getY() + ", " + c.getZ() +
-                " §8(§e" + dist + "m§8)"), false);
+                " §8(§e" + dist + "m§8)"));
         }
         return 1;
     }
@@ -1613,14 +1662,14 @@ public class SpCommand {
         ServerPlayerEntity admin = source.getPlayer();
         if (admin == null) return 0;
         UUID ownerUuid = resolveUuid(source, ownerName);
-        if (ownerUuid == null) { admin.sendMessage(Text.translatable("sp.add.player_not_found", ownerName).formatted(Formatting.RED), false); return 0; }
+        if (ownerUuid == null) { admin.sendMessage(Text.translatable("sp.add.player_not_found", ownerName).formatted(Formatting.RED)); return 0; }
         List<PlotData> plots = PlotManager.getOrCreate(admin.getServerWorld()).getPlayerPlots(ownerUuid);
-        if (plots.isEmpty()) { admin.sendMessage(Text.literal("§7" + ownerName + " has no plots."), false); return 0; }
-        admin.sendMessage(Text.literal("§6🛡 Plots of " + ownerName + " (" + plots.size() + ")").formatted(Formatting.BOLD), false);
+        if (plots.isEmpty()) { admin.sendMessage(Text.literal("§7" + ownerName + " has no plots.")); return 0; }
+        admin.sendMessage(Text.literal("§6🛡 Plots of " + ownerName + " (" + plots.size() + ")").formatted(Formatting.BOLD));
         for (int i = 0; i < plots.size(); i++) {
             PlotData p = plots.get(i);
             BlockPos c = p.getCenter();
-            admin.sendMessage(Text.literal("  " + (i + 1) + ". §f" + p.getPlotName() + " §8[" + p.getSize().getDisplayName() + "] " + c.getX() + ", " + c.getY() + ", " + c.getZ()), false);
+            admin.sendMessage(Text.literal("  " + (i + 1) + ". §f" + p.getPlotName() + " §8[" + p.getSize().getDisplayName() + "] " + c.getX() + ", " + c.getY() + ", " + c.getZ()));
         }
         return 1;
     }
@@ -1629,7 +1678,7 @@ public class SpCommand {
         ServerPlayerEntity admin = source.getPlayer();
         if (admin == null) return 0;
         UUID ownerUuid = resolveUuid(source, ownerName);
-        if (ownerUuid == null) { admin.sendMessage(Text.translatable("sp.add.player_not_found", ownerName).formatted(Formatting.RED), false); return 0; }
+        if (ownerUuid == null) { admin.sendMessage(Text.translatable("sp.add.player_not_found", ownerName).formatted(Formatting.RED)); return 0; }
         PlotManager manager = PlotManager.getOrCreate(admin.getServerWorld());
         List<PlotData> owned = manager.getPlayerPlots(ownerUuid);
         List<PlotData> resolved = resolvePlots(owned, plotArg, admin);
@@ -1642,7 +1691,7 @@ public class SpCommand {
         ServerPlayerEntity admin = source.getPlayer();
         if (admin == null) return 0;
         UUID ownerUuid = resolveUuid(source, ownerName);
-        if (ownerUuid == null) { admin.sendMessage(Text.translatable("sp.add.player_not_found", ownerName).formatted(Formatting.RED), false); return 0; }
+        if (ownerUuid == null) { admin.sendMessage(Text.translatable("sp.add.player_not_found", ownerName).formatted(Formatting.RED)); return 0; }
         PlotManager manager = PlotManager.getOrCreate(admin.getServerWorld());
         List<PlotData> owned = manager.getPlayerPlots(ownerUuid);
         List<PlotData> resolved = resolvePlots(owned, plotArg, admin);
@@ -1652,7 +1701,7 @@ public class SpCommand {
         BlockPos c = plot.getCenter();
         double tpY = sw.getTopPosition(Heightmap.Type.MOTION_BLOCKING_NO_LEAVES, c).getY();
         admin.teleport(sw, c.getX() + 0.5, tpY, c.getZ() + 0.5, Set.of(), admin.getYaw(), admin.getPitch());
-        admin.sendMessage(Text.translatable("sp.tp.success", plot.getPlotName()).formatted(Formatting.GREEN), false);
+        admin.sendMessage(Text.translatable("sp.tp.success", plot.getPlotName()).formatted(Formatting.GREEN));
         return 1;
     }
 
@@ -1660,14 +1709,14 @@ public class SpCommand {
         ServerPlayerEntity admin = source.getPlayer();
         if (admin == null) return 0;
         UUID ownerUuid = resolveUuid(source, ownerName);
-        if (ownerUuid == null) { admin.sendMessage(Text.translatable("sp.add.player_not_found", ownerName).formatted(Formatting.RED), false); return 0; }
+        if (ownerUuid == null) { admin.sendMessage(Text.translatable("sp.add.player_not_found", ownerName).formatted(Formatting.RED)); return 0; }
         PlotManager manager = PlotManager.getOrCreate(admin.getServerWorld());
         List<PlotData> owned = manager.getPlayerPlots(ownerUuid);
-        if (owned.isEmpty()) { admin.sendMessage(Text.translatable("sp.error.no_plots").formatted(Formatting.RED), false); return 0; }
+        if (owned.isEmpty()) { admin.sendMessage(Text.translatable("sp.error.no_plots").formatted(Formatting.RED)); return 0; }
         List<PlotData> targets = plotArg.equalsIgnoreCase("all") ? new ArrayList<>(owned) : resolvePlots(owned, plotArg, admin);
         if (targets == null) return 0;
         for (PlotData p : targets) manager.removePlot(p.getCenter());
-        admin.sendMessage(Text.literal("§a\u2714 Deleted " + targets.size() + " plot(s) owned by §f" + ownerName), false);
+        admin.sendMessage(Text.literal("§a\u2714 Deleted " + targets.size() + " plot(s) owned by §f" + ownerName));
         return 1;
     }
 
@@ -1675,7 +1724,7 @@ public class SpCommand {
         ServerPlayerEntity admin = source.getPlayer();
         if (admin == null) return 0;
         UUID ownerUuid = resolveUuid(source, ownerName);
-        if (ownerUuid == null) { admin.sendMessage(Text.translatable("sp.add.player_not_found", ownerName).formatted(Formatting.RED), false); return 0; }
+        if (ownerUuid == null) { admin.sendMessage(Text.translatable("sp.add.player_not_found", ownerName).formatted(Formatting.RED)); return 0; }
         PlotManager manager = PlotManager.getOrCreate(admin.getServerWorld());
         List<PlotData> owned = manager.getPlayerPlots(ownerUuid);
         List<PlotData> resolved = resolvePlots(owned, plotArg, admin);
@@ -1688,20 +1737,20 @@ public class SpCommand {
         if (admin == null) return 0;
         PlotManager manager = PlotManager.getOrCreate(admin.getServerWorld());
         PlotData plot = manager.getPlotAt(admin.getBlockPos());
-        if (plot == null) { admin.sendMessage(Text.translatable("sp.error.not_in_plot").formatted(Formatting.RED), false); return 0; }
+        if (plot == null) { admin.sendMessage(Text.translatable("sp.error.not_in_plot").formatted(Formatting.RED)); return 0; }
         ServerPlayerEntity newOwner = source.getServer().getPlayerManager().getPlayer(newOwnerName);
         UUID newUuid; String resolvedName;
         if (newOwner != null) { newUuid = newOwner.getUuid(); resolvedName = newOwner.getName().getString(); }
         else {
             Optional<GameProfile> profile = source.getServer().getUserCache().findByName(newOwnerName);
-            if (profile.isEmpty()) { admin.sendMessage(Text.translatable("sp.add.player_not_found", newOwnerName).formatted(Formatting.RED), false); return 0; }
+            if (profile.isEmpty()) { admin.sendMessage(Text.translatable("sp.add.player_not_found", newOwnerName).formatted(Formatting.RED)); return 0; }
             newUuid = profile.get().getId(); resolvedName = profile.get().getName();
         }
         plot.addMember(newUuid, resolvedName, PlotData.Role.MEMBER);
         plot.getMembers().put(newUuid, PlotData.Role.OWNER);
         manager.markDirty();
-        admin.sendMessage(Text.literal("§a\u2714 §fOwnership of §e\"" + plot.getPlotName() + "§e\" §ftransferred to §a" + resolvedName), false);
-        if (newOwner != null) newOwner.sendMessage(Text.literal("§eYou have been given ownership of §f\"" + plot.getPlotName() + "\""), false);
+        admin.sendMessage(Text.literal("§a\u2714 §fOwnership of §e\"" + plot.getPlotName() + "§e\" §ftransferred to §a" + resolvedName));
+        if (newOwner != null) newOwner.sendMessage(Text.literal("§eYou have been given ownership of §f\"" + plot.getPlotName() + "\""));
         return 1;
     }
 
@@ -1709,7 +1758,7 @@ public class SpCommand {
         ServerPlayerEntity admin = source.getPlayer();
         if (admin == null) return 0;
         UUID ownerUuid = resolveUuid(source, ownerName);
-        if (ownerUuid == null) { admin.sendMessage(Text.translatable("sp.add.player_not_found", ownerName).formatted(Formatting.RED), false); return 0; }
+        if (ownerUuid == null) { admin.sendMessage(Text.translatable("sp.add.player_not_found", ownerName).formatted(Formatting.RED)); return 0; }
         if (!(admin.getWorld() instanceof ServerWorld sw)) return 0;
         PlotManager manager = PlotManager.getOrCreate(sw);
         List<PlotData> owned = manager.getPlayerPlots(ownerUuid);
@@ -1717,11 +1766,11 @@ public class SpCommand {
         if (resolved == null || resolved.isEmpty()) return 0;
         PlotData plot = resolved.get(0);
         PlotSize next = plot.getSize().next();
-        if (next == null) { admin.sendMessage(Text.translatable("sp.upgrade.max_level").formatted(Formatting.RED), false); return 0; }
+        if (next == null) { admin.sendMessage(Text.translatable("sp.upgrade.max_level").formatted(Formatting.RED)); return 0; }
         plot.setSize(next);
         sw.setBlockState(plot.getCenter(), ModBlocks.fromTier(next.tier).getDefaultState());
         manager.markDirty();
-        admin.sendMessage(Text.translatable("sp.upgrade.success", next.getDisplayName(), next.getRadius(), next.getRadius()).formatted(Formatting.GREEN), false);
+        admin.sendMessage(Text.translatable("sp.upgrade.success", next.getDisplayName(), next.getRadius(), next.getRadius()).formatted(Formatting.GREEN));
         return 1;
     }
 
@@ -1729,7 +1778,7 @@ public class SpCommand {
         ServerPlayerEntity admin = source.getPlayer();
         if (admin == null) return 0;
         UUID ownerUuid = resolveUuid(source, ownerName);
-        if (ownerUuid == null) { admin.sendMessage(Text.translatable("sp.add.player_not_found", ownerName).formatted(Formatting.RED), false); return 0; }
+        if (ownerUuid == null) { admin.sendMessage(Text.translatable("sp.add.player_not_found", ownerName).formatted(Formatting.RED)); return 0; }
         PlotManager manager = PlotManager.getOrCreate(admin.getServerWorld());
         List<PlotData> owned = manager.getPlayerPlots(ownerUuid);
         List<PlotData> resolved = resolvePlots(owned, plotArg, admin);
@@ -1737,7 +1786,7 @@ public class SpCommand {
         PlotData plot = resolved.get(0);
         plot.setHasRank(value);
         manager.markDirty();
-        admin.sendMessage(Text.literal("§a\u2714 §fPlot §e\"" + plot.getPlotName() + "§e\" rank protection: §f" + (value ? "§aenabled (immune to expiry)" : "§cdisabled")), false);
+        admin.sendMessage(Text.literal("§a\u2714 §fPlot §e\"" + plot.getPlotName() + "§e\" rank protection: §f" + (value ? "§aenabled (immune to expiry)" : "§cdisabled")));
         return 1;
     }
 
@@ -1746,7 +1795,7 @@ public class SpCommand {
         ServerPlayerEntity admin = source.getPlayer();
         if (admin == null) return 0;
         UUID ownerUuid = resolveUuid(source, ownerName);
-        if (ownerUuid == null) { admin.sendMessage(Text.translatable("sp.add.player_not_found", ownerName).formatted(Formatting.RED), false); return 0; }
+        if (ownerUuid == null) { admin.sendMessage(Text.translatable("sp.add.player_not_found", ownerName).formatted(Formatting.RED)); return 0; }
         PlotManager manager = PlotManager.getOrCreate(admin.getServerWorld());
         List<PlotData> owned = manager.getPlayerPlots(ownerUuid);
         List<PlotData> resolved = resolvePlots(owned, plotArg, admin);
@@ -1758,7 +1807,7 @@ public class SpCommand {
             case "music"    -> plot.setMusicSound(clear);
             case "weather"  -> {
                 if (!clear.isEmpty() && !clear.equalsIgnoreCase("CLEAR") && !clear.equalsIgnoreCase("RAIN") && !clear.equalsIgnoreCase("THUNDER")) {
-                    admin.sendMessage(Text.translatable("sp.plot.weather_invalid").formatted(Formatting.RED), false); return 0;
+                    admin.sendMessage(Text.translatable("sp.plot.weather_invalid").formatted(Formatting.RED)); return 0;
                 }
                 plot.setWeatherType(clear);
             }
@@ -1771,7 +1820,7 @@ public class SpCommand {
             case "exit"  -> plot.setExitMessage(clear);
         }
         manager.markDirty();
-        admin.sendMessage(Text.literal("§a\u2714 §f" + field + " updated for §e\"" + plot.getPlotName() + "\"").formatted(Formatting.GREEN), false);
+        admin.sendMessage(Text.literal("§a\u2714 §f" + field + " updated for §e\"" + plot.getPlotName() + "\"").formatted(Formatting.GREEN));
         return 1;
     }
 
@@ -1782,7 +1831,7 @@ public class SpCommand {
         for (ServerPlayerEntity p : source.getServer().getPlayerManager().getPlayerList())
             ModPackets.sendSyncBorderConfig(p);
         Text msg = Text.literal("§a\u2714 SecurePlots config reloaded.");
-        if (admin != null) admin.sendMessage(msg, false);
+        if (admin != null) admin.sendMessage(msg);
         else source.sendFeedback(() -> msg, false);
         return 1;
     }
@@ -1793,25 +1842,25 @@ public class SpCommand {
         ServerPlayerEntity player = source.getPlayer();
         if (player == null) return 0;
         SecurePlotsConfig cfg = SecurePlotsConfig.INSTANCE;
-        if (cfg == null) { player.sendMessage(Text.literal("§cConfig not loaded."), false); return 0; }
+        if (cfg == null) { player.sendMessage(Text.literal("§cConfig not loaded.")); return 0; }
 
         ResolvedPerks perks = cfg.resolvePerks(player);
         int maxPlots = cfg.getMaxPlotsFor(player);
 
-        player.sendMessage(Text.literal("§e══ Your Plot Rank Perks ══"), false);
-        player.sendMessage(Text.literal("§7Max plots:    §f" + (maxPlots == 0 ? "unlimited" : maxPlots)), false);
-        player.sendMessage(Text.literal("§7Max tier:     §f" + perks.maxTier + " (" + cfg.getTierConfig(perks.maxTier).displayName + ")"), false);
-        player.sendMessage(Text.literal("§7Rename:       " + perkIcon(perks.canRename)), false);
-        player.sendMessage(Text.literal("§7Music:        " + perkIcon(perks.canSetMusic)), false);
-        player.sendMessage(Text.literal("§7Particles:    " + perkIcon(perks.canSetParticles)), false);
-        player.sendMessage(Text.literal("§7Weather:      " + perkIcon(perks.canSetWeather)), false);
-        player.sendMessage(Text.literal("§7Time:         " + perkIcon(perks.canSetTime)), false);
-        player.sendMessage(Text.literal("§7Enter/Exit:   " + perkIcon(perks.canSetEnterExit)), false);
-        player.sendMessage(Text.literal("§7Teleport:     " + perkIcon(perks.canTp)), false);
-        player.sendMessage(Text.literal("§7Fly:          " + perkIcon(perks.canFly)), false);
-        player.sendMessage(Text.literal("§7Upgrade:      " + perkIcon(perks.canUpgrade)), false);
-        player.sendMessage(Text.literal("§7Groups:       " + perkIcon(perks.canGroups)), false);
-        player.sendMessage(Text.literal("§7Rank protect: " + perkIcon(perks.hasRankProtection)), false);
+        player.sendMessage(Text.literal("§e══ Your Plot Rank Perks ══"));
+        player.sendMessage(Text.literal("§7Max plots:    §f" + (maxPlots == 0 ? "unlimited" : maxPlots)));
+        player.sendMessage(Text.literal("§7Max tier:     §f" + perks.maxTier + " (" + cfg.getTierConfig(perks.maxTier).displayName + ")"));
+        player.sendMessage(Text.literal("§7Rename:       " + perkIcon(perks.canRename)));
+        player.sendMessage(Text.literal("§7Music:        " + perkIcon(perks.canSetMusic)));
+        player.sendMessage(Text.literal("§7Particles:    " + perkIcon(perks.canSetParticles)));
+        player.sendMessage(Text.literal("§7Weather:      " + perkIcon(perks.canSetWeather)));
+        player.sendMessage(Text.literal("§7Time:         " + perkIcon(perks.canSetTime)));
+        player.sendMessage(Text.literal("§7Enter/Exit:   " + perkIcon(perks.canSetEnterExit)));
+        player.sendMessage(Text.literal("§7Teleport:     " + perkIcon(perks.canTp)));
+        player.sendMessage(Text.literal("§7Fly:          " + perkIcon(perks.canFly)));
+        player.sendMessage(Text.literal("§7Upgrade:      " + perkIcon(perks.canUpgrade)));
+        player.sendMessage(Text.literal("§7Groups:       " + perkIcon(perks.canGroups)));
+        player.sendMessage(Text.literal("§7Rank protect: " + perkIcon(perks.hasRankProtection)));
         return 1;
     }
 
@@ -1826,16 +1875,16 @@ public class SpCommand {
         if (admin == null) return 0;
         ServerPlayerEntity target = source.getServer().getPlayerManager().getPlayer(targetName);
         if (target == null) {
-            if (admin != null) admin.sendMessage(Text.translatable("sp.add.player_not_found", targetName).formatted(Formatting.RED), false);
+            if (admin != null) admin.sendMessage(Text.translatable("sp.add.player_not_found", targetName).formatted(Formatting.RED));
             return 0;
         }
         if (add) {
             target.addCommandTag(tag);
-            admin.sendMessage(Text.literal("§a✔ §fTag §e" + tag + " §fadded to §a" + targetName), false);
-            target.sendMessage(Text.literal("§aYou received the rank tag §e" + tag), false);
+            admin.sendMessage(Text.literal("§a✔ §fTag §e" + tag + " §fadded to §a" + targetName));
+            target.sendMessage(Text.literal("§aYou received the rank tag §e" + tag));
         } else {
             target.removeCommandTag(tag);
-            admin.sendMessage(Text.literal("§a✔ §fTag §e" + tag + " §fremoved from §c" + targetName), false);
+            admin.sendMessage(Text.literal("§a✔ §fTag §e" + tag + " §fremoved from §c" + targetName));
         }
         return 1;
     }
@@ -1845,9 +1894,9 @@ public class SpCommand {
     private static PlotData getOwnedPlotAt(ServerPlayerEntity player) {
         PlotManager manager = PlotManager.getOrCreate(player.getServerWorld());
         PlotData plot = manager.getPlotAt(player.getBlockPos());
-        if (plot == null) { player.sendMessage(Text.translatable("sp.error.not_in_plot").formatted(Formatting.RED), false); return null; }
+        if (plot == null) { player.sendMessage(Text.translatable("sp.error.not_in_plot").formatted(Formatting.RED)); return null; }
         if (!plot.getOwnerId().equals(player.getUuid()) && !player.getCommandTags().contains(adminTag())) {
-            player.sendMessage(Text.translatable("sp.error.not_owner").formatted(Formatting.RED), false); return null;
+            player.sendMessage(Text.translatable("sp.error.not_owner").formatted(Formatting.RED)); return null;
         }
         return plot;
     }
@@ -1855,9 +1904,9 @@ public class SpCommand {
     private static PlotData resolveSinglePlot(ServerPlayerEntity player, PlotManager manager, String plotArg) {
         if (plotArg == null) {
             PlotData plot = manager.getPlotAt(player.getBlockPos());
-            if (plot == null) { player.sendMessage(Text.translatable("sp.error.not_in_plot_arg").formatted(Formatting.RED), false); return null; }
+            if (plot == null) { player.sendMessage(Text.translatable("sp.error.not_in_plot_arg").formatted(Formatting.RED)); return null; }
             if (!plot.getOwnerId().equals(player.getUuid()) && plot.getRoleOf(player.getUuid()) != PlotData.Role.ADMIN && !player.getCommandTags().contains(adminTag())) {
-                player.sendMessage(Text.translatable("sp.error.not_owner_or_admin").formatted(Formatting.RED), false); return null;
+                player.sendMessage(Text.translatable("sp.error.not_owner_or_admin").formatted(Formatting.RED)); return null;
             }
             return plot;
         }
@@ -1870,13 +1919,13 @@ public class SpCommand {
         try {
             int index = Integer.parseInt(plotArg);
             if (index < 1 || index > owned.size()) {
-                player.sendMessage(Text.translatable("sp.error.invalid_index", owned.size()).formatted(Formatting.RED), false); return null;
+                player.sendMessage(Text.translatable("sp.error.invalid_index", owned.size()).formatted(Formatting.RED)); return null;
             }
             return List.of(owned.get(index - 1));
         } catch (NumberFormatException ignored) {}
         for (PlotData p : owned) if (p.getPlotName().equalsIgnoreCase(plotArg)) return List.of(p);
         player.sendMessage(Text.translatable("sp.error.plot_not_found", plotArg).formatted(Formatting.RED)
-            .append(Text.literal(" ")).append(Text.literal("/sp list").formatted(Formatting.YELLOW)), false);
+            .append(Text.literal(" ")).append(Text.literal("/sp list").formatted(Formatting.YELLOW)));
         return null;
     }
 
@@ -1902,9 +1951,9 @@ public class SpCommand {
 
     private static int doRename(ServerPlayerEntity player, PlotManager manager, PlotData plot, String newName) {
         newName = newName.trim();
-        if (newName.isEmpty() || newName.length() > 32) { player.sendMessage(Text.translatable("sp.rename.invalid_name").formatted(Formatting.RED), false); return 0; }
+        if (newName.isEmpty() || newName.length() > 32) { player.sendMessage(Text.translatable("sp.rename.invalid_name").formatted(Formatting.RED)); return 0; }
         for (PlotData p : manager.getPlayerPlots(plot.getOwnerId())) {
-            if (p != plot && p.getPlotName().equalsIgnoreCase(newName)) { player.sendMessage(Text.translatable("sp.rename.duplicate").formatted(Formatting.RED), false); return 0; }
+            if (p != plot && p.getPlotName().equalsIgnoreCase(newName)) { player.sendMessage(Text.translatable("sp.rename.duplicate").formatted(Formatting.RED)); return 0; }
         }
         String old = plot.getPlotName();
         plot.setPlotName(newName);
@@ -1912,7 +1961,7 @@ public class SpCommand {
         player.sendMessage(Text.literal("\u2714 ").formatted(Formatting.GREEN)
             .append(Text.literal("\"" + old + "\"").formatted(Formatting.GRAY))
             .append(Text.literal(" \u2192 ").formatted(Formatting.GREEN))
-            .append(Text.literal("\"" + newName + "\"").formatted(Formatting.YELLOW)), false);
+            .append(Text.literal("\"" + newName + "\"").formatted(Formatting.YELLOW)));
         return 1;
     }
 
@@ -1928,7 +1977,7 @@ public class SpCommand {
             default -> {
                 try { yield Long.parseLong(valueStr); }
                 catch (NumberFormatException e) {
-                    player.sendMessage(Text.translatable("sp.plot.time_invalid").formatted(Formatting.RED), false);
+                    player.sendMessage(Text.translatable("sp.plot.time_invalid").formatted(Formatting.RED));
                     yield Long.MIN_VALUE;
                 }
             }
@@ -1937,46 +1986,46 @@ public class SpCommand {
 
     private static void printPlotInfo(ServerPlayerEntity player, PlotData plot) {
         BlockPos c = plot.getCenter(); int sz = plot.getSize().getRadius();
-        player.sendMessage(Text.translatable("sp.info.header",  plot.getPlotName()).formatted(Formatting.YELLOW, Formatting.BOLD), false);
-        player.sendMessage(Text.translatable("sp.info.owner",   plot.getOwnerName()), false);
-        player.sendMessage(Text.translatable("sp.info.tier",    plot.getSize().getDisplayName()), false);
-        player.sendMessage(Text.translatable("sp.info.size",    sz + "x" + sz), false);
-        player.sendMessage(Text.translatable("sp.info.coords",  c.getX(), c.getY(), c.getZ()), false);
-        if (!plot.getParticleEffect().isBlank()) player.sendMessage(Text.translatable("sp.info.particle", plot.getParticleEffect()), false);
-        if (!plot.getWeatherType().isBlank())    player.sendMessage(Text.translatable("sp.info.weather",  plot.getWeatherType()), false);
-        if (plot.getPlotTime() >= 0)             player.sendMessage(Text.translatable("sp.info.time",     plot.getPlotTime()), false);
-        if (!plot.getMusicSound().isBlank())     player.sendMessage(Text.translatable("sp.info.music",    plot.getMusicSound()), false);
-        if (!plot.getEnterMessage().isBlank())   player.sendMessage(Text.literal("§7  Enter msg: §f" + plot.getEnterMessage()), false);
-        if (!plot.getExitMessage().isBlank())    player.sendMessage(Text.literal("§7  Exit msg:  §f" + plot.getExitMessage()), false);
+        player.sendMessage(Text.translatable("sp.info.header",  plot.getPlotName()).formatted(Formatting.YELLOW, Formatting.BOLD));
+        player.sendMessage(Text.translatable("sp.info.owner",   plot.getOwnerName()));
+        player.sendMessage(Text.translatable("sp.info.tier",    plot.getSize().getDisplayName()));
+        player.sendMessage(Text.translatable("sp.info.size",    sz + "x" + sz));
+        player.sendMessage(Text.translatable("sp.info.coords",  c.getX(), c.getY(), c.getZ()));
+        if (!plot.getParticleEffect().isBlank()) player.sendMessage(Text.translatable("sp.info.particle", plot.getParticleEffect()));
+        if (!plot.getWeatherType().isBlank())    player.sendMessage(Text.translatable("sp.info.weather",  plot.getWeatherType()));
+        if (plot.getPlotTime() >= 0)             player.sendMessage(Text.translatable("sp.info.time",     plot.getPlotTime()));
+        if (!plot.getMusicSound().isBlank())     player.sendMessage(Text.translatable("sp.info.music",    plot.getMusicSound()));
+        if (!plot.getEnterMessage().isBlank())   player.sendMessage(Text.literal("§7  Enter msg: §f" + plot.getEnterMessage()));
+        if (!plot.getExitMessage().isBlank())    player.sendMessage(Text.literal("§7  Exit msg:  §f" + plot.getExitMessage()));
         if (!plot.getFlags().isEmpty()) {
             StringBuilder sb = new StringBuilder();
             for (PlotData.Flag f : plot.getFlags()) { if (sb.length() > 0) sb.append(", "); sb.append(f.name().toLowerCase()); }
-            player.sendMessage(Text.translatable("sp.info.flags", sb.toString()), false);
+            player.sendMessage(Text.translatable("sp.info.flags", sb.toString()));
         }
         if (!plot.getGroups().isEmpty()) {
-            player.sendMessage(Text.translatable("sp.info.groups", plot.getGroups().size()), false);
+            player.sendMessage(Text.translatable("sp.info.groups", plot.getGroups().size()));
             for (PlotData.PermissionGroup g : plot.getGroups())
-                player.sendMessage(Text.literal("    \u2022 §d" + g.name + " §8(" + g.members.size() + " members, " + g.permissions.size() + " perms)"), false);
+                player.sendMessage(Text.literal("    \u2022 §d" + g.name + " §8(" + g.members.size() + " members, " + g.permissions.size() + " perms)"));
         }
         Map<UUID, PlotData.Role> members = plot.getMembers();
-        if (members.isEmpty()) { player.sendMessage(Text.translatable("sp.info.no_members"), false); }
+        if (members.isEmpty()) { player.sendMessage(Text.translatable("sp.info.no_members")); }
         else {
-            player.sendMessage(Text.translatable("sp.info.members", members.size()), false);
+            player.sendMessage(Text.translatable("sp.info.members", members.size()));
             for (Map.Entry<UUID, PlotData.Role> entry : members.entrySet())
                 player.sendMessage(Text.literal("    \u2022 ").formatted(Formatting.DARK_GRAY)
                     .append(Text.literal(plot.getMemberName(entry.getKey())).formatted(Formatting.WHITE))
-                    .append(Text.literal(" [" + entry.getValue().name().toLowerCase() + "]").formatted(Formatting.GRAY)), false);
+                    .append(Text.literal(" [" + entry.getValue().name().toLowerCase() + "]").formatted(Formatting.GRAY)));
         }
     }
 
     private static PlotData.Flag parseFlag(ServerPlayerEntity player, String name) {
         try { return PlotData.Flag.valueOf(name.toUpperCase()); }
-        catch (IllegalArgumentException e) { player.sendMessage(Text.translatable("sp.error.unknown_flag", name).formatted(Formatting.RED), false); return null; }
+        catch (IllegalArgumentException e) { player.sendMessage(Text.translatable("sp.error.unknown_flag", name).formatted(Formatting.RED)); return null; }
     }
 
     private static PlotData.Permission parsePerm(ServerPlayerEntity player, String name) {
         try { return PlotData.Permission.valueOf(name.toUpperCase()); }
-        catch (IllegalArgumentException e) { player.sendMessage(Text.translatable("sp.error.unknown_perm", name).formatted(Formatting.RED), false); return null; }
+        catch (IllegalArgumentException e) { player.sendMessage(Text.translatable("sp.error.unknown_perm", name).formatted(Formatting.RED)); return null; }
     }
 
     private static String adminTag() {
@@ -2015,7 +2064,7 @@ public class SpCommand {
 
         SecurePlotsConfig cfg = SecurePlotsConfig.INSTANCE;
         if (cfg == null || cfg.predefinedAreas == null || cfg.predefinedAreas.isEmpty()) {
-            player.sendMessage(Text.literal("§c✗ No predefined areas available.").formatted(Formatting.RED), false);
+            player.sendMessage(Text.literal("§c✗ No predefined areas available.").formatted(Formatting.RED));
             return 0;
         }
 
@@ -2025,19 +2074,19 @@ public class SpCommand {
         }
 
         if (available.isEmpty()) {
-            player.sendMessage(Text.literal("§c✗ All predefined areas have been claimed.").formatted(Formatting.RED), false);
+            player.sendMessage(Text.literal("§c✗ All predefined areas have been claimed.").formatted(Formatting.RED));
             return 0;
         }
 
-        player.sendMessage(Text.literal("§e§l=== Available Plot Areas ===").formatted(Formatting.BOLD), false);
+        player.sendMessage(Text.literal("§e§l=== Available Plot Areas ===").formatted(Formatting.BOLD));
         for (SecurePlotsConfig.PredefinedArea area : available) {
             PlotSize size = PlotSize.fromTier(area.tier);
             String reqRank = area.requiredRank != null && !area.requiredRank.isEmpty() ? " §7[Rank: §c" + area.requiredRank + "§7]" : "";
             player.sendMessage(Text.literal("  §a" + area.name + " §8- §f" + size.getDisplayName() + " §7(" + size.getRadius() + "x" + size.getRadius() + ")")
-                .append(Text.literal(reqRank)), false);
-            player.sendMessage(Text.literal("    §7Center: §f" + area.centerX + ", " + area.centerY + ", " + area.centerZ).formatted(Formatting.GRAY), false);
+                .append(Text.literal(reqRank)));
+            player.sendMessage(Text.literal("    §7Center: §f" + area.centerX + ", " + area.centerY + ", " + area.centerZ).formatted(Formatting.GRAY));
         }
-        player.sendMessage(Text.literal("§eUse §b/sp claimarea <name> [tier] §eto claim an area.").formatted(Formatting.YELLOW), false);
+        player.sendMessage(Text.literal("§eUse §b/sp claimarea <name> [tier] §eto claim an area.").formatted(Formatting.YELLOW));
         return 1;
     }
 
@@ -2047,7 +2096,7 @@ public class SpCommand {
 
         SecurePlotsConfig cfg = SecurePlotsConfig.INSTANCE;
         if (cfg == null || cfg.predefinedAreas == null) {
-            player.sendMessage(Text.literal("§c✗ No predefined areas configured.").formatted(Formatting.RED), false);
+            player.sendMessage(Text.literal("§c✗ No predefined areas configured.").formatted(Formatting.RED));
             return 0;
         }
 
@@ -2060,20 +2109,20 @@ public class SpCommand {
         }
 
         if (target == null) {
-            player.sendMessage(Text.literal("§c✗ Unknown area: §e" + areaName).formatted(Formatting.RED), false);
+            player.sendMessage(Text.literal("§c✗ Unknown area: §e" + areaName).formatted(Formatting.RED));
             return 0;
         }
 
         PlotSize size = PlotSize.fromTier(target.tier);
-        player.sendMessage(Text.literal("§e§l=== " + target.name + " ===").formatted(Formatting.BOLD), false);
-        player.sendMessage(Text.literal("§7Tier: §f" + size.getDisplayName() + " §8(" + size.getRadius() + "x" + size.getRadius() + ")"), false);
-        player.sendMessage(Text.literal("§7Center: §f" + target.centerX + ", " + target.centerY + ", " + target.centerZ), false);
-        player.sendMessage(Text.literal("§7Status: " + (target.available ? "§aAvailable" : "§cClaimed")), false);
+        player.sendMessage(Text.literal("§e§l=== " + target.name + " ===").formatted(Formatting.BOLD));
+        player.sendMessage(Text.literal("§7Tier: §f" + size.getDisplayName() + " §8(" + size.getRadius() + "x" + size.getRadius() + ")"));
+        player.sendMessage(Text.literal("§7Center: §f" + target.centerX + ", " + target.centerY + ", " + target.centerZ));
+        player.sendMessage(Text.literal("§7Status: " + (target.available ? "§aAvailable" : "§cClaimed")));
         if (target.requiredRank != null && !target.requiredRank.isEmpty()) {
-            player.sendMessage(Text.literal("§7Required Rank: §c" + target.requiredRank), false);
+            player.sendMessage(Text.literal("§7Required Rank: §c" + target.requiredRank));
         }
         if (target.oneTimeClaim) {
-            player.sendMessage(Text.literal("§7One-time claim: §eYes"), false);
+            player.sendMessage(Text.literal("§7One-time claim: §eYes"));
         }
         return 1;
     }
@@ -2086,7 +2135,7 @@ public class SpCommand {
 
         SecurePlotsConfig cfg = SecurePlotsConfig.INSTANCE;
         if (cfg == null || cfg.predefinedAreas == null || cfg.predefinedAreas.isEmpty()) {
-            player.sendMessage(Text.literal("§c✗ No predefined areas configured.").formatted(Formatting.RED), false);
+            player.sendMessage(Text.literal("§c✗ No predefined areas configured.").formatted(Formatting.RED));
             return 0;
         }
 
@@ -2099,19 +2148,19 @@ public class SpCommand {
         }
 
         if (target == null) {
-            player.sendMessage(Text.literal("§c✗ Unknown area: §e" + areaName).formatted(Formatting.RED), false);
+            player.sendMessage(Text.literal("§c✗ Unknown area: §e" + areaName).formatted(Formatting.RED));
             return 0;
         }
 
         if (!target.available) {
-            player.sendMessage(Text.literal("§c✗ This area has already been claimed.").formatted(Formatting.RED), false);
+            player.sendMessage(Text.literal("§c✗ This area has already been claimed.").formatted(Formatting.RED));
             return 0;
         }
 
         // Check rank requirement
         if (target.requiredRank != null && !target.requiredRank.isEmpty()) {
             if (!player.getCommandTags().contains(target.requiredRank)) {
-                player.sendMessage(Text.literal("§c✗ You need the §e" + target.requiredRank + " §crank to claim this area.").formatted(Formatting.RED), false);
+                player.sendMessage(Text.literal("§c✗ You need the §e" + target.requiredRank + " §crank to claim this area.").formatted(Formatting.RED));
                 return 0;
             }
         }
@@ -2122,7 +2171,7 @@ public class SpCommand {
         // Check if already in a plot
         PlotData existing = manager.getPlotAt(center);
         if (existing != null) {
-            player.sendMessage(Text.literal("§c✗ This area is already a plot.").formatted(Formatting.RED), false);
+            player.sendMessage(Text.literal("§c✗ This area is already a plot.").formatted(Formatting.RED));
             return 0;
         }
 
@@ -2137,7 +2186,7 @@ public class SpCommand {
 
         // Check placement
         if (!manager.canPlace(center, size)) {
-            player.sendMessage(Text.literal("§c✗ Cannot place plot here — too close to another plot").formatted(Formatting.RED), false);
+            player.sendMessage(Text.literal("§c✗ Cannot place plot here — too close to another plot").formatted(Formatting.RED));
             return 0;
         }
 
@@ -2152,9 +2201,9 @@ public class SpCommand {
             SecurePlotsConfig.save();
         }
 
-        player.sendMessage(Text.literal("§a✓ Plot claimed: §e\"" + plot.getPlotName() + "\"").formatted(Formatting.GREEN), false);
-        player.sendMessage(Text.literal("§7Center: §f" + center.getX() + ", " + center.getY() + ", " + center.getZ()), false);
-        player.sendMessage(Text.literal("§7Size: §f" + size.getRadius() + "x" + size.getRadius() + " (" + size.getDisplayName() + ")"), false);
+        player.sendMessage(Text.literal("§a✓ Plot claimed: §e\"" + plot.getPlotName() + "\"").formatted(Formatting.GREEN));
+        player.sendMessage(Text.literal("§7Center: §f" + center.getX() + ", " + center.getY() + ", " + center.getZ()));
+        player.sendMessage(Text.literal("§7Size: §f" + size.getRadius() + "x" + size.getRadius() + " (" + size.getDisplayName() + ")"));
 
         // Place the plot block
         ((ServerWorld) player.getWorld()).setBlockState(center, ModBlocks.fromTier(size.tier).getDefaultState());
@@ -2172,8 +2221,8 @@ public class SpCommand {
         BlockPos pos2 = SELECTION_POS2.get(player.getUuid());
 
         if (pos1 == null || pos2 == null) {
-            player.sendMessage(Text.literal("§c✗ Incomplete selection. Set both positions first.").formatted(Formatting.RED), false);
-            player.sendMessage(Text.literal("§7Use §b/sp pos1 §7and §b/sp pos2 §7to select the area.").formatted(Formatting.GRAY), false);
+            player.sendMessage(Text.literal("§c✗ Incomplete selection. Set both positions first.").formatted(Formatting.RED));
+            player.sendMessage(Text.literal("§7Use §b/sp pos1 §7and §b/sp pos2 §7to select the area.").formatted(Formatting.GRAY));
             return 0;
         }
 
@@ -2198,27 +2247,27 @@ public class SpCommand {
             // Auto-detect best tier
             size = getBestFittingTier(requiredRadius);
             if (size == null) {
-                player.sendMessage(Text.literal("§c✗ Selection too large for any tier.").formatted(Formatting.RED), false);
+                player.sendMessage(Text.literal("§c✗ Selection too large for any tier.").formatted(Formatting.RED));
                 return 0;
             }
         }
 
         // Check if selection fits the tier
         if (requiredRadius > size.getRadius()) {
-            player.sendMessage(Text.literal("§c✗ Selection too large for " + size.getDisplayName() + " tier (max: " + size.getRadius() + "x" + size.getRadius() + ")").formatted(Formatting.RED), false);
+            player.sendMessage(Text.literal("§c✗ Selection too large for " + size.getDisplayName() + " tier (max: " + size.getRadius() + "x" + size.getRadius() + ")").formatted(Formatting.RED));
             return 0;
         }
 
         SecurePlotsConfig cfg = SecurePlotsConfig.INSTANCE;
         if (cfg == null) {
-            player.sendMessage(Text.literal("§c✗ Config not loaded.").formatted(Formatting.RED), false);
+            player.sendMessage(Text.literal("§c✗ Config not loaded.").formatted(Formatting.RED));
             return 0;
         }
 
         // Check if name already exists
         for (SecurePlotsConfig.PredefinedArea existing : cfg.predefinedAreas) {
             if (existing.name.equalsIgnoreCase(areaName)) {
-                player.sendMessage(Text.literal("§c✗ An area named §e" + areaName + " §calready exists.").formatted(Formatting.RED), false);
+                player.sendMessage(Text.literal("§c✗ An area named §e" + areaName + " §calready exists.").formatted(Formatting.RED));
                 return 0;
             }
         }
@@ -2234,13 +2283,13 @@ public class SpCommand {
         cfg.predefinedAreas.add(newArea);
         SecurePlotsConfig.save();
 
-        player.sendMessage(Text.literal("§a✓ Predefined area saved: §e" + areaName).formatted(Formatting.GREEN), false);
-        player.sendMessage(Text.literal("§7Center: §f" + centerX + ", " + centerY + ", " + centerZ), false);
-        player.sendMessage(Text.literal("§7Tier: §f" + size.getDisplayName() + " §8(" + size.getRadius() + "x" + size.getRadius() + ")"), false);
+        player.sendMessage(Text.literal("§a✓ Predefined area saved: §e" + areaName).formatted(Formatting.GREEN));
+        player.sendMessage(Text.literal("§7Center: §f" + centerX + ", " + centerY + ", " + centerZ));
+        player.sendMessage(Text.literal("§7Tier: §f" + size.getDisplayName() + " §8(" + size.getRadius() + "x" + size.getRadius() + ")"));
         if (requiredRank != null && !requiredRank.isEmpty()) {
-            player.sendMessage(Text.literal("§7Required Rank: §c" + requiredRank), false);
+            player.sendMessage(Text.literal("§7Required Rank: §c" + requiredRank));
         }
-        player.sendMessage(Text.literal("§ePlayers can now claim this area with §b/sp claimarea " + areaName).formatted(Formatting.YELLOW), false);
+        player.sendMessage(Text.literal("§ePlayers can now claim this area with §b/sp claimarea " + areaName).formatted(Formatting.YELLOW));
 
         // Clear selection
         SELECTION_POS1.remove(player.getUuid());
@@ -2352,21 +2401,21 @@ public class SpCommand {
         BlockPos pos2 = SELECTION_POS2.get(player.getUuid());
 
         if (pos1 == null || pos2 == null) {
-            player.sendMessage(Text.literal("§c✗ Incomplete selection. Set both positions first.").formatted(Formatting.RED), false);
-            player.sendMessage(Text.literal("§7Use §b/sp pos1 §7and §b/sp pos2 §7to select the area.").formatted(Formatting.GRAY), false);
+            player.sendMessage(Text.literal("§c✗ Incomplete selection. Set both positions first.").formatted(Formatting.RED));
+            player.sendMessage(Text.literal("§7Use §b/sp pos1 §7and §b/sp pos2 §7to select the area.").formatted(Formatting.GRAY));
             return 0;
         }
 
         SecurePlotsConfig cfg = SecurePlotsConfig.INSTANCE;
         if (cfg == null) {
-            player.sendMessage(Text.literal("§c✗ Config not loaded.").formatted(Formatting.RED), false);
+            player.sendMessage(Text.literal("§c✗ Config not loaded.").formatted(Formatting.RED));
             return 0;
         }
 
         // Check if name already exists
         for (SecurePlotsConfig.ProtectedArea existing : cfg.protectedAreas) {
             if (existing.name.equalsIgnoreCase(name)) {
-                player.sendMessage(Text.literal("§c✗ A protected area named §e" + name + " §calready exists.").formatted(Formatting.RED), false);
+                player.sendMessage(Text.literal("§c✗ A protected area named §e" + name + " §calready exists.").formatted(Formatting.RED));
                 return 0;
             }
         }
@@ -2383,10 +2432,10 @@ public class SpCommand {
         cfg.protectedAreas.add(area);
         SecurePlotsConfig.save();
 
-        player.sendMessage(Text.literal("§a✓ Protected area created: §e" + name).formatted(Formatting.GREEN), false);
-        player.sendMessage(Text.literal("§7Bounds: §f(" + area.x1 + ", " + area.y1 + ", " + area.z1 + ") §7→ §f(" + area.x2 + ", " + area.y2 + ", " + area.z2 + ")").formatted(Formatting.GRAY), false);
-        player.sendMessage(Text.literal("§7Dimension: §f" + area.dimension).formatted(Formatting.GRAY), false);
-        player.sendMessage(Text.literal("§eYou are set as an owner. Use §b/sp admin protectedarea addowner §7to add more.").formatted(Formatting.YELLOW), false);
+        player.sendMessage(Text.literal("§a✓ Protected area created: §e" + name).formatted(Formatting.GREEN));
+        player.sendMessage(Text.literal("§7Bounds: §f(" + area.x1 + ", " + area.y1 + ", " + area.z1 + ") §7→ §f(" + area.x2 + ", " + area.y2 + ", " + area.z2 + ")").formatted(Formatting.GRAY));
+        player.sendMessage(Text.literal("§7Dimension: §f" + area.dimension).formatted(Formatting.GRAY));
+        player.sendMessage(Text.literal("§eYou are set as an owner. Use §b/sp admin protectedarea addowner §7to add more.").formatted(Formatting.YELLOW));
 
         // Clear selection
         SELECTION_POS1.remove(player.getUuid());
@@ -2403,10 +2452,10 @@ public class SpCommand {
         boolean removed = cfg.protectedAreas.removeIf(a -> a.name.equalsIgnoreCase(name));
         if (removed) {
             SecurePlotsConfig.save();
-            source.sendMessage(Text.literal("§a✓ Protected area removed: §e" + name).formatted(Formatting.GREEN), false);
+            source.sendMessage(Text.literal("§a✓ Protected area removed: §e" + name).formatted(Formatting.GREEN));
             return 1;
         } else {
-            source.sendMessage(Text.literal("§c✗ Protected area not found: §e" + name).formatted(Formatting.RED), false);
+            source.sendMessage(Text.literal("§c✗ Protected area not found: §e" + name).formatted(Formatting.RED));
             return 0;
         }
     }
@@ -2418,17 +2467,66 @@ public class SpCommand {
         if (cfg == null || player == null) return 0;
 
         if (cfg.protectedAreas.isEmpty()) {
-            player.sendMessage(Text.literal("§7No protected areas defined.").formatted(Formatting.GRAY), false);
+            player.sendMessage(Text.literal("§7No protected areas defined.").formatted(Formatting.GRAY));
             return 1;
         }
 
-        player.sendMessage(Text.literal("§e§l=== Protected Areas ===").formatted(Formatting.BOLD), false);
+        player.sendMessage(Text.literal("§e§l=== Protected Areas (Admin) ===").formatted(Formatting.BOLD));
         for (SecurePlotsConfig.ProtectedArea area : cfg.protectedAreas) {
             String status = area.enabled ? "§a[ON]" : "§c[OFF]";
-            player.sendMessage(Text.literal("  " + status + " §f" + area.name +
-                " §7(" + area.dimension + ") §8[" + area.allowedPlayers.size() + " owners]").formatted(Formatting.GRAY), false);
+            String temp = area.isTemporary ? " §8[temp]" : "";
+            player.sendMessage(Text.literal("  " + status + " §f" + area.name + temp +
+                " §7(" + area.dimension + ") §8[" + area.allowedPlayers.size() + " owners]").formatted(Formatting.GRAY));
         }
-        player.sendMessage(Text.literal("§7Use §b/sp admin protectedarea info <name> §7for details.").formatted(Formatting.GRAY), false);
+        return 1;
+    }
+
+    // /sp protectedarea list (player command)
+    private static int executePlayerListProtectedAreas(ServerCommandSource source) {
+        SecurePlotsConfig cfg = SecurePlotsConfig.INSTANCE;
+        ServerPlayerEntity player = source.getPlayer();
+        if (cfg == null || player == null) return 0;
+
+        ServerWorld world = (ServerWorld) player.getWorld();
+        ProtectedAreaManager manager = ProtectedAreaManager.getOrCreate(world);
+        String dimension = world.getRegistryKey().getValue().toString();
+        BlockPos pos = player.getBlockPos();
+
+        // Get areas player is currently in
+        var currentAreas = manager.getAreasAt(pos, dimension);
+
+        if (currentAreas.isEmpty()) {
+            player.sendMessage(Text.literal("§7You are not inside any protected area.").formatted(Formatting.GRAY));
+        } else {
+            player.sendMessage(Text.literal("§e§l=== Current Protected Areas ===").formatted(Formatting.BOLD));
+            for (SecurePlotsConfig.ProtectedArea area : currentAreas) {
+                if (!area.enabled) continue;
+                player.sendMessage(Text.literal("  §f" + area.name +
+                    " §7(Break:" + (area.protectBreak ? "Y" : "N") +
+                    " Place:" + (area.protectPlace ? "Y" : "N") +
+                    " Interact:" + (area.protectInteract ? "Y" : "N") + ")").formatted(Formatting.GRAY));
+            }
+        }
+
+        // List all enabled public areas in this dimension
+        var allAreas = manager.getAllAreas();
+        var publicAreas = new ArrayList<SecurePlotsConfig.ProtectedArea>();
+        for (SecurePlotsConfig.ProtectedArea area : allAreas) {
+            if (!area.enabled) continue;
+            if (!area.dimension.equals(dimension)) continue;
+            if (!manager.isPlayerAllowed(area, player)) {
+                publicAreas.add(area);
+            }
+        }
+
+        if (!publicAreas.isEmpty()) {
+            player.sendMessage(Text.literal("§e§l=== Other Protected Areas ===").formatted(Formatting.BOLD));
+            for (SecurePlotsConfig.ProtectedArea area : publicAreas) {
+                player.sendMessage(Text.literal("  §f" + area.name +
+                    " §7[" + area.allowedPlayers.size() + " owners]").formatted(Formatting.GRAY));
+            }
+        }
+
         return 1;
     }
 
@@ -2447,24 +2545,38 @@ public class SpCommand {
         }
 
         if (area == null) {
-            player.sendMessage(Text.literal("§c✗ Protected area not found: §e" + name).formatted(Formatting.RED), false);
+            player.sendMessage(Text.literal("§c✗ Protected area not found: §e" + name).formatted(Formatting.RED));
             return 0;
         }
 
-        player.sendMessage(Text.literal("§e§l=== " + area.name + " ===").formatted(Formatting.BOLD), false);
-        player.sendMessage(Text.literal("§7Status: " + (area.enabled ? "§aActive" : "§cDisabled")).formatted(Formatting.GRAY), false);
-        player.sendMessage(Text.literal("§7Dimension: §f" + area.dimension).formatted(Formatting.GRAY), false);
-        player.sendMessage(Text.literal("§7Bounds: §f(" + area.x1 + ", " + area.y1 + ", " + area.z1 + ")").formatted(Formatting.GRAY), false);
-        player.sendMessage(Text.literal("§7      §f(" + area.x2 + ", " + area.y2 + ", " + area.z2 + ")").formatted(Formatting.GRAY), false);
-        player.sendMessage(Text.literal("§7Protections:").formatted(Formatting.GRAY), false);
-        player.sendMessage(Text.literal("  §8• §7Break: " + (area.protectBreak ? "§aYes" : "§cNo")).formatted(Formatting.GRAY), false);
-        player.sendMessage(Text.literal("  §8• §7Place: " + (area.protectPlace ? "§aYes" : "§cNo")).formatted(Formatting.GRAY), false);
-        player.sendMessage(Text.literal("  §8• §7Interact: " + (area.protectInteract ? "§aYes" : "§cNo")).formatted(Formatting.GRAY), false);
-        player.sendMessage(Text.literal("  §8• §7Containers: " + (area.protectContainers ? "§aYes" : "§cNo")).formatted(Formatting.GRAY), false);
-        player.sendMessage(Text.literal("  §8• §7Require Auth: " + (area.requireAuth ? "§aYes" : "§cNo")).formatted(Formatting.GRAY), false);
-        player.sendMessage(Text.literal("§7Owners (" + area.allowedPlayers.size() + "):").formatted(Formatting.GRAY), false);
+        player.sendMessage(Text.literal("§e§l=== " + area.name + " ===").formatted(Formatting.BOLD));
+        player.sendMessage(Text.literal("§7Status: " + (area.enabled ? "§aActive" : "§cDisabled")).formatted(Formatting.GRAY));
+        if (area.isTemporary) {
+            java.time.Instant expiry = java.time.Instant.ofEpochMilli(area.expiryTime);
+            player.sendMessage(Text.literal("§7Type: §bTemporary (expires: " + expiry.toString() + ")").formatted(Formatting.GRAY));
+        }
+        player.sendMessage(Text.literal("§7Dimension: §f" + area.dimension).formatted(Formatting.GRAY));
+        player.sendMessage(Text.literal("§7Bounds: §f(" + area.x1 + ", " + area.y1 + ", " + area.z1 + ")").formatted(Formatting.GRAY));
+        player.sendMessage(Text.literal("§7      §f(" + area.x2 + ", " + area.y2 + ", " + area.z2 + ")").formatted(Formatting.GRAY));
+        player.sendMessage(Text.literal("§7Protections:").formatted(Formatting.GRAY));
+        player.sendMessage(Text.literal("  §8• §7Break: " + (area.protectBreak ? "§aYes" : "§cNo")).formatted(Formatting.GRAY));
+        player.sendMessage(Text.literal("  §8• §7Place: " + (area.protectPlace ? "§aYes" : "§cNo")).formatted(Formatting.GRAY));
+        player.sendMessage(Text.literal("  §8• §7Interact: " + (area.protectInteract ? "§aYes" : "§cNo")).formatted(Formatting.GRAY));
+        player.sendMessage(Text.literal("  §8• §7Containers: " + (area.protectContainers ? "§aYes" : "§cNo")).formatted(Formatting.GRAY));
+        player.sendMessage(Text.literal("  §8• §7Entities: " + (area.protectEntities ? "§aYes" : "§cNo")).formatted(Formatting.GRAY));
+        player.sendMessage(Text.literal("  §8• §7Explosions: " + (area.protectExplosions ? "§aYes" : "§cNo")).formatted(Formatting.GRAY));
+        player.sendMessage(Text.literal("  §8• §7Liquids: " + (area.protectLiquids ? "§aYes" : "§cNo")).formatted(Formatting.GRAY));
+        player.sendMessage(Text.literal("  §8• §7Require Auth: " + (area.requireAuth ? "§aYes" : "§cNo")).formatted(Formatting.GRAY));
+        player.sendMessage(Text.literal("  §8• §7Notifications: " + (area.showNotifications ? "§aYes" : "§cNo")).formatted(Formatting.GRAY));
+        player.sendMessage(Text.literal("§7Owners (" + area.allowedPlayers.size() + "):").formatted(Formatting.GRAY));
         for (String owner : area.allowedPlayers) {
-            player.sendMessage(Text.literal("  §8• §f" + owner).formatted(Formatting.GRAY), false);
+            player.sendMessage(Text.literal("  §8• §f" + owner).formatted(Formatting.GRAY));
+        }
+        if (!area.allowedGroups.isEmpty()) {
+            player.sendMessage(Text.literal("§7Groups (" + area.allowedGroups.size() + "):").formatted(Formatting.GRAY));
+            for (String group : area.allowedGroups) {
+                player.sendMessage(Text.literal("  §8• §f" + group).formatted(Formatting.GRAY));
+            }
         }
         return 1;
     }
@@ -2478,12 +2590,12 @@ public class SpCommand {
             if (area.name.equalsIgnoreCase(name)) {
                 area.enabled = !area.enabled;
                 SecurePlotsConfig.save();
-                source.sendMessage(Text.literal("§a✓ Protected area '" + name + "' " + (area.enabled ? "enabled" : "disabled")).formatted(Formatting.GREEN), false);
+                source.sendMessage(Text.literal("§a✓ Protected area '" + name + "' " + (area.enabled ? "enabled" : "disabled")).formatted(Formatting.GREEN));
                 return 1;
             }
         }
 
-        source.sendMessage(Text.literal("§c✗ Protected area not found: §e" + name).formatted(Formatting.RED), false);
+        source.sendMessage(Text.literal("§c✗ Protected area not found: §e" + name).formatted(Formatting.RED));
         return 0;
     }
 
@@ -2495,17 +2607,17 @@ public class SpCommand {
         for (SecurePlotsConfig.ProtectedArea area : cfg.protectedAreas) {
             if (area.name.equalsIgnoreCase(areaName)) {
                 if (area.allowedPlayers.stream().anyMatch(p -> p.equalsIgnoreCase(playerName))) {
-                    source.sendMessage(Text.literal("§c✗ §f" + playerName + " §cis already an owner.").formatted(Formatting.RED), false);
+                    source.sendMessage(Text.literal("§c✗ §f" + playerName + " §cis already an owner.").formatted(Formatting.RED));
                     return 0;
                 }
                 area.allowedPlayers.add(playerName);
                 SecurePlotsConfig.save();
-                source.sendMessage(Text.literal("§a✓ Added §f" + playerName + " §aas owner of §e" + areaName).formatted(Formatting.GREEN), false);
+                source.sendMessage(Text.literal("§a✓ Added §f" + playerName + " §aas owner of §e" + areaName).formatted(Formatting.GREEN));
                 return 1;
             }
         }
 
-        source.sendMessage(Text.literal("§c✗ Protected area not found: §e" + areaName).formatted(Formatting.RED), false);
+        source.sendMessage(Text.literal("§c✗ Protected area not found: §e" + areaName).formatted(Formatting.RED));
         return 0;
     }
 
@@ -2519,16 +2631,16 @@ public class SpCommand {
                 boolean removed = area.allowedPlayers.removeIf(p -> p.equalsIgnoreCase(playerName));
                 if (removed) {
                     SecurePlotsConfig.save();
-                    source.sendMessage(Text.literal("§a✓ Removed §f" + playerName + " §afrom §e" + areaName).formatted(Formatting.GREEN), false);
+                    source.sendMessage(Text.literal("§a✓ Removed §f" + playerName + " §afrom §e" + areaName).formatted(Formatting.GREEN));
                     return 1;
                 } else {
-                    source.sendMessage(Text.literal("§c✗ §f" + playerName + " §cis not an owner.").formatted(Formatting.RED), false);
+                    source.sendMessage(Text.literal("§c✗ §f" + playerName + " §cis not an owner.").formatted(Formatting.RED));
                     return 0;
                 }
             }
         }
 
-        source.sendMessage(Text.literal("§c✗ Protected area not found: §e" + areaName).formatted(Formatting.RED), false);
+        source.sendMessage(Text.literal("§c✗ Protected area not found: §e" + areaName).formatted(Formatting.RED));
         return 0;
     }
 
@@ -2544,15 +2656,120 @@ public class SpCommand {
                 area.protectInteract = protectInteract;
                 area.protectContainers = protectInteract; // Containers follow interact by default
                 SecurePlotsConfig.save();
-                source.sendMessage(Text.literal("§a✓ Updated protections for §e" + name).formatted(Formatting.GREEN), false);
+                source.sendMessage(Text.literal("§a✓ Updated protections for §e" + name).formatted(Formatting.GREEN));
                 source.sendMessage(Text.literal("§7Break: " + (protectBreak ? "§aYes" : "§cNo") +
                     " §8| Place: " + (protectPlace ? "§aYes" : "§cNo") +
-                    " §8| Interact: " + (protectInteract ? "§aYes" : "§cNo")).formatted(Formatting.GRAY), false);
+                    " §8| Interact: " + (protectInteract ? "§aYes" : "§cNo")).formatted(Formatting.GRAY));
                 return 1;
             }
         }
 
-        source.sendMessage(Text.literal("§c✗ Protected area not found: §e" + name).formatted(Formatting.RED), false);
+        source.sendMessage(Text.literal("§c✗ Protected area not found: §e" + name).formatted(Formatting.RED));
+        return 0;
+    }
+
+    // /sp admin protectedarea addgroup <area> <group>
+    private static int executeAddProtectedAreaGroup(ServerCommandSource source, String areaName, String group) {
+        SecurePlotsConfig cfg = SecurePlotsConfig.INSTANCE;
+        if (cfg == null) return 0;
+
+        for (SecurePlotsConfig.ProtectedArea area : cfg.protectedAreas) {
+            if (area.name.equalsIgnoreCase(areaName)) {
+                if (!area.allowedGroups.contains(group)) {
+                    area.allowedGroups.add(group);
+                    SecurePlotsConfig.save();
+                    source.sendMessage(Text.literal("§a✓ Added group §e" + group + " §a to §e" + areaName).formatted(Formatting.GREEN));
+                } else {
+                    source.sendMessage(Text.literal("§c✗ Group already in list: §e" + group).formatted(Formatting.RED));
+                }
+                return 1;
+            }
+        }
+
+        source.sendMessage(Text.literal("§c✗ Protected area not found: §e" + areaName).formatted(Formatting.RED));
+        return 0;
+    }
+
+    // /sp admin protectedarea removegroup <area> <group>
+    private static int executeRemoveProtectedAreaGroup(ServerCommandSource source, String areaName, String group) {
+        SecurePlotsConfig cfg = SecurePlotsConfig.INSTANCE;
+        if (cfg == null) return 0;
+
+        for (SecurePlotsConfig.ProtectedArea area : cfg.protectedAreas) {
+            if (area.name.equalsIgnoreCase(areaName)) {
+                if (area.allowedGroups.remove(group)) {
+                    SecurePlotsConfig.save();
+                    source.sendMessage(Text.literal("§a✓ Removed group §e" + group + " §a from §e" + areaName).formatted(Formatting.GREEN));
+                } else {
+                    source.sendMessage(Text.literal("§c✗ Group not found: §e" + group).formatted(Formatting.RED));
+                }
+                return 1;
+            }
+        }
+
+        source.sendMessage(Text.literal("§c✗ Protected area not found: §e" + areaName).formatted(Formatting.RED));
+        return 0;
+    }
+
+    // /sp admin protectedarea settemporal <name> <durationMinutes>
+    private static int executeSetTemporalArea(ServerCommandSource source, String name, int durationMinutes) {
+        SecurePlotsConfig cfg = SecurePlotsConfig.INSTANCE;
+        if (cfg == null) return 0;
+
+        long expiryTime = System.currentTimeMillis() + (durationMinutes * 60_000L);
+
+        for (SecurePlotsConfig.ProtectedArea area : cfg.protectedAreas) {
+            if (area.name.equalsIgnoreCase(name)) {
+                area.isTemporary = true;
+                area.expiryTime = expiryTime;
+                SecurePlotsConfig.save();
+                source.sendMessage(Text.literal("§a✓ Area §e" + name + " §a set as temporary (expires in §e" + durationMinutes + "min§a)").formatted(Formatting.GREEN));
+                return 1;
+            }
+        }
+
+        source.sendMessage(Text.literal("§c✗ Protected area not found: §e" + name).formatted(Formatting.RED));
+        return 0;
+    }
+
+    // /sp admin protectedarea setnotifications <name> <enabled>
+    private static int executeSetAreaNotifications(ServerCommandSource source, String name, boolean enabled) {
+        SecurePlotsConfig cfg = SecurePlotsConfig.INSTANCE;
+        if (cfg == null) return 0;
+
+        for (SecurePlotsConfig.ProtectedArea area : cfg.protectedAreas) {
+            if (area.name.equalsIgnoreCase(name)) {
+                area.showNotifications = enabled;
+                SecurePlotsConfig.save();
+                source.sendMessage(Text.literal("§a✓ Notifications " + (enabled ? "§aenabled" : "§cdisabled") + " §afor §e" + name).formatted(Formatting.GREEN));
+                return 1;
+            }
+        }
+
+        source.sendMessage(Text.literal("§c✗ Protected area not found: §e" + name).formatted(Formatting.RED));
+        return 0;
+    }
+
+    // /sp admin protectedarea setprotections <name> <entities> <explosions> <liquids>
+    private static int executeSetAreaProtections(ServerCommandSource source, String name, boolean entities, boolean explosions, boolean liquids) {
+        SecurePlotsConfig cfg = SecurePlotsConfig.INSTANCE;
+        if (cfg == null) return 0;
+
+        for (SecurePlotsConfig.ProtectedArea area : cfg.protectedAreas) {
+            if (area.name.equalsIgnoreCase(name)) {
+                area.protectEntities = entities;
+                area.protectExplosions = explosions;
+                area.protectLiquids = liquids;
+                SecurePlotsConfig.save();
+                source.sendMessage(Text.literal("§a✓ Updated protections for §e" + name).formatted(Formatting.GREEN));
+                source.sendMessage(Text.literal("§7Entities: " + (entities ? "§aYes" : "§cNo") +
+                    " §8| Explosions: " + (explosions ? "§aYes" : "§cNo") +
+                    " §8| Liquids: " + (liquids ? "§aYes" : "§cNo")).formatted(Formatting.GRAY));
+                return 1;
+            }
+        }
+
+        source.sendMessage(Text.literal("§c✗ Protected area not found: §e" + name).formatted(Formatting.RED));
         return 0;
     }
 }

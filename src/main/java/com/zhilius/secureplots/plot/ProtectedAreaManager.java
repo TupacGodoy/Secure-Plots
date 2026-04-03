@@ -21,6 +21,7 @@ import com.zhilius.secureplots.config.SecurePlotsConfig;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.nbt.NbtList;
 import net.minecraft.nbt.NbtString;
+import net.minecraft.registry.RegistryWrapper;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.math.BlockPos;
@@ -96,12 +97,48 @@ public class ProtectedAreaManager extends PersistentState {
 
     /**
      * Checks if a player is allowed to interact in a protected area.
+     * Checks both player name and permission groups.
      */
     public boolean isPlayerAllowed(SecurePlotsConfig.ProtectedArea area, ServerPlayerEntity player) {
         if (!area.enabled) return true; // Area disabled, allow all
-        if (area.allowedPlayers.isEmpty()) return false; // No allowed players = nobody can interact
+
         String playerName = player.getName().getString().toLowerCase();
-        return area.allowedPlayers.stream().anyMatch(p -> p.equalsIgnoreCase(playerName));
+
+        // Check if player name is in allowed list
+        boolean nameAllowed = area.allowedPlayers.stream().anyMatch(p -> p.equalsIgnoreCase(playerName));
+        if (nameAllowed) return true;
+
+        // Check if player has any allowed group (LuckPerms integration)
+        if (!area.allowedGroups.isEmpty()) {
+            try {
+                Class<?> lpProviderClass = Class.forName("net.luckperms.api.LuckPermsProvider");
+                Object luckPerms = lpProviderClass.getMethod("get").invoke(null);
+                if (luckPerms != null) {
+                    Object userManager = luckPerms.getClass().getMethod("getUserManager").invoke(luckPerms);
+                    Object user = userManager.getClass().getMethod("getUser", java.util.UUID.class).invoke(userManager, player.getUuid());
+                    if (user != null) {
+                        Object nodes = user.getClass().getMethod("getNodes").invoke(user);
+                        for (String groupName : area.allowedGroups) {
+                            String targetKey = "group." + groupName;
+                            boolean hasGroup = (boolean) nodes.getClass().getMethod("stream").invoke(nodes)
+                                .getClass().getMethod("anyMatch", java.util.function.Predicate.class)
+                                .invoke(nodes, (java.util.function.Predicate<Object>) n -> {
+                                    try {
+                                        return (boolean) n.getClass().getMethod("getKey").invoke(n).equals(targetKey);
+                                    } catch (Exception e) {
+                                        return false;
+                                    }
+                                });
+                            if (hasGroup) return true;
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                // LuckPerms not available or error, continue with name check
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -147,6 +184,50 @@ public class ProtectedAreaManager extends PersistentState {
         SecurePlotsConfig.ProtectedArea area = getAreaAt(pos, dimension);
         if (area == null || !area.requireAuth) return true;
         return isPlayerAllowed(area, player);
+    }
+
+    /**
+     * Checks if entities are protected at a position.
+     */
+    public boolean isEntityProtected(BlockPos pos, String dimension) {
+        SecurePlotsConfig.ProtectedArea area = getAreaAt(pos, dimension);
+        return area != null && area.protectEntities && area.enabled;
+    }
+
+    /**
+     * Checks if explosions are blocked at a position.
+     */
+    public boolean isExplosionProtected(BlockPos pos, String dimension) {
+        SecurePlotsConfig.ProtectedArea area = getAreaAt(pos, dimension);
+        return area != null && area.protectExplosions && area.enabled;
+    }
+
+    /**
+     * Checks if liquids are protected at a position.
+     */
+    public boolean isLiquidProtected(BlockPos pos, String dimension) {
+        SecurePlotsConfig.ProtectedArea area = getAreaAt(pos, dimension);
+        return area != null && area.protectLiquids && area.enabled;
+    }
+
+    /**
+     * Checks and removes expired temporary areas.
+     * @return true if any areas were removed
+     */
+    public boolean cleanupExpiredAreas() {
+        long now = System.currentTimeMillis();
+        boolean changed = areas.removeIf(area -> area.isTemporary && area.expiryTime > 0 && now > area.expiryTime);
+        if (changed) markDirty();
+        return changed;
+    }
+
+    /**
+     * Gets all areas that a player is currently inside (for enter/exit tracking).
+     */
+    public List<SecurePlotsConfig.ProtectedArea> getAreasForPlayer(ServerPlayerEntity player) {
+        BlockPos pos = player.getBlockPos();
+        String dimension = player.getWorld().getRegistryKey().getValue().toString();
+        return getAreasAt(pos, dimension);
     }
 
     /**
@@ -207,7 +288,13 @@ public class ProtectedAreaManager extends PersistentState {
         nbt.putBoolean("protectPlace", area.protectPlace);
         nbt.putBoolean("protectInteract", area.protectInteract);
         nbt.putBoolean("protectContainers", area.protectContainers);
+        nbt.putBoolean("protectEntities", area.protectEntities);
+        nbt.putBoolean("protectExplosions", area.protectExplosions);
+        nbt.putBoolean("protectLiquids", area.protectLiquids);
         nbt.putBoolean("enabled", area.enabled);
+        nbt.putBoolean("showNotifications", area.showNotifications);
+        nbt.putBoolean("isTemporary", area.isTemporary);
+        nbt.putLong("expiryTime", area.expiryTime);
         nbt.putString("dimension", area.dimension);
 
         NbtList allowedList = new NbtList();
@@ -215,6 +302,12 @@ public class ProtectedAreaManager extends PersistentState {
             allowedList.add(NbtString.of(player));
         }
         nbt.put("allowedPlayers", allowedList);
+
+        NbtList groupList = new NbtList();
+        for (String group : area.allowedGroups) {
+            groupList.add(NbtString.of(group));
+        }
+        nbt.put("allowedGroups", groupList);
 
         return nbt;
     }
@@ -233,12 +326,23 @@ public class ProtectedAreaManager extends PersistentState {
         area.protectPlace = nbt.getBoolean("protectPlace");
         area.protectInteract = nbt.getBoolean("protectInteract");
         area.protectContainers = nbt.getBoolean("protectContainers");
+        area.protectEntities = nbt.getBoolean("protectEntities");
+        area.protectExplosions = nbt.getBoolean("protectExplosions");
+        area.protectLiquids = nbt.getBoolean("protectLiquids");
         area.enabled = nbt.getBoolean("enabled");
+        area.showNotifications = nbt.getBoolean("showNotifications");
+        area.isTemporary = nbt.getBoolean("isTemporary");
+        area.expiryTime = nbt.getLong("expiryTime");
         area.dimension = nbt.contains("dimension") ? nbt.getString("dimension") : "minecraft:overworld";
 
         NbtList allowedList = nbt.getList("allowedPlayers", 8);
         for (int i = 0; i < allowedList.size(); i++) {
             area.allowedPlayers.add(allowedList.getString(i));
+        }
+
+        NbtList groupList = nbt.getList("allowedGroups", 8);
+        for (int i = 0; i < groupList.size(); i++) {
+            area.allowedGroups.add(groupList.getString(i));
         }
 
         return area;

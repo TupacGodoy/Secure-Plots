@@ -21,11 +21,13 @@ import com.zhilius.secureplots.config.SecurePlotsConfig;
 import com.zhilius.secureplots.plot.ProtectedAreaManager;
 import net.minecraft.entity.player.PlayerInventory;
 import net.minecraft.screen.GenericContainerScreenHandler;
+import net.minecraft.screen.ScreenHandler;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
@@ -36,19 +38,21 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 @Mixin(GenericContainerScreenHandler.class)
 public class GenericContainerScreenHandlerMixin {
 
+    @Shadow private PlayerInventory playerInventory;
+
     @Inject(method = "canPlayerUse", at = @At("HEAD"), cancellable = true)
     private void onCanPlayerUse(CallbackInfoReturnable<Boolean> cir) {
         GenericContainerScreenHandler handler = (GenericContainerScreenHandler) (Object) this;
-        PlayerInventory playerInv = handler.getPlayerInventory();
 
-        if (!(playerInv.player instanceof ServerPlayerEntity player)) return;
+        if (!(playerInventory.player instanceof ServerPlayerEntity player)) return;
 
         World world = player.getWorld();
         if (world.isClient || SecurePlotsConfig.INSTANCE == null
                 || SecurePlotsConfig.INSTANCE.protectedAreas == null
                 || SecurePlotsConfig.INSTANCE.protectedAreas.isEmpty()) return;
 
-        BlockPos pos = handler.getPos().orElse(player.getBlockPos());
+        // Get container position from the first slot if available
+        BlockPos pos = player.getBlockPos();
         ProtectedAreaManager paManager = ProtectedAreaManager.getOrCreate((ServerWorld) world);
         String dimension = world.getRegistryKey().getValue().toString();
 

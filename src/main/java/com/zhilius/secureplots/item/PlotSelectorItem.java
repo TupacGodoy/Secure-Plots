@@ -70,12 +70,13 @@ public class PlotSelectorItem extends Item {
 
     @Override
     public ActionResult useOnBlock(net.minecraft.item.ItemUsageContext context) {
-        if (!context.getWorld().isClient && context.getUser() instanceof ServerPlayerEntity player) {
+        if (!context.getWorld().isClient && context.getPlayer() instanceof ServerPlayerEntity player) {
             if (player.isSneaking()) {
-                return executeCreatePlot(player);
+                executeCreatePlot(player);
             } else {
-                return executeSetPos2(player);
+                executeSetPos2(player);
             }
+            return ActionResult.SUCCESS;
         }
         return ActionResult.PASS;
     }
@@ -196,7 +197,7 @@ public class PlotSelectorItem extends Item {
     public static ItemStack createWand() {
         ItemStack stack = new ItemStack(Items.WOODEN_AXE);
         stack.set(DataComponentTypes.CUSTOM_NAME, Text.literal("§e§lPlot Selector").formatted(Formatting.BOLD));
-        stack.set(DataComponentTypes.LORE, net.minecraft.component.type.LoreComponent.fromList(List.of(
+        stack.set(DataComponentTypes.LORE, new net.minecraft.component.type.LoreComponent(List.of(
             Text.literal("§7Left-click: Set position 1"),
             Text.literal("§7Right-click: Set position 2"),
             Text.literal("§7Shift+Right-click: Create plot")
