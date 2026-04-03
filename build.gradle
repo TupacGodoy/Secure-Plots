@@ -1,6 +1,7 @@
 plugins {
 	id 'fabric-loom' version "${loom_version}"
 	id 'maven-publish'
+	id 'com.modrinth.minotaur' version '2.+'
 }
 
 version = project.mod_version
@@ -84,3 +85,24 @@ publishing {
 		// retrieving dependencies.
 	}
 }
+
+// Modrinth publication configuration
+modrinth {
+	token = project.hasProperty('modrinth_token') ? project.modrinth_token : System.getenv('MODRINTH_TOKEN')
+	projectId = 'secure-plots'
+	versionNumber = project.mod_version
+	versionType = 'release'
+	uploadFile = remapJar
+	gameVersions = [project.minecraft_version]
+	loaders = ['fabric']
+	changelog = """
+## Cambios en esta versión
+
+- Sistema de áreas protegidas completado con protección total
+- Corrección de errores de compilación para Minecraft 1.21.11
+- Actualización de dependencias y configuración
+"""
+}
+
+// Publicar en Modrinth requiere ejecutar: ./gradlew modrinth -Pmodrinth_token=TU_TOKEN
+// O setear la variable de entorno: MODRINTH_TOKEN=tu_token

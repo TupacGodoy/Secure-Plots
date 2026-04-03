@@ -7,7 +7,8 @@
       "Bash(git commit:*)",
       "Bash(git push:*)",
       "Bash(./gradlew dependencies:*)",
-      "Bash(gh release:*)"
+      "Bash(gh release:*)",
+      "Bash(./gradlew modrinth:*)"
     ]
   }
 }

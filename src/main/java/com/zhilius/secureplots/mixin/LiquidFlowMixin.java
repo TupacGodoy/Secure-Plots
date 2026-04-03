@@ -19,23 +19,28 @@ package com.zhilius.secureplots.mixin;
 
 import com.zhilius.secureplots.config.SecurePlotsConfig;
 import com.zhilius.secureplots.plot.ProtectedAreaManager;
-import net.minecraft.block.FluidBlock;
+import net.minecraft.block.BlockState;
+import net.minecraft.fluid.FlowableFluid;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.math.BlockPos;
+import net.minecraft.world.WorldAccess;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-/**
- * Mixin to prevent liquid flow in protected areas.
- */
-@Mixin(FluidBlock.class)
+@Mixin(FlowableFluid.class)
 public class LiquidFlowMixin {
 
-    @Inject(method = "flow", at = @At("HEAD"), cancellable = true)
-    private void onFlow(net.minecraft.world.WorldAccess world, BlockPos pos, net.minecraft.block.BlockState state, CallbackInfo ci) {
-        if (world.isClient() || SecurePlotsConfig.INSTANCE == null) return;
+    @Inject(
+        method = "flow(Lnet/minecraft/world/WorldAccess;Lnet/minecraft/util/math/BlockPos;Lnet/minecraft/block/BlockState;)V",
+        at = @At("HEAD"),
+        cancellable = true,
+        require = 0
+    )
+    private void onFlow(WorldAccess world, BlockPos pos, BlockState state, CallbackInfo ci) {
+        if (world.isClient()) return;
+        if (SecurePlotsConfig.INSTANCE == null) return;
 
         ServerWorld serverWorld = (ServerWorld) world;
         ProtectedAreaManager manager = ProtectedAreaManager.getOrCreate(serverWorld);
