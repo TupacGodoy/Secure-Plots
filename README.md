@@ -4,6 +4,7 @@
 
 # 🛡 Secure Plots
 
+![Version](https://img.shields.io/badge/version-1.0.4-blue)
 **Minecraft 1.21.1 — Fabric**  
 Territory protection mod with menus, roles, upgrades, rank-based permissions, ambient effects, and a fully configurable visual border system.
 
@@ -109,6 +110,26 @@ All `/sp admin` commands require OP level ≥ `adminOpLevel` (default: 2).
 | `/sp admin setrank <player> <tag>` | Add a rank tag to a player (shortcut for `/tag <player> add <tag>`) |
 | `/sp admin removerank <player> <tag>` | Remove a rank tag from a player |
 | `/sp admin reload` | Reload both config files and re-sync all clients (no restart needed) |
+
+### Protected Area commands
+
+Global protection zones independent of player-owned plots.
+
+| Command | Description |
+|---------|-------------|
+| `/sp protectedarea list` | List protected areas you're currently in |
+| `/sp admin protectedarea create <name>` | Create protected area from current selection (pos1/pos2) |
+| `/sp admin protectedarea remove <name>` | Delete a protected area |
+| `/sp admin protectedarea list` | List all protected areas |
+| `/sp admin protectedarea info <name>` | Show details of a protected area |
+| `/sp admin protectedarea toggle <name>` | Enable/disable a protected area |
+| `/sp admin protectedarea addowner <area> <player>` | Add an owner to a protected area |
+| `/sp admin protectedarea setflags <name> <break> <place> <interact>` | Set protection flags |
+| `/sp admin protectedarea addgroup <area> <group>` | Add a LuckPerms group |
+| `/sp admin protectedarea removegroup <area> <group>` | Remove a LuckPerms group |
+| `/sp admin protectedarea settemporal <name> <minutes>` | Set area to expire after X minutes |
+| `/sp admin protectedarea setnotifications <name> <true/false>` | Toggle enter/exit notifications |
+| `/sp admin protectedarea setprotections <name> <entities> <explosions> <liquids>` | Set entity/explosion/liquid protection |
 
 ---
 
@@ -221,6 +242,55 @@ Ranks let you give different players different plot feature limits — without t
   }
 ]
 ```
+
+---
+
+## Protected Areas
+
+Protected areas are global protection zones that work independently of player-owned plots. They're ideal for spawn zones, event areas, or any region you want to protect from unauthorized interaction.
+
+### Features
+
+- **Block protection**: Prevent breaking, placing, and interaction
+- **Container protection**: Protect chests, furnaces, and other inventories
+- **Entity protection**: Prevent damage to mobs and animals
+- **Explosion protection**: Cancel TNT and creeper explosions
+- **Liquid protection**: Prevent lava and water flow
+- **Group permissions**: Integrate with LuckPerms for group-based access
+- **Temporary areas**: Set areas to expire after a specified time
+- **Enter/exit notifications**: Optional messages when players cross boundaries
+- **Visual boundaries**: Particle effects and holograms show area limits
+
+### Quick start
+
+1. Select two corners with `/sp pos1` and `/sp pos2`
+2. Create the area: `/sp admin protectedarea create spawn`
+3. Add owners: `/sp admin protectedarea addowner spawn Steve`
+4. Enable notifications: `/sp admin protectedarea setnotifications spawn true`
+
+### Protected Area configuration
+
+Each area has the following properties:
+
+| Property | Description |
+|----------|-------------|
+| `name` | Unique identifier for the area |
+| `x1, y1, z1` | First corner coordinates |
+| `x2, y2, z2` | Second corner coordinates |
+| `dimension` | World dimension (e.g., `minecraft:overworld`) |
+| `enabled` | Whether the area is currently active |
+| `protectBreak` | Prevent block breaking |
+| `protectPlace` | Prevent block placing |
+| `protectInteract` | Prevent block interaction |
+| `protectContainers` | Protect chests, furnaces, etc. |
+| `protectEntities` | Protect mobs and animals |
+| `protectExplosions` | Cancel explosions |
+| `protectLiquids` | Prevent liquid flow |
+| `allowedPlayers` | List of player names who bypass protection |
+| `allowedGroups` | List of LuckPerms groups who bypass protection |
+| `showNotifications` | Show enter/exit messages |
+| `isTemporary` | If true, area expires at `expiryTime` |
+| `expiryTime` | Unix timestamp when area expires (0 = never) |
 
 ---
 
