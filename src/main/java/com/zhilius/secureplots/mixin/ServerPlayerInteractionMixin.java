@@ -19,7 +19,7 @@ package com.zhilius.secureplots.mixin;
 
 import com.zhilius.secureplots.config.SecurePlotsConfig;
 import com.zhilius.secureplots.plot.ProtectedAreaManager;
-import net.minecraft.block.BlockState;
+import net.minecraft.item.ItemStack;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.network.ServerPlayerInteractionManager;
 import net.minecraft.server.world.ServerWorld;
@@ -34,10 +34,6 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-/**
- * Mixin into ServerPlayerInteractionManager to intercept block break and interact events
- * for protected area enforcement.
- */
 @Mixin(ServerPlayerInteractionManager.class)
 public class ServerPlayerInteractionMixin {
 
@@ -45,9 +41,7 @@ public class ServerPlayerInteractionMixin {
 
     @Inject(method = "tryBreakBlock", at = @At("HEAD"), cancellable = true)
     private void onTryBreakBlock(BlockPos pos, CallbackInfoReturnable<Boolean> cir) {
-        ServerPlayerEntity player = this.player;
         World world = player.getWorld();
-
         if (!world.isClient && SecurePlotsConfig.INSTANCE != null
                 && SecurePlotsConfig.INSTANCE.protectedAreas != null
                 && !SecurePlotsConfig.INSTANCE.protectedAreas.isEmpty()) {
@@ -56,7 +50,9 @@ public class ServerPlayerInteractionMixin {
             String dimension = world.getRegistryKey().getValue().toString();
 
             if (!paManager.canBreak(player, pos, dimension)) {
-                player.sendMessage(net.minecraft.text.Text.literal("§c✗ You cannot break blocks here (protected area)").formatted(net.minecraft.util.Formatting.RED), true);
+                player.sendMessage(net.minecraft.text.Text.literal(
+                    "§c✗ You cannot break blocks here (protected area)")
+                    .formatted(net.minecraft.util.Formatting.RED), true);
                 cir.setReturnValue(false);
                 cir.cancel();
             }
@@ -64,9 +60,10 @@ public class ServerPlayerInteractionMixin {
     }
 
     @Inject(method = "interactBlock", at = @At("HEAD"), cancellable = true)
-    private void onInteractBlock(ServerPlayerEntity player, World world, BlockState state,
-                                  BlockPos pos, Hand hand, BlockHitResult hit,
+    private void onInteractBlock(ServerPlayerEntity player, World world, ItemStack stack,
+                                  Hand hand, BlockHitResult hit,
                                   CallbackInfoReturnable<ActionResult> cir) {
+        BlockPos pos = hit.getBlockPos();
         if (!world.isClient && SecurePlotsConfig.INSTANCE != null
                 && SecurePlotsConfig.INSTANCE.protectedAreas != null
                 && !SecurePlotsConfig.INSTANCE.protectedAreas.isEmpty()) {
@@ -75,7 +72,9 @@ public class ServerPlayerInteractionMixin {
             String dimension = world.getRegistryKey().getValue().toString();
 
             if (!paManager.canInteract(player, pos, dimension)) {
-                player.sendMessage(net.minecraft.text.Text.literal("§c✗ You cannot interact here (protected area)").formatted(net.minecraft.util.Formatting.RED), true);
+                player.sendMessage(net.minecraft.text.Text.literal(
+                    "§c✗ You cannot interact here (protected area)")
+                    .formatted(net.minecraft.util.Formatting.RED), true);
                 cir.setReturnValue(ActionResult.FAIL);
                 cir.cancel();
             }
@@ -83,60 +82,25 @@ public class ServerPlayerInteractionMixin {
     }
 
     @Inject(method = "interactItem", at = @At("HEAD"), cancellable = true)
-    private void onInteractItem(ServerPlayerEntity player, World world, Hand hand,
-                                 CallbackInfoReturnable<ActionResult> cir) {
+    private void onInteractItem(ServerPlayerEntity player, World world, ItemStack stack, Hand hand,
+                                CallbackInfoReturnable<ActionResult> cir) {
         if (!world.isClient && SecurePlotsConfig.INSTANCE != null
-                && SecurePlotsConfig.INSTANCE.protectedAreas != null
-                && !SecurePlotsConfig.INSTANCE.protectedAreas.isEmpty()) {
+                && SecurePlotsConfig.INSTANCE.protectedAreas != null) {
 
             BlockPos pos = player.getBlockPos();
             ProtectedAreaManager paManager = ProtectedAreaManager.getOrCreate((ServerWorld) world);
             String dimension = world.getRegistryKey().getValue().toString();
 
-            // Check if player is in a protected area that requires auth
             var areas = paManager.getAreasAt(pos, dimension);
             for (var area : areas) {
                 if (area.requireAuth && !paManager.isPlayerAllowed(area, player)) {
-                    player.sendMessage(net.minecraft.text.Text.literal("§c✗ You cannot use items here (protected area)").formatted(net.minecraft.util.Formatting.RED), true);
+                    player.sendMessage(net.minecraft.text.Text.literal(
+                        "§c✗ You cannot use items here (protected area)")
+                        .formatted(net.minecraft.util.Formatting.RED), true);
                     cir.setReturnValue(ActionResult.FAIL);
                     cir.cancel();
                     return;
                 }
-            }
-        }
-    }
-
-    @Inject(method = "tryPlaceBlock", at = @At("HEAD"), cancellable = true)
-    private void onTryPlaceBlock(ServerPlayerEntity player, World world, BlockPos pos,
-                                  BlockHitResult hit, CallbackInfoReturnable<Boolean> cir) {
-        if (!world.isClient && SecurePlotsConfig.INSTANCE != null
-                && SecurePlotsConfig.INSTANCE.protectedAreas != null
-                && !SecurePlotsConfig.INSTANCE.protectedAreas.isEmpty()) {
-
-            ProtectedAreaManager paManager = ProtectedAreaManager.getOrCreate((ServerWorld) world);
-            String dimension = world.getRegistryKey().getValue().toString();
-
-            if (!paManager.canPlace(player, pos, dimension)) {
-                player.sendMessage(net.minecraft.text.Text.literal("§c✗ You cannot place blocks here (protected area)").formatted(net.minecraft.util.Formatting.RED), true);
-                cir.setReturnValue(false);
-                cir.cancel();
-            }
-        }
-    }
-
-    @Inject(method = "tryPlaceBlock", at = @At("HEAD"), cancellable = true)
-    private void onTryPlaceLiquid(ServerPlayerEntity player, World world, BlockPos pos,
-                                   BlockHitResult hit, CallbackInfoReturnable<Boolean> cir) {
-        if (!world.isClient && SecurePlotsConfig.INSTANCE != null
-                && SecurePlotsConfig.INSTANCE.protectedAreas != null) {
-
-            ProtectedAreaManager paManager = ProtectedAreaManager.getOrCreate((ServerWorld) world);
-            String dimension = world.getRegistryKey().getValue().toString();
-
-            if (paManager.isLiquidProtected(pos, dimension)) {
-                player.sendMessage(net.minecraft.text.Text.literal("§c✗ You cannot place liquids here (protected area)").formatted(net.minecraft.util.Formatting.RED), true);
-                cir.setReturnValue(false);
-                cir.cancel();
             }
         }
     }

@@ -19,45 +19,37 @@ package com.zhilius.secureplots.mixin;
 
 import com.zhilius.secureplots.config.SecurePlotsConfig;
 import com.zhilius.secureplots.plot.ProtectedAreaManager;
-import net.minecraft.entity.player.PlayerInventory;
+import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.screen.GenericContainerScreenHandler;
-import net.minecraft.screen.ScreenHandler;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
 import org.spongepowered.asm.mixin.Mixin;
-import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-/**
- * Mixin to intercept container access (chests, barrels, etc.) for protected areas.
- */
 @Mixin(GenericContainerScreenHandler.class)
 public class GenericContainerScreenHandlerMixin {
 
-    @Shadow private PlayerInventory playerInventory;
-
-    @Inject(method = "canPlayerUse", at = @At("HEAD"), cancellable = true)
-    private void onCanPlayerUse(CallbackInfoReturnable<Boolean> cir) {
-        GenericContainerScreenHandler handler = (GenericContainerScreenHandler) (Object) this;
-
-        if (!(playerInventory.player instanceof ServerPlayerEntity player)) return;
+    @Inject(method = "canUse", at = @At("HEAD"), cancellable = true)
+    private void onCanUse(PlayerEntity playerEntity, CallbackInfoReturnable<Boolean> cir) {
+        if (!(playerEntity instanceof ServerPlayerEntity player)) return;
 
         World world = player.getWorld();
         if (world.isClient || SecurePlotsConfig.INSTANCE == null
                 || SecurePlotsConfig.INSTANCE.protectedAreas == null
                 || SecurePlotsConfig.INSTANCE.protectedAreas.isEmpty()) return;
 
-        // Get container position from the first slot if available
         BlockPos pos = player.getBlockPos();
         ProtectedAreaManager paManager = ProtectedAreaManager.getOrCreate((ServerWorld) world);
         String dimension = world.getRegistryKey().getValue().toString();
 
         if (!paManager.canAccessContainers(player, pos, dimension)) {
-            player.sendMessage(net.minecraft.text.Text.literal("§c✗ You cannot access this container (protected area)").formatted(net.minecraft.util.Formatting.RED), true);
+            player.sendMessage(net.minecraft.text.Text.literal(
+                "§c✗ You cannot access this container (protected area)")
+                .formatted(net.minecraft.util.Formatting.RED), true);
             cir.setReturnValue(false);
             cir.cancel();
         }
