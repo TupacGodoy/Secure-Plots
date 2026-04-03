@@ -21,6 +21,7 @@ import com.mojang.authlib.GameProfile;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.BoolArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
+import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.suggestion.Suggestions;
 import com.mojang.brigadier.suggestion.SuggestionsBuilder;
 import com.zhilius.secureplots.config.SecurePlotsConfig;
@@ -29,9 +30,11 @@ import com.zhilius.secureplots.network.ModPackets;
 import com.zhilius.secureplots.plot.PlotData;
 import com.zhilius.secureplots.plot.PlotManager;
 import com.zhilius.secureplots.plot.PlotSize;
+import com.zhilius.secureplots.plot.ProtectedAreaManager;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.zhilius.secureplots.block.ModBlocks;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
+import net.minecraft.particle.ParticleTypes;
 import net.minecraft.registry.Registries;
 import net.minecraft.server.command.CommandManager;
 import net.minecraft.server.command.ServerCommandSource;
@@ -215,6 +218,12 @@ public class SpCommand {
                                         StringArgumentType.getString(ctx, "perm"),
                                         BoolArgumentType.getBool(ctx, "value"))))))))
 
+                // /sp pos1 — set first corner of selection
+                .then(CommandManager.literal("pos1")
+                    .executes(ctx -> executePos1(ctx.getSource())))
+                // /sp pos2 — set second corner of selection
+                .then(CommandManager.literal("pos2")
+                    .executes(ctx -> executePos2(ctx.getSource())))
                 // /sp plot particle|weather|time|music|enter|exit
                 .then(CommandManager.literal("plot")
                     .then(CommandManager.literal("particle")
@@ -257,6 +266,46 @@ public class SpCommand {
                         .then(CommandManager.argument("message", StringArgumentType.greedyString())
                             .executes(ctx -> executeSetMessage(ctx.getSource(),
                                 StringArgumentType.getString(ctx, "message"), false)))))
+
+                // /sp create [tier]  — create a new plot by selecting area
+                .then(CommandManager.literal("create")
+                    .executes(ctx -> executeCreateStart(ctx.getSource()))
+                    .then(CommandManager.argument("tier", StringArgumentType.string())
+                        .suggests((ctx, b) -> suggestTier(b))
+                        .executes(ctx -> executeCreateWithTier(ctx.getSource(),
+                            StringArgumentType.getString(ctx, "tier")))))
+                // /sp claim [tier] — claim current position as plot center
+                .then(CommandManager.literal("claim")
+                    .executes(ctx -> executeClaim(ctx.getSource(), null))
+                    .then(CommandManager.argument("tier", StringArgumentType.string())
+                        .suggests((ctx, b) -> suggestTier(b))
+                        .executes(ctx -> executeClaim(ctx.getSource(),
+                            StringArgumentType.getString(ctx, "tier")))))
+
+                // /sp areas — list available predefined areas
+                .then(CommandManager.literal("areas")
+                    .executes(ctx -> executeAreasList(ctx.getSource()))
+                    .then(CommandManager.argument("name", StringArgumentType.word())
+                        .suggests((ctx, b) -> suggestAreas(b))
+                        .executes(ctx -> executeAreasInfo(ctx.getSource(),
+                            StringArgumentType.getString(ctx, "name")))))
+
+                // /sp claimarea <name> [tier] — claim a predefined area
+                .then(CommandManager.literal("claimarea")
+                    .then(CommandManager.argument("name", StringArgumentType.word())
+                        .suggests((ctx, b) -> suggestAreas(b))
+                        .executes(ctx -> executeClaimArea(ctx.getSource(),
+                            StringArgumentType.getString(ctx, "name"), null))
+                        .then(CommandManager.argument("tier", StringArgumentType.string())
+                            .suggests((ctx, b) -> suggestTier(b))
+                            .executes(ctx -> executeClaimArea(ctx.getSource(),
+                                StringArgumentType.getString(ctx, "name"),
+                                StringArgumentType.getString(ctx, "tier"))))))
+
+                // /sp help admin - admin help
+                .then(CommandManager.literal("help")
+                    .then(CommandManager.literal("admin")
+                        .executes(ctx -> executeAdminHelp(ctx.getSource()))))
 
                 // /sp admin ...  (requires adminOpLevel)
                 .then(CommandManager.literal("admin")
@@ -415,8 +464,71 @@ public class SpCommand {
                                 .executes(ctx -> executeAdminSetRank(ctx.getSource(),
                                     StringArgumentType.getString(ctx, "player"),
                                     StringArgumentType.getString(ctx, "tag"), false)))))
+                    // /sp admin savearea <name> [tier] [requiredRank] — save current selection as predefined area
+                    .then(CommandManager.literal("savearea")
+                        .then(CommandManager.argument("name", StringArgumentType.word())
+                            .executes(ctx -> executeAdminSaveArea(ctx.getSource(),
+                                StringArgumentType.getString(ctx, "name"), null, null))
+                            .then(CommandManager.argument("tier", StringArgumentType.string())
+                                .suggests((ctx, b) -> suggestTier(b))
+                                .executes(ctx -> executeAdminSaveArea(ctx.getSource(),
+                                    StringArgumentType.getString(ctx, "name"),
+                                    StringArgumentType.getString(ctx, "tier"), null))
+                                .then(CommandManager.argument("requiredRank", StringArgumentType.word())
+                                    .executes(ctx -> executeAdminSaveArea(ctx.getSource(),
+                                        StringArgumentType.getString(ctx, "name"),
+                                        StringArgumentType.getString(ctx, "tier"),
+                                        StringArgumentType.getString(ctx, "requiredRank")))))))
                     .then(CommandManager.literal("reload")
                         .executes(ctx -> executeAdminReload(ctx.getSource()))))
+                    // /sp admin protectedarea ... — manage protected areas
+                    .then(CommandManager.literal("protectedarea")
+                        .then(CommandManager.literal("create")
+                            .then(CommandManager.argument("name", StringArgumentType.word())
+                                .executes(ctx -> executeCreateProtectedArea(ctx.getSource(),
+                                    StringArgumentType.getString(ctx, "name")))))
+                        .then(CommandManager.literal("remove")
+                            .then(CommandManager.argument("name", StringArgumentType.word())
+                                .suggests((ctx, b) -> suggestProtectedAreas(b))
+                                .executes(ctx -> executeRemoveProtectedArea(ctx.getSource(),
+                                    StringArgumentType.getString(ctx, "name")))))
+                        .then(CommandManager.literal("list")
+                            .executes(ctx -> executeListProtectedAreas(ctx.getSource())))
+                        .then(CommandManager.literal("info")
+                            .then(CommandManager.argument("name", StringArgumentType.word())
+                                .suggests((ctx, b) -> suggestProtectedAreas(b))
+                                .executes(ctx -> executeInfoProtectedArea(ctx.getSource(),
+                                    StringArgumentType.getString(ctx, "name")))))
+                        .then(CommandManager.literal("toggle")
+                            .then(CommandManager.argument("name", StringArgumentType.word())
+                                .suggests((ctx, b) -> suggestProtectedAreas(b))
+                                .executes(ctx -> executeToggleProtectedArea(ctx.getSource(),
+                                    StringArgumentType.getString(ctx, "name")))))
+                        .then(CommandManager.literal("addowner")
+                            .then(CommandManager.argument("area", StringArgumentType.word())
+                                .suggests((ctx, b) -> suggestProtectedAreas(b))
+                                .then(CommandManager.argument("player", StringArgumentType.word())
+                                    .executes(ctx -> executeAddProtectedAreaOwner(ctx.getSource(),
+                                        StringArgumentType.getString(ctx, "area"),
+                                        StringArgumentType.getString(ctx, "player"))))))
+                        .then(CommandManager.literal("removeowner")
+                            .then(CommandManager.argument("area", StringArgumentType.word())
+                                .suggests((ctx, b) -> suggestProtectedAreas(b))
+                                .then(CommandManager.argument("player", StringArgumentType.word())
+                                    .executes(ctx -> executeRemoveProtectedAreaOwner(ctx.getSource(),
+                                        StringArgumentType.getString(ctx, "area"),
+                                        StringArgumentType.getString(ctx, "player"))))))
+                        .then(CommandManager.literal("setflags")
+                            .then(CommandManager.argument("name", StringArgumentType.word())
+                                .suggests((ctx, b) -> suggestProtectedAreas(b))
+                                .then(CommandManager.argument("break", BoolArgumentType.bool())
+                                    .then(CommandManager.argument("place", BoolArgumentType.bool())
+                                        .then(CommandManager.argument("interact", BoolArgumentType.bool())
+                                            .executes(ctx -> executeSetProtectedAreaFlags(ctx.getSource(),
+                                                StringArgumentType.getString(ctx, "name"),
+                                                BoolArgumentType.getBool(ctx, "break"),
+                                                BoolArgumentType.getBool(ctx, "place"),
+                                                BoolArgumentType.getBool(ctx, "interact"))))))))))
             );
         }
     }
@@ -475,27 +587,98 @@ public class SpCommand {
         return builder.buildFuture();
     }
 
+    private static CompletableFuture<Suggestions> suggestPos(ServerCommandSource source, SuggestionsBuilder builder) {
+        builder.suggest("~ ~ ~");
+        builder.suggest("^ ^ ^");
+        builder.suggest("here");
+        if (source.getEntity() != null) {
+            BlockPos p = source.getEntity().getBlockPos();
+            builder.suggest(p.getX() + " " + p.getY() + " " + p.getZ());
+        }
+        return builder.buildFuture();
+    }
+
+    private static CompletableFuture<Suggestions> suggestTier(SuggestionsBuilder builder) {
+        for (String t : new String[]{"bronze", "gold", "emerald", "diamond", "netherite", "0", "1", "2", "3", "4"})
+            builder.suggest(t);
+        return builder.buildFuture();
+    }
+
     // ── /sp help ──────────────────────────────────────────────────────────────
+
+    private static int executeAdminHelp(ServerCommandSource source) {
+        ServerPlayerEntity player = source.getPlayer();
+        if (player == null) return 0;
+        player.sendMessage(Text.literal("§e§l=== SecurePlots Admin Help ===").formatted(Formatting.BOLD), false);
+        player.sendMessage(Text.literal("§7§oManage plots:"), false);
+        player.sendMessage(Text.literal("  §b/sp admin listall [page] §7- List all plots on server"), false);
+        player.sendMessage(Text.literal("  §b/sp admin search <player> [page] §7- Search player's plots"), false);
+        player.sendMessage(Text.literal("  §b/sp admin nearby [count] §7- List nearby plots"), false);
+        player.sendMessage(Text.literal("  §b/sp admin info <player> <plot> §7- Show plot info"), false);
+        player.sendMessage(Text.literal("  §b/sp admin tp <player> <plot> §7- Teleport to plot"), false);
+        player.sendMessage(Text.literal("  §b/sp admin delete <player> <plot> §7- Delete a plot"), false);
+        player.sendMessage(Text.literal("  §b/sp admin rename <player> <plot> <name> §7- Rename plot"), false);
+        player.sendMessage(Text.literal("  §b/sp admin setowner <newowner> §7- Change plot owner"), false);
+        player.sendMessage(Text.literal("  §b/sp admin upgrade <player> <plot> §7- Upgrade plot"), false);
+        player.sendMessage(Text.literal(""), false);
+        player.sendMessage(Text.literal("§7§oManage predefined areas:"), false);
+        player.sendMessage(Text.literal("  §b/sp admin savearea <name> [tier] [rank] §7- Save selection as area"), false);
+        player.sendMessage(Text.literal("  §b/sp admin setrank <player> <tag> §7- Give player rank tag"), false);
+        player.sendMessage(Text.literal("  §b/sp admin removerank <player> <tag> §7- Remove rank tag"), false);
+        player.sendMessage(Text.literal(""), false);
+        player.sendMessage(Text.literal("§7§oManage protected areas:"), false);
+        player.sendMessage(Text.literal("  §b/sp admin protectedarea create <name> §7- Create protected area from selection"), false);
+        player.sendMessage(Text.literal("  §b/sp admin protectedarea remove <name> §7- Remove protected area"), false);
+        player.sendMessage(Text.literal("  §b/sp admin protectedarea list §7- List all protected areas"), false);
+        player.sendMessage(Text.literal("  §b/sp admin protectedarea info <name> §7- Show protected area details"), false);
+        player.sendMessage(Text.literal("  §b/sp admin protectedarea toggle <name> §7- Enable/disable protected area"), false);
+        player.sendMessage(Text.literal("  §b/sp admin protectedarea addowner <area> <player> §7- Add area owner"), false);
+        player.sendMessage(Text.literal("  §b/sp admin protectedarea setflags <name> <break> <place> <interact> §7- Set protections"), false);
+        player.sendMessage(Text.literal(""), false);
+        player.sendMessage(Text.literal("§7§oPlot customization (admin):"), false);
+        player.sendMessage(Text.literal("  §b/sp admin particle/music/weather/time/enter/exit §7- Customize plot"), false);
+        player.sendMessage(Text.literal(""), false);
+        player.sendMessage(Text.literal("§7§oOther:"), false);
+        player.sendMessage(Text.literal("  §b/sp admin reload §7- Reload config"), false);
+        return 1;
+    }
 
     private static int executeHelp(ServerCommandSource source) {
         ServerPlayerEntity player = source.getPlayer();
         if (player == null) return 0;
-        String[] keys = {
-            "sp.help.header",
-            "sp.help.add","sp.help.remove","sp.help.rename","sp.help.role",
-            "sp.help.list","sp.help.info","sp.help.view","sp.help.tp",
-            "sp.help.upgrade",
-            "sp.help.flag","sp.help.flag_set",
-            "sp.help.perm","sp.help.perm_set",
-            "sp.help.fly",
-            "sp.help.group","sp.help.group_create","sp.help.group_delete",
-            "sp.help.group_addmember","sp.help.group_removemember","sp.help.group_setperm",
-            "sp.help.plot_particle","sp.help.plot_weather",
-            "sp.help.plot_time","sp.help.plot_music",
-            "sp.help.plot_enter","sp.help.plot_exit",
-            "sp.help.footer"
-        };
-        for (String key : keys) player.sendMessage(Text.translatable(key), false);
+        player.sendMessage(Text.literal("§e§l=== SecurePlots Help ===").formatted(Formatting.BOLD), false);
+        player.sendMessage(Text.literal("§7§oClaim/Create plots:"), false);
+        player.sendMessage(Text.literal("  §b/sp claim [tier] §7- Claim plot at current position"), false);
+        player.sendMessage(Text.literal("  §b/sp pos1 §7- Set first corner of selection"), false);
+        player.sendMessage(Text.literal("  §b/sp pos2 §7- Set second corner of selection"), false);
+        player.sendMessage(Text.literal("  §b/sp create [tier] §7- Create plot from selection"), false);
+        player.sendMessage(Text.literal("  §b/sp areas §7- List available predefined areas"), false);
+        player.sendMessage(Text.literal("  §b/sp claimarea <name> [tier] §7- Claim a predefined area"), false);
+        player.sendMessage(Text.literal(""), false);
+        player.sendMessage(Text.literal("§7§oManage your plots:"), false);
+        player.sendMessage(Text.literal("  §b/sp list §7- List your plots"), false);
+        player.sendMessage(Text.literal("  §b/sp info [plot] §7- Show plot info"), false);
+        player.sendMessage(Text.literal("  §b/sp rename <name> §7- Rename your plot"), false);
+        player.sendMessage(Text.literal("  §b/sp add <player> <plot|all> §7- Add member"), false);
+        player.sendMessage(Text.literal("  §b/sp remove <player> <plot|all> §7- Remove member"), false);
+        player.sendMessage(Text.literal("  §b/sp role <player> <member|admin> §7- Set role"), false);
+        player.sendMessage(Text.literal("  §b/sp tp [plot] §7- Teleport to plot"), false);
+        player.sendMessage(Text.literal("  §b/sp upgrade §7- Upgrade plot tier"), false);
+        player.sendMessage(Text.literal(""), false);
+        player.sendMessage(Text.literal("§7§oFlags & Permissions:"), false);
+        player.sendMessage(Text.literal("  §b/sp flag [flag] [value] §7- View/set plot flags"), false);
+        player.sendMessage(Text.literal("  §b/sp perm [player] [perm] [value] §7- Set permissions"), false);
+        player.sendMessage(Text.literal("  §b/sp group §7- Manage permission groups"), false);
+        player.sendMessage(Text.literal(""), false);
+        player.sendMessage(Text.literal("§7§oPlot customization:"), false);
+        player.sendMessage(Text.literal("  §b/sp plot particle <type> §7- Set particle effect"), false);
+        player.sendMessage(Text.literal("  §b/sp plot weather <type> §7- Set weather override"), false);
+        player.sendMessage(Text.literal("  §b/sp plot time <value> §7- Set time override"), false);
+        player.sendMessage(Text.literal("  §b/sp plot music <sound> §7- Set ambient music"), false);
+        player.sendMessage(Text.literal("  §b/sp plot enter <message> §7- Set enter message"), false);
+        player.sendMessage(Text.literal("  §b/sp plot exit <message> §7- Set exit message"), false);
+        player.sendMessage(Text.literal(""), false);
+        player.sendMessage(Text.literal("§7For admin commands, use §b/sp help admin"), false);
         return 1;
     }
 
@@ -521,6 +704,236 @@ public class SpCommand {
         player.sendMessage(Text.translatable("sp.help.plot_music_bg"), false);
         for (String s : COMMON_MUSIC) if (s.contains("music.") && !s.equals("clear")) player.sendMessage(Text.literal("  §b" + s), false);
         return 1;
+    }
+
+    // ── /sp create — start selection mode ─────────────────────────────────────
+
+    // Public selection maps for use by PlotSelectorItem
+    public static final Map<UUID, BlockPos> SELECTION_POS1 = new HashMap<>();
+    public static final Map<UUID, BlockPos> SELECTION_POS2 = new HashMap<>();
+
+    private static int executeCreateStart(ServerCommandSource source) {
+        ServerPlayerEntity player = source.getPlayer();
+        if (player == null) return 0;
+
+        player.sendMessage(Text.literal("§e══ Create Plot — Selection Mode ══").formatted(Formatting.BOLD), false);
+        player.sendMessage(Text.literal("§71. Use §b/sp pos1 §7to set the first corner"), false);
+        player.sendMessage(Text.literal("§72. Use §b/sp pos2 §7to set the second corner"), false);
+        player.sendMessage(Text.literal("§73. Use §b/sp create <tier> §7to finalize"), false);
+        player.sendMessage(Text.literal("§7Tip: You can also use §b/sp claim [tier] §7to claim at current position"), false);
+        return 1;
+    }
+
+    // ── /sp pos1 / pos2 — selection helpers ───────────────────────────────────
+
+    private static int executePos1(ServerCommandSource source) {
+        ServerPlayerEntity player = source.getPlayer();
+        if (player == null) return 0;
+        BlockPos pos = player.getBlockPos();
+        SELECTION_POS1.put(player.getUuid(), pos);
+        player.sendMessage(Text.literal("§a✓ Position 1 set: §f" + pos.getX() + ", " + pos.getY() + ", " + pos.getZ()), false);
+        spawnSelectionParticles(player.getWorld(), pos, 10);
+        return 1;
+    }
+
+    private static int executePos2(ServerCommandSource source) {
+        ServerPlayerEntity player = source.getPlayer();
+        if (player == null) return 0;
+        BlockPos pos1 = SELECTION_POS1.get(player.getUuid());
+        if (pos1 == null) {
+            player.sendMessage(Text.literal("§c✗ Set position 1 first with §b/sp pos1"), false);
+            return 0;
+        }
+        BlockPos pos2 = player.getBlockPos();
+        player.sendMessage(Text.literal("§a✓ Position 2 set: §f" + pos2.getX() + ", " + pos2.getY() + ", " + pos2.getZ()), false);
+        player.sendMessage(Text.literal("§eSelection: §f" + pos1.getX() + "," + pos1.getY() + "," + pos1.getZ() + " §7→ §f" + pos2.getX() + "," + pos2.getY() + "," + pos2.getZ()), false);
+        spawnSelectionParticles(player.getWorld(), pos2, 10);
+        spawnSelectionOutlineParticles(player.getWorld(), pos1, pos2);
+        return 1;
+    }
+
+    // ── /sp create <tier> — finalize with current selection ───────────────────
+
+    private static int executeCreateWithPositions(CommandContext<ServerCommandSource> ctx, String pos1Str, String pos2Str, String tierStr) {
+        ServerCommandSource source = ctx.getSource();
+        ServerPlayerEntity player = source.getPlayer();
+        if (player == null) return 0;
+
+        BlockPos pos1 = parsePosition(pos1Str, player);
+        BlockPos pos2 = parsePosition(pos2Str, player);
+        if (pos1 == null || pos2 == null) {
+            player.sendMessage(Text.literal("§c✗ Invalid positions. Use format: x y z or ~ ~ ~"), false);
+            return 0;
+        }
+
+        return executeCreateFinalize(player, pos1, pos2, tierStr);
+    }
+
+    private static int executeCreateWithSelection(ServerPlayerEntity player, String tierStr) {
+        BlockPos pos1 = SELECTION_POS1.get(player.getUuid());
+        if (pos1 == null) {
+            player.sendMessage(Text.literal("§c✗ No selection. Use §b/sp pos1 §7and §b/sp pos2§7, or use §b/sp claim"), false);
+            return 0;
+        }
+        BlockPos pos2 = player.getBlockPos();
+        return executeCreateFinalize(player, pos1, pos2, tierStr);
+    }
+
+    private static int executeCreateFinalize(ServerPlayerEntity player, BlockPos pos1, BlockPos pos2, String tierStr) {
+        PlotManager manager = PlotManager.getOrCreate((ServerWorld) player.getWorld());
+
+        // Calculate center and size from selection
+        int minX = Math.min(pos1.getX(), pos2.getX());
+        int maxX = Math.max(pos1.getX(), pos2.getX());
+        int minZ = Math.min(pos1.getZ(), pos2.getZ());
+        int maxZ = Math.max(pos1.getZ(), pos2.getZ());
+
+        int centerX = (minX + maxX) / 2;
+        int centerZ = (minZ + maxZ) / 2;
+        int centerY = (Math.min(pos1.getY(), pos2.getY()) + Math.max(pos1.getY(), pos2.getY())) / 2;
+        BlockPos center = new BlockPos(centerX, centerY, centerZ);
+
+        // Calculate required radius
+        int radiusX = maxX - minX + 1;
+        int radiusZ = maxZ - minZ + 1;
+        int requiredRadius = Math.max(radiusX, radiusZ);
+
+        // Find best fitting tier
+        PlotSize targetSize = parseTier(player, tierStr);
+        if (targetSize == null) return 0;
+
+        // Check if the selected size fits the tier
+        if (requiredRadius > targetSize.getRadius()) {
+            player.sendMessage(Text.literal("§c✗ Selection too large for " + targetSize.getDisplayName() + " tier (max: " + targetSize.getRadius() + "x" + targetSize.getRadius() + ")"), false);
+            player.sendMessage(Text.literal("§7Required: " + requiredRadius + "x" + requiredRadius), false);
+            return 0;
+        }
+
+        // Check if player can place here
+        if (!manager.canPlace(center, targetSize)) {
+            player.sendMessage(Text.literal("§c✗ Cannot place plot here — overlaps with another plot"), false);
+            return 0;
+        }
+
+        // Check structure collision
+        if (!canPlaceAtStructure(player, center, targetSize)) {
+            player.sendMessage(Text.literal("§c✗ Cannot place plot here — collides with a structure"), false);
+            return 0;
+        }
+
+        // Create the plot
+        long currentTick = player.getWorld().getTime();
+        PlotData plot = new PlotData(player.getUuid(), player.getName().getString(), center, targetSize, currentTick);
+        manager.addPlot(plot);
+
+        player.sendMessage(Text.literal("§a✓ Plot created: §e\"" + plot.getPlotName() + "\""), false);
+        player.sendMessage(Text.literal("§7Center: §f" + center.getX() + ", " + center.getY() + ", " + center.getZ()), false);
+        player.sendMessage(Text.literal("§7Size: §f" + targetSize.getRadius() + "x" + targetSize.getRadius() + " (" + targetSize.getDisplayName() + ")"), false);
+
+        // Place the plot block
+        ((ServerWorld) player.getWorld()).setBlockState(center, ModBlocks.fromTier(targetSize.tier).getDefaultState());
+
+        SELECTION_POS1.remove(player.getUuid());
+        return 1;
+    }
+
+    // ── /sp claim [tier] — claim at current position ──────────────────────────
+
+    private static int executeClaim(ServerCommandSource source, String tierStr) {
+        ServerPlayerEntity player = source.getPlayer();
+        if (player == null) return 0;
+
+        PlotManager manager = PlotManager.getOrCreate((ServerWorld) player.getWorld());
+        BlockPos center = player.getBlockPos();
+
+        // Check if already in a plot
+        PlotData existing = manager.getPlotAt(center);
+        if (existing != null) {
+            player.sendMessage(Text.literal("§c✗ Already inside plot §e\"" + existing.getPlotName() + "\""), false);
+            return 0;
+        }
+
+        // Default to bronze tier if not specified
+        PlotSize size = tierStr != null ? parseTier(player, tierStr) : PlotSize.BRONZE;
+        if (size == null) return 0;
+
+        // Check placement
+        if (!manager.canPlace(center, size)) {
+            player.sendMessage(Text.literal("§c✗ Cannot place plot here — too close to another plot"), false);
+            return 0;
+        }
+
+        if (!canPlaceAtStructure(player, center, size)) {
+            player.sendMessage(Text.literal("§c✗ Cannot place plot here — collides with a structure"), false);
+            return 0;
+        }
+
+        // Create the plot
+        long currentTick = player.getWorld().getTime();
+        PlotData plot = new PlotData(player.getUuid(), player.getName().getString(), center, size, currentTick);
+        manager.addPlot(plot);
+
+        player.sendMessage(Text.literal("§a✓ Plot claimed: §e\"" + plot.getPlotName() + "\""), false);
+        player.sendMessage(Text.literal("§7Center: §f" + center.getX() + ", " + center.getY() + ", " + center.getZ()), false);
+        player.sendMessage(Text.literal("§7Size: §f" + size.getRadius() + "x" + size.getRadius() + " (" + size.getDisplayName() + ")"), false);
+
+        // Place the plot block
+        ((ServerWorld) player.getWorld()).setBlockState(center, ModBlocks.fromTier(size.tier).getDefaultState());
+
+        return 1;
+    }
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
+
+    private static BlockPos parsePosition(String posStr, ServerPlayerEntity player) {
+        if (posStr.equalsIgnoreCase("here")) return player.getBlockPos();
+        if (posStr.equals("~ ~ ~")) return player.getBlockPos();
+
+        String[] parts = posStr.split(" ");
+        if (parts.length != 3) return null;
+
+        try {
+            int x = parseCoord(parts[0], player.getBlockPos().getX());
+            int y = parseCoord(parts[1], player.getBlockPos().getY());
+            int z = parseCoord(parts[2], player.getBlockPos().getZ());
+            return new BlockPos(x, y, z);
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    private static int parseCoord(String coord, int current) {
+        if (coord.equals("~")) return current;
+        if (coord.startsWith("~")) return current + Integer.parseInt(coord.substring(1));
+        return Integer.parseInt(coord);
+    }
+
+    private static PlotSize parseTier(ServerPlayerEntity player, String tierStr) {
+        if (tierStr == null) return PlotSize.BRONZE;
+
+        try {
+            int tier = Integer.parseInt(tierStr);
+            if (tier >= 0 && tier <= 4) return PlotSize.fromTier(tier);
+        } catch (NumberFormatException ignored) {}
+
+        try {
+            return PlotSize.valueOf(tierStr.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            player.sendMessage(Text.literal("§c✗ Unknown tier: §e" + tierStr), false);
+            player.sendMessage(Text.literal("§7Valid tiers: bronze(0), gold(1), emerald(2), diamond(3), netherite(4)"), false);
+            return null;
+        }
+    }
+
+    private static boolean canPlaceAtStructure(ServerPlayerEntity player, BlockPos center, PlotSize size) {
+        SecurePlotsConfig cfg = SecurePlotsConfig.INSTANCE;
+        if (cfg == null || cfg.blockedStructurePrefixes == null || cfg.blockedStructurePrefixes.isEmpty())
+            return true;
+
+        int half = size.getRadius() / 2;
+        // Simplified check — just check center chunk for structures
+        // Full implementation would scan the entire area
+        return true; // TODO: Implement structure check if needed
     }
 
     // ── /sp view ──────────────────────────────────────────────────────────────
@@ -1592,5 +2005,554 @@ public class SpCommand {
             net.minecraft.item.ItemStack s = player.getInventory().getStack(i);
             if (s.getItem() == item) { int take = Math.min(s.getCount(), remaining); s.decrement(take); remaining -= take; }
         }
+    }
+
+    // ── /sp areas — list available predefined areas ───────────────────────────
+
+    private static int executeAreasList(ServerCommandSource source) {
+        ServerPlayerEntity player = source.getPlayer();
+        if (player == null) return 0;
+
+        SecurePlotsConfig cfg = SecurePlotsConfig.INSTANCE;
+        if (cfg == null || cfg.predefinedAreas == null || cfg.predefinedAreas.isEmpty()) {
+            player.sendMessage(Text.literal("§c✗ No predefined areas available.").formatted(Formatting.RED), false);
+            return 0;
+        }
+
+        List<SecurePlotsConfig.PredefinedArea> available = new ArrayList<>();
+        for (SecurePlotsConfig.PredefinedArea area : cfg.predefinedAreas) {
+            if (area.available) available.add(area);
+        }
+
+        if (available.isEmpty()) {
+            player.sendMessage(Text.literal("§c✗ All predefined areas have been claimed.").formatted(Formatting.RED), false);
+            return 0;
+        }
+
+        player.sendMessage(Text.literal("§e§l=== Available Plot Areas ===").formatted(Formatting.BOLD), false);
+        for (SecurePlotsConfig.PredefinedArea area : available) {
+            PlotSize size = PlotSize.fromTier(area.tier);
+            String reqRank = area.requiredRank != null && !area.requiredRank.isEmpty() ? " §7[Rank: §c" + area.requiredRank + "§7]" : "";
+            player.sendMessage(Text.literal("  §a" + area.name + " §8- §f" + size.getDisplayName() + " §7(" + size.getRadius() + "x" + size.getRadius() + ")")
+                .append(Text.literal(reqRank)), false);
+            player.sendMessage(Text.literal("    §7Center: §f" + area.centerX + ", " + area.centerY + ", " + area.centerZ).formatted(Formatting.GRAY), false);
+        }
+        player.sendMessage(Text.literal("§eUse §b/sp claimarea <name> [tier] §eto claim an area.").formatted(Formatting.YELLOW), false);
+        return 1;
+    }
+
+    private static int executeAreasInfo(ServerCommandSource source, String areaName) {
+        ServerPlayerEntity player = source.getPlayer();
+        if (player == null) return 0;
+
+        SecurePlotsConfig cfg = SecurePlotsConfig.INSTANCE;
+        if (cfg == null || cfg.predefinedAreas == null) {
+            player.sendMessage(Text.literal("§c✗ No predefined areas configured.").formatted(Formatting.RED), false);
+            return 0;
+        }
+
+        SecurePlotsConfig.PredefinedArea target = null;
+        for (SecurePlotsConfig.PredefinedArea area : cfg.predefinedAreas) {
+            if (area.name.equalsIgnoreCase(areaName)) {
+                target = area;
+                break;
+            }
+        }
+
+        if (target == null) {
+            player.sendMessage(Text.literal("§c✗ Unknown area: §e" + areaName).formatted(Formatting.RED), false);
+            return 0;
+        }
+
+        PlotSize size = PlotSize.fromTier(target.tier);
+        player.sendMessage(Text.literal("§e§l=== " + target.name + " ===").formatted(Formatting.BOLD), false);
+        player.sendMessage(Text.literal("§7Tier: §f" + size.getDisplayName() + " §8(" + size.getRadius() + "x" + size.getRadius() + ")"), false);
+        player.sendMessage(Text.literal("§7Center: §f" + target.centerX + ", " + target.centerY + ", " + target.centerZ), false);
+        player.sendMessage(Text.literal("§7Status: " + (target.available ? "§aAvailable" : "§cClaimed")), false);
+        if (target.requiredRank != null && !target.requiredRank.isEmpty()) {
+            player.sendMessage(Text.literal("§7Required Rank: §c" + target.requiredRank), false);
+        }
+        if (target.oneTimeClaim) {
+            player.sendMessage(Text.literal("§7One-time claim: §eYes"), false);
+        }
+        return 1;
+    }
+
+    // ── /sp claimarea <name> [tier] — claim a predefined area ─────────────────
+
+    private static int executeClaimArea(ServerCommandSource source, String areaName, String tierStr) {
+        ServerPlayerEntity player = source.getPlayer();
+        if (player == null) return 0;
+
+        SecurePlotsConfig cfg = SecurePlotsConfig.INSTANCE;
+        if (cfg == null || cfg.predefinedAreas == null || cfg.predefinedAreas.isEmpty()) {
+            player.sendMessage(Text.literal("§c✗ No predefined areas configured.").formatted(Formatting.RED), false);
+            return 0;
+        }
+
+        SecurePlotsConfig.PredefinedArea target = null;
+        for (SecurePlotsConfig.PredefinedArea area : cfg.predefinedAreas) {
+            if (area.name.equalsIgnoreCase(areaName)) {
+                target = area;
+                break;
+            }
+        }
+
+        if (target == null) {
+            player.sendMessage(Text.literal("§c✗ Unknown area: §e" + areaName).formatted(Formatting.RED), false);
+            return 0;
+        }
+
+        if (!target.available) {
+            player.sendMessage(Text.literal("§c✗ This area has already been claimed.").formatted(Formatting.RED), false);
+            return 0;
+        }
+
+        // Check rank requirement
+        if (target.requiredRank != null && !target.requiredRank.isEmpty()) {
+            if (!player.getCommandTags().contains(target.requiredRank)) {
+                player.sendMessage(Text.literal("§c✗ You need the §e" + target.requiredRank + " §crank to claim this area.").formatted(Formatting.RED), false);
+                return 0;
+            }
+        }
+
+        PlotManager manager = PlotManager.getOrCreate((ServerWorld) player.getWorld());
+        BlockPos center = new BlockPos(target.centerX, target.centerY, target.centerZ);
+
+        // Check if already in a plot
+        PlotData existing = manager.getPlotAt(center);
+        if (existing != null) {
+            player.sendMessage(Text.literal("§c✗ This area is already a plot.").formatted(Formatting.RED), false);
+            return 0;
+        }
+
+        // Determine tier
+        PlotSize size = tierStr != null ? parseTier(player, tierStr) : PlotSize.fromTier(target.tier);
+        if (size == null) return 0;
+
+        // Use the predefined tier if no tier specified or if tier is higher than allowed
+        if (tierStr == null) {
+            size = PlotSize.fromTier(target.tier);
+        }
+
+        // Check placement
+        if (!manager.canPlace(center, size)) {
+            player.sendMessage(Text.literal("§c✗ Cannot place plot here — too close to another plot").formatted(Formatting.RED), false);
+            return 0;
+        }
+
+        // Create the plot
+        long currentTick = player.getWorld().getTime();
+        PlotData plot = new PlotData(player.getUuid(), player.getName().getString(), center, size, currentTick);
+        manager.addPlot(plot);
+
+        // Mark area as claimed if one-time claim
+        if (target.oneTimeClaim) {
+            target.available = false;
+            SecurePlotsConfig.save();
+        }
+
+        player.sendMessage(Text.literal("§a✓ Plot claimed: §e\"" + plot.getPlotName() + "\"").formatted(Formatting.GREEN), false);
+        player.sendMessage(Text.literal("§7Center: §f" + center.getX() + ", " + center.getY() + ", " + center.getZ()), false);
+        player.sendMessage(Text.literal("§7Size: §f" + size.getRadius() + "x" + size.getRadius() + " (" + size.getDisplayName() + ")"), false);
+
+        // Place the plot block
+        ((ServerWorld) player.getWorld()).setBlockState(center, ModBlocks.fromTier(size.tier).getDefaultState());
+
+        return 1;
+    }
+
+    // ── /sp admin savearea <name> [tier] [requiredRank] ───────────────────────
+
+    private static int executeAdminSaveArea(ServerCommandSource source, String areaName, String tierStr, String requiredRank) {
+        ServerPlayerEntity player = source.getPlayer();
+        if (player == null) return 0;
+
+        BlockPos pos1 = SELECTION_POS1.get(player.getUuid());
+        BlockPos pos2 = SELECTION_POS2.get(player.getUuid());
+
+        if (pos1 == null || pos2 == null) {
+            player.sendMessage(Text.literal("§c✗ Incomplete selection. Set both positions first.").formatted(Formatting.RED), false);
+            player.sendMessage(Text.literal("§7Use §b/sp pos1 §7and §b/sp pos2 §7to select the area.").formatted(Formatting.GRAY), false);
+            return 0;
+        }
+
+        // Calculate center
+        int minX = Math.min(pos1.getX(), pos2.getX());
+        int maxX = Math.max(pos1.getX(), pos2.getX());
+        int minZ = Math.min(pos1.getZ(), pos2.getZ());
+        int maxZ = Math.max(pos1.getZ(), pos2.getZ());
+
+        int centerX = (minX + maxX) / 2;
+        int centerZ = (minZ + maxZ) / 2;
+        int centerY = (Math.min(pos1.getY(), pos2.getY()) + Math.max(pos1.getY(), pos2.getY())) / 2;
+
+        // Calculate required radius
+        int radiusX = maxX - minX + 1;
+        int radiusZ = maxZ - minZ + 1;
+        int requiredRadius = Math.max(radiusX, radiusZ);
+
+        // Determine tier
+        PlotSize size = tierStr != null ? parseTier(player, tierStr) : null;
+        if (size == null) {
+            // Auto-detect best tier
+            size = getBestFittingTier(requiredRadius);
+            if (size == null) {
+                player.sendMessage(Text.literal("§c✗ Selection too large for any tier.").formatted(Formatting.RED), false);
+                return 0;
+            }
+        }
+
+        // Check if selection fits the tier
+        if (requiredRadius > size.getRadius()) {
+            player.sendMessage(Text.literal("§c✗ Selection too large for " + size.getDisplayName() + " tier (max: " + size.getRadius() + "x" + size.getRadius() + ")").formatted(Formatting.RED), false);
+            return 0;
+        }
+
+        SecurePlotsConfig cfg = SecurePlotsConfig.INSTANCE;
+        if (cfg == null) {
+            player.sendMessage(Text.literal("§c✗ Config not loaded.").formatted(Formatting.RED), false);
+            return 0;
+        }
+
+        // Check if name already exists
+        for (SecurePlotsConfig.PredefinedArea existing : cfg.predefinedAreas) {
+            if (existing.name.equalsIgnoreCase(areaName)) {
+                player.sendMessage(Text.literal("§c✗ An area named §e" + areaName + " §calready exists.").formatted(Formatting.RED), false);
+                return 0;
+            }
+        }
+
+        // Create new predefined area
+        SecurePlotsConfig.PredefinedArea newArea = new SecurePlotsConfig.PredefinedArea(
+            areaName, centerX, centerY, centerZ, size.tier
+        );
+        newArea.requiredRank = requiredRank != null && !requiredRank.isEmpty() ? requiredRank : "";
+        newArea.oneTimeClaim = true;
+        newArea.available = true;
+
+        cfg.predefinedAreas.add(newArea);
+        SecurePlotsConfig.save();
+
+        player.sendMessage(Text.literal("§a✓ Predefined area saved: §e" + areaName).formatted(Formatting.GREEN), false);
+        player.sendMessage(Text.literal("§7Center: §f" + centerX + ", " + centerY + ", " + centerZ), false);
+        player.sendMessage(Text.literal("§7Tier: §f" + size.getDisplayName() + " §8(" + size.getRadius() + "x" + size.getRadius() + ")"), false);
+        if (requiredRank != null && !requiredRank.isEmpty()) {
+            player.sendMessage(Text.literal("§7Required Rank: §c" + requiredRank), false);
+        }
+        player.sendMessage(Text.literal("§ePlayers can now claim this area with §b/sp claimarea " + areaName).formatted(Formatting.YELLOW), false);
+
+        // Clear selection
+        SELECTION_POS1.remove(player.getUuid());
+        SELECTION_POS2.remove(player.getUuid());
+
+        return 1;
+    }
+
+    private static PlotSize getBestFittingTier(int requiredRadius) {
+        for (int tier = 0; tier <= 4; tier++) {
+            PlotSize size = PlotSize.fromTier(tier);
+            if (size.getRadius() >= requiredRadius) {
+                return size;
+            }
+        }
+        return null;
+    }
+
+    private static CompletableFuture<Suggestions> suggestAreas(SuggestionsBuilder builder) {
+        SecurePlotsConfig cfg = SecurePlotsConfig.INSTANCE;
+        if (cfg != null && cfg.predefinedAreas != null) {
+            for (SecurePlotsConfig.PredefinedArea area : cfg.predefinedAreas) {
+                if (area.available) builder.suggest(area.name);
+            }
+        }
+        return builder.buildFuture();
+    }
+
+    // ── Selection particles ────────────────────────────────────────────────────
+
+    /** Spawns particles at a single block position. */
+    private static void spawnSelectionParticles(net.minecraft.world.World world, BlockPos pos, int count) {
+        if (world instanceof ServerWorld sw) {
+            for (int i = 0; i < count; i++) {
+                double x = pos.getX() + 0.5 + world.random.nextDouble() * 0.8 - 0.4;
+                double y = pos.getY() + 0.5 + world.random.nextDouble() * 0.8 - 0.4;
+                double z = pos.getZ() + 0.5 + world.random.nextDouble() * 0.8 - 0.4;
+                sw.spawnParticles(ParticleTypes.END_ROD, x, y, z, 1, 0, 0, 0, 0);
+            }
+        }
+    }
+
+    /** Spawns particle outline around the selected area. */
+    private static void spawnSelectionOutlineParticles(net.minecraft.world.World world, BlockPos pos1, BlockPos pos2) {
+        if (!(world instanceof ServerWorld sw)) return;
+
+        int minX = Math.min(pos1.getX(), pos2.getX());
+        int maxX = Math.max(pos1.getX(), pos2.getX());
+        int minY = Math.min(pos1.getY(), pos2.getY());
+        int maxY = Math.max(pos1.getY(), pos2.getY());
+        int minZ = Math.min(pos1.getZ(), pos2.getZ());
+        int maxZ = Math.max(pos1.getZ(), pos2.getZ());
+
+        // Top and bottom edges
+        for (int x = minX; x <= maxX; x++) {
+            for (int z = minZ; z <= maxZ; z++) {
+                spawnParticleAt(sw, x, minY, z);
+                spawnParticleAt(sw, x, maxY, z);
+            }
+        }
+
+        // Vertical edges at corners
+        for (int y = minY; y <= maxY; y++) {
+            spawnParticleAt(sw, minX, y, minZ);
+            spawnParticleAt(sw, minX, y, maxZ);
+            spawnParticleAt(sw, maxX, y, minZ);
+            spawnParticleAt(sw, maxX, y, maxZ);
+        }
+
+        // Horizontal edges along X
+        for (int x = minX; x <= maxX; x++) {
+            for (int y = minY; y <= maxY; y += Math.max(1, (maxY - minY) / 3)) {
+                spawnParticleAt(sw, x, y, minZ);
+                spawnParticleAt(sw, x, y, maxZ);
+            }
+        }
+
+        // Horizontal edges along Z
+        for (int z = minZ; z <= maxZ; z++) {
+            for (int y = minY; y <= maxY; y += Math.max(1, (maxY - minY) / 3)) {
+                spawnParticleAt(sw, minX, y, z);
+                spawnParticleAt(sw, maxX, y, z);
+            }
+        }
+    }
+
+    private static void spawnParticleAt(ServerWorld world, int x, int y, int z) {
+        world.spawnParticles(ParticleTypes.END_ROD, x + 0.5, y + 0.5, z + 0.5, 1, 0, 0, 0, 0);
+    }
+
+    // ══ Protected Area Commands ═══════════════════════════════════════════════
+
+    private static CompletableFuture<Suggestions> suggestProtectedAreas(SuggestionsBuilder builder) {
+        SecurePlotsConfig cfg = SecurePlotsConfig.INSTANCE;
+        if (cfg != null && cfg.protectedAreas != null) {
+            for (SecurePlotsConfig.ProtectedArea area : cfg.protectedAreas) {
+                builder.suggest(area.name);
+            }
+        }
+        return builder.buildFuture();
+    }
+
+    // /sp admin protectedarea create <name> — create from current selection
+    private static int executeCreateProtectedArea(ServerCommandSource source, String name) {
+        ServerPlayerEntity player = source.getPlayer();
+        if (player == null) return 0;
+
+        BlockPos pos1 = SELECTION_POS1.get(player.getUuid());
+        BlockPos pos2 = SELECTION_POS2.get(player.getUuid());
+
+        if (pos1 == null || pos2 == null) {
+            player.sendMessage(Text.literal("§c✗ Incomplete selection. Set both positions first.").formatted(Formatting.RED), false);
+            player.sendMessage(Text.literal("§7Use §b/sp pos1 §7and §b/sp pos2 §7to select the area.").formatted(Formatting.GRAY), false);
+            return 0;
+        }
+
+        SecurePlotsConfig cfg = SecurePlotsConfig.INSTANCE;
+        if (cfg == null) {
+            player.sendMessage(Text.literal("§c✗ Config not loaded.").formatted(Formatting.RED), false);
+            return 0;
+        }
+
+        // Check if name already exists
+        for (SecurePlotsConfig.ProtectedArea existing : cfg.protectedAreas) {
+            if (existing.name.equalsIgnoreCase(name)) {
+                player.sendMessage(Text.literal("§c✗ A protected area named §e" + name + " §calready exists.").formatted(Formatting.RED), false);
+                return 0;
+            }
+        }
+
+        // Create protected area from selection
+        SecurePlotsConfig.ProtectedArea area = new SecurePlotsConfig.ProtectedArea(
+            name,
+            pos1.getX(), pos1.getY(), pos1.getZ(),
+            pos2.getX(), pos2.getY(), pos2.getZ()
+        );
+        area.dimension = player.getWorld().getRegistryKey().getValue().toString();
+        area.allowedPlayers.add(player.getName().getString());
+
+        cfg.protectedAreas.add(area);
+        SecurePlotsConfig.save();
+
+        player.sendMessage(Text.literal("§a✓ Protected area created: §e" + name).formatted(Formatting.GREEN), false);
+        player.sendMessage(Text.literal("§7Bounds: §f(" + area.x1 + ", " + area.y1 + ", " + area.z1 + ") §7→ §f(" + area.x2 + ", " + area.y2 + ", " + area.z2 + ")").formatted(Formatting.GRAY), false);
+        player.sendMessage(Text.literal("§7Dimension: §f" + area.dimension).formatted(Formatting.GRAY), false);
+        player.sendMessage(Text.literal("§eYou are set as an owner. Use §b/sp admin protectedarea addowner §7to add more.").formatted(Formatting.YELLOW), false);
+
+        // Clear selection
+        SELECTION_POS1.remove(player.getUuid());
+        SELECTION_POS2.remove(player.getUuid());
+
+        return 1;
+    }
+
+    // /sp admin protectedarea remove <name>
+    private static int executeRemoveProtectedArea(ServerCommandSource source, String name) {
+        SecurePlotsConfig cfg = SecurePlotsConfig.INSTANCE;
+        if (cfg == null) return 0;
+
+        boolean removed = cfg.protectedAreas.removeIf(a -> a.name.equalsIgnoreCase(name));
+        if (removed) {
+            SecurePlotsConfig.save();
+            source.sendMessage(Text.literal("§a✓ Protected area removed: §e" + name).formatted(Formatting.GREEN), false);
+            return 1;
+        } else {
+            source.sendMessage(Text.literal("§c✗ Protected area not found: §e" + name).formatted(Formatting.RED), false);
+            return 0;
+        }
+    }
+
+    // /sp admin protectedarea list
+    private static int executeListProtectedAreas(ServerCommandSource source) {
+        SecurePlotsConfig cfg = SecurePlotsConfig.INSTANCE;
+        ServerPlayerEntity player = source.getPlayer();
+        if (cfg == null || player == null) return 0;
+
+        if (cfg.protectedAreas.isEmpty()) {
+            player.sendMessage(Text.literal("§7No protected areas defined.").formatted(Formatting.GRAY), false);
+            return 1;
+        }
+
+        player.sendMessage(Text.literal("§e§l=== Protected Areas ===").formatted(Formatting.BOLD), false);
+        for (SecurePlotsConfig.ProtectedArea area : cfg.protectedAreas) {
+            String status = area.enabled ? "§a[ON]" : "§c[OFF]";
+            player.sendMessage(Text.literal("  " + status + " §f" + area.name +
+                " §7(" + area.dimension + ") §8[" + area.allowedPlayers.size() + " owners]").formatted(Formatting.GRAY), false);
+        }
+        player.sendMessage(Text.literal("§7Use §b/sp admin protectedarea info <name> §7for details.").formatted(Formatting.GRAY), false);
+        return 1;
+    }
+
+    // /sp admin protectedarea info <name>
+    private static int executeInfoProtectedArea(ServerCommandSource source, String name) {
+        SecurePlotsConfig cfg = SecurePlotsConfig.INSTANCE;
+        ServerPlayerEntity player = source.getPlayer();
+        if (cfg == null || player == null) return 0;
+
+        SecurePlotsConfig.ProtectedArea area = null;
+        for (SecurePlotsConfig.ProtectedArea a : cfg.protectedAreas) {
+            if (a.name.equalsIgnoreCase(name)) {
+                area = a;
+                break;
+            }
+        }
+
+        if (area == null) {
+            player.sendMessage(Text.literal("§c✗ Protected area not found: §e" + name).formatted(Formatting.RED), false);
+            return 0;
+        }
+
+        player.sendMessage(Text.literal("§e§l=== " + area.name + " ===").formatted(Formatting.BOLD), false);
+        player.sendMessage(Text.literal("§7Status: " + (area.enabled ? "§aActive" : "§cDisabled")).formatted(Formatting.GRAY), false);
+        player.sendMessage(Text.literal("§7Dimension: §f" + area.dimension).formatted(Formatting.GRAY), false);
+        player.sendMessage(Text.literal("§7Bounds: §f(" + area.x1 + ", " + area.y1 + ", " + area.z1 + ")").formatted(Formatting.GRAY), false);
+        player.sendMessage(Text.literal("§7      §f(" + area.x2 + ", " + area.y2 + ", " + area.z2 + ")").formatted(Formatting.GRAY), false);
+        player.sendMessage(Text.literal("§7Protections:").formatted(Formatting.GRAY), false);
+        player.sendMessage(Text.literal("  §8• §7Break: " + (area.protectBreak ? "§aYes" : "§cNo")).formatted(Formatting.GRAY), false);
+        player.sendMessage(Text.literal("  §8• §7Place: " + (area.protectPlace ? "§aYes" : "§cNo")).formatted(Formatting.GRAY), false);
+        player.sendMessage(Text.literal("  §8• §7Interact: " + (area.protectInteract ? "§aYes" : "§cNo")).formatted(Formatting.GRAY), false);
+        player.sendMessage(Text.literal("  §8• §7Containers: " + (area.protectContainers ? "§aYes" : "§cNo")).formatted(Formatting.GRAY), false);
+        player.sendMessage(Text.literal("  §8• §7Require Auth: " + (area.requireAuth ? "§aYes" : "§cNo")).formatted(Formatting.GRAY), false);
+        player.sendMessage(Text.literal("§7Owners (" + area.allowedPlayers.size() + "):").formatted(Formatting.GRAY), false);
+        for (String owner : area.allowedPlayers) {
+            player.sendMessage(Text.literal("  §8• §f" + owner).formatted(Formatting.GRAY), false);
+        }
+        return 1;
+    }
+
+    // /sp admin protectedarea toggle <name>
+    private static int executeToggleProtectedArea(ServerCommandSource source, String name) {
+        SecurePlotsConfig cfg = SecurePlotsConfig.INSTANCE;
+        if (cfg == null) return 0;
+
+        for (SecurePlotsConfig.ProtectedArea area : cfg.protectedAreas) {
+            if (area.name.equalsIgnoreCase(name)) {
+                area.enabled = !area.enabled;
+                SecurePlotsConfig.save();
+                source.sendMessage(Text.literal("§a✓ Protected area '" + name + "' " + (area.enabled ? "enabled" : "disabled")).formatted(Formatting.GREEN), false);
+                return 1;
+            }
+        }
+
+        source.sendMessage(Text.literal("§c✗ Protected area not found: §e" + name).formatted(Formatting.RED), false);
+        return 0;
+    }
+
+    // /sp admin protectedarea addowner <area> <player>
+    private static int executeAddProtectedAreaOwner(ServerCommandSource source, String areaName, String playerName) {
+        SecurePlotsConfig cfg = SecurePlotsConfig.INSTANCE;
+        if (cfg == null) return 0;
+
+        for (SecurePlotsConfig.ProtectedArea area : cfg.protectedAreas) {
+            if (area.name.equalsIgnoreCase(areaName)) {
+                if (area.allowedPlayers.stream().anyMatch(p -> p.equalsIgnoreCase(playerName))) {
+                    source.sendMessage(Text.literal("§c✗ §f" + playerName + " §cis already an owner.").formatted(Formatting.RED), false);
+                    return 0;
+                }
+                area.allowedPlayers.add(playerName);
+                SecurePlotsConfig.save();
+                source.sendMessage(Text.literal("§a✓ Added §f" + playerName + " §aas owner of §e" + areaName).formatted(Formatting.GREEN), false);
+                return 1;
+            }
+        }
+
+        source.sendMessage(Text.literal("§c✗ Protected area not found: §e" + areaName).formatted(Formatting.RED), false);
+        return 0;
+    }
+
+    // /sp admin protectedarea removeowner <area> <player>
+    private static int executeRemoveProtectedAreaOwner(ServerCommandSource source, String areaName, String playerName) {
+        SecurePlotsConfig cfg = SecurePlotsConfig.INSTANCE;
+        if (cfg == null) return 0;
+
+        for (SecurePlotsConfig.ProtectedArea area : cfg.protectedAreas) {
+            if (area.name.equalsIgnoreCase(areaName)) {
+                boolean removed = area.allowedPlayers.removeIf(p -> p.equalsIgnoreCase(playerName));
+                if (removed) {
+                    SecurePlotsConfig.save();
+                    source.sendMessage(Text.literal("§a✓ Removed §f" + playerName + " §afrom §e" + areaName).formatted(Formatting.GREEN), false);
+                    return 1;
+                } else {
+                    source.sendMessage(Text.literal("§c✗ §f" + playerName + " §cis not an owner.").formatted(Formatting.RED), false);
+                    return 0;
+                }
+            }
+        }
+
+        source.sendMessage(Text.literal("§c✗ Protected area not found: §e" + areaName).formatted(Formatting.RED), false);
+        return 0;
+    }
+
+    // /sp admin protectedarea setflags <name> <break> <place> <interact>
+    private static int executeSetProtectedAreaFlags(ServerCommandSource source, String name, boolean protectBreak, boolean protectPlace, boolean protectInteract) {
+        SecurePlotsConfig cfg = SecurePlotsConfig.INSTANCE;
+        if (cfg == null) return 0;
+
+        for (SecurePlotsConfig.ProtectedArea area : cfg.protectedAreas) {
+            if (area.name.equalsIgnoreCase(name)) {
+                area.protectBreak = protectBreak;
+                area.protectPlace = protectPlace;
+                area.protectInteract = protectInteract;
+                area.protectContainers = protectInteract; // Containers follow interact by default
+                SecurePlotsConfig.save();
+                source.sendMessage(Text.literal("§a✓ Updated protections for §e" + name).formatted(Formatting.GREEN), false);
+                source.sendMessage(Text.literal("§7Break: " + (protectBreak ? "§aYes" : "§cNo") +
+                    " §8| Place: " + (protectPlace ? "§aYes" : "§cNo") +
+                    " §8| Interact: " + (protectInteract ? "§aYes" : "§cNo")).formatted(Formatting.GRAY), false);
+                return 1;
+            }
+        }
+
+        source.sendMessage(Text.literal("§c✗ Protected area not found: §e" + name).formatted(Formatting.RED), false);
+        return 0;
     }
 }

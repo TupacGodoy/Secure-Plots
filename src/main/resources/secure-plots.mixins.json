@@ -3,7 +3,9 @@
   "package": "com.zhilius.secureplots.mixin",
   "compatibilityLevel": "JAVA_21",
   "mixins": [
-    "UpdateSignMixin"
+    "UpdateSignMixin",
+    "ServerPlayerInteractionMixin",
+    "GenericContainerScreenHandlerMixin"
   ],
   "injectors": {
     "defaultRequire": 1

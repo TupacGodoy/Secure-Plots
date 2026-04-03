@@ -21,6 +21,7 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.util.math.BlockPos;
 
 import java.io.*;
 import java.util.*;
@@ -91,6 +92,84 @@ public class SecurePlotsConfig {
 
     /** Enable inactivity expiry system. */
     public boolean enableInactivityExpiry = false;
+
+    /** Enable predefined plot areas that can be claimed. */
+    public boolean enablePredefinedAreas = false;
+
+    /** Enable protected areas system. */
+    public boolean enableProtectedAreas = true;
+
+    /** Predefined plot areas that can be claimed by players. */
+    public List<PredefinedArea> predefinedAreas = new ArrayList<>();
+
+    public static class PredefinedArea {
+        /** Unique name for this area. */
+        public String name = "";
+        /** Center position of the area. */
+        public int centerX, centerY, centerZ;
+        /** Size tier (0-4). */
+        public int tier = 0;
+        /** If true, only players with the specified rank tag can claim. Empty = anyone. */
+        public String requiredRank = "";
+        /** If true, the area can only be claimed once. */
+        public boolean oneTimeClaim = true;
+        /** If true, the area is currently available for claiming. */
+        public boolean available = true;
+
+        public PredefinedArea() {}
+        public PredefinedArea(String name, int cx, int cy, int cz, int tier) {
+            this.name = name; this.centerX = cx; this.centerY = cy; this.centerZ = cz; this.tier = tier;
+        }
+    }
+
+    // ── Protected Areas ───────────────────────────────────────────────────────
+    /**
+     * Protected areas where unauthenticated players cannot interact.
+     * These are global protection zones independent of player-owned plots.
+     */
+    public List<ProtectedArea> protectedAreas = new ArrayList<>();
+
+    public static class ProtectedArea {
+        /** Unique name for this protected area. */
+        public String name = "";
+        /** First corner position (min bounds). */
+        public int x1, y1, z1;
+        /** Second corner position (max bounds). */
+        public int x2, y2, z2;
+        /** If true, players must be authenticated to enter. */
+        public boolean requireAuth = false;
+        /** If true, prevents block breaking by unauthorized players. */
+        public boolean protectBreak = true;
+        /** If true, prevents block placing by unauthorized players. */
+        public boolean protectPlace = true;
+        /** If true, prevents interaction by unauthorized players. */
+        public boolean protectInteract = true;
+        /** If true, prevents container access by unauthorized players. */
+        public boolean protectContainers = true;
+        /** List of player names who bypass this protection (owners). */
+        public List<String> allowedPlayers = new ArrayList<>();
+        /** If true, the protection is currently active. */
+        public boolean enabled = true;
+        /** Dimension this area belongs to (e.g., "minecraft:overworld"). */
+        public String dimension = "minecraft:overworld";
+
+        public ProtectedArea() {}
+
+        public ProtectedArea(String name, int x1, int y1, int z1, int x2, int y2, int z2) {
+            this.name = name;
+            this.x1 = Math.min(x1, x2); this.y1 = Math.min(y1, y2); this.z1 = Math.min(z1, z2);
+            this.x2 = Math.max(x1, x2); this.y2 = Math.max(y1, y2); this.z2 = Math.max(z1, z2);
+        }
+
+        /** Checks if a position is inside this protected area. */
+        public boolean contains(int x, int y, int z) {
+            return x >= x1 && x <= x2 && y >= y1 && y <= y2 && z >= z1 && z <= z2;
+        }
+
+        public boolean contains(BlockPos pos) {
+            return contains(pos.getX(), pos.getY(), pos.getZ());
+        }
+    }
 
     /** If true, plot blocks are unbreakable by non-owners (ignores hardness). */
     public boolean plotBlocksUnbreakable = true;
@@ -439,6 +518,8 @@ public class SecurePlotsConfig {
         if (c.checkInterval <= 0)                                   c.checkInterval = 10;
         if (c.ambientInterval <= 0)                                 c.ambientInterval = 20;
         if (c.craftingRecipes == null || c.craftingRecipes.isEmpty()) c.craftingRecipes = createDefault().craftingRecipes;
+        if (c.protectedAreas == null)                               c.protectedAreas = new ArrayList<>();
+        if (c.predefinedAreas == null)                              c.predefinedAreas = new ArrayList<>();
     }
 
     // ── Default config ────────────────────────────────────────────────────────
