@@ -5,7 +5,10 @@
   "mixins": [
     "UpdateSignMixin",
     "ServerPlayerInteractionMixin",
-    "GenericContainerScreenHandlerMixin"
+    "GenericContainerScreenHandlerMixin",
+    "ExplosionMixin",
+    "EntityProtectionMixin",
+    "LiquidFlowMixin"
   ],
   "injectors": {
     "defaultRequire": 1

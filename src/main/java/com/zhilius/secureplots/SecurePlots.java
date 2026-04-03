@@ -21,6 +21,7 @@ import com.zhilius.secureplots.network.ModPackets;
 import com.zhilius.secureplots.plot.PlotAreaTracker;
 import com.zhilius.secureplots.plot.PlotData.Permission;
 import com.zhilius.secureplots.plot.PlotManager;
+import com.zhilius.secureplots.plot.ProtectedAreaTracker;
 import com.zhilius.secureplots.recipe.DynamicRecipeManager;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.event.player.AttackBlockCallback;
@@ -71,6 +72,7 @@ public class SecurePlots implements ModInitializer {
         PlotHologram.registerTicker();
         DynamicRecipeManager.register();
         PlotAreaTracker.register();
+        ProtectedAreaTracker.register();
 
         registerProtectionEvents();
         registerBlueprintOffhand();
@@ -102,6 +104,7 @@ public class SecurePlots implements ModInitializer {
             var world  = server.getOverworld();
             PlotManager.getOrCreate(world).updateOwnerSeen(player.getUuid(), world.getTime());
             PlotAreaTracker.onPlayerLeave(player);
+            ProtectedAreaTracker.onPlayerDisconnect(player.getUuid());
         });
     }
 

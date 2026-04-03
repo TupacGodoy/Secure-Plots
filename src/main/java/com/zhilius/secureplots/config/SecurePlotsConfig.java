@@ -146,10 +146,24 @@ public class SecurePlotsConfig {
         public boolean protectInteract = true;
         /** If true, prevents container access by unauthorized players. */
         public boolean protectContainers = true;
+        /** If true, prevents entity damage/modification in this area. */
+        public boolean protectEntities = false;
+        /** If true, prevents explosions in this area. */
+        public boolean protectExplosions = false;
+        /** If true, prevents liquid flow/placement in this area. */
+        public boolean protectLiquids = false;
         /** List of player names who bypass this protection (owners). */
         public List<String> allowedPlayers = new ArrayList<>();
+        /** List of permission groups (LuckPerms) that bypass this protection. */
+        public List<String> allowedGroups = new ArrayList<>();
         /** If true, the protection is currently active. */
         public boolean enabled = true;
+        /** If true, show enter/exit notifications. */
+        public boolean showNotifications = false;
+        /** If true, this area expires at the specified time. */
+        public boolean isTemporary = false;
+        /** Unix timestamp when this area expires (0 = never). */
+        public long expiryTime = 0;
         /** Dimension this area belongs to (e.g., "minecraft:overworld"). */
         public String dimension = "minecraft:overworld";
 
